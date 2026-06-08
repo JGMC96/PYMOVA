@@ -128,25 +128,34 @@ export function useMarketingPosts(): UseMarketingPostsReturn {
     }
     let cancelled = false;
     (async () => {
-      const { data, error: err } = await supabase
+      const { data: members, error: err } = await supabase
         .from('business_members')
-        .select('user_id, profiles(full_name)')
+        .select('user_id')
         .eq('business_id', activeBusinessId)
         .eq('is_active', true);
 
       if (cancelled) return;
-      if (err) {
-        console.error('Error fetching team members:', err);
+      if (err || !members?.length) {
+        if (err) console.error('Error fetching team members:', err);
         setTeamMembers([]);
         return;
       }
 
-      const members: TeamMember[] = (data || []).map((m) => ({
-        user_id: m.user_id as string,
-        full_name:
-          (m as { profiles: { full_name: string | null } | null }).profiles?.full_name ?? null,
-      }));
-      setTeamMembers(members);
+      const userIds = members.map((m) => m.user_id as string);
+      const { data: profiles, error: pErr } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', userIds);
+
+      if (cancelled) return;
+      if (pErr) {
+        console.error('Error fetching profiles:', pErr);
+        setTeamMembers(userIds.map((id) => ({ user_id: id, full_name: null })));
+        return;
+      }
+
+      const byId = new Map((profiles || []).map((p) => [p.id as string, p.full_name as string | null]));
+      setTeamMembers(userIds.map((id) => ({ user_id: id, full_name: byId.get(id) ?? null })));
     })();
     return () => {
       cancelled = true;
