@@ -6,7 +6,30 @@ export type SubscriptionStatus = 'active' | 'cancelled' | 'past_due' | 'trialing
 export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled';
 
 // Module keys for type safety (maps to modules.key in DB)
-export type ModuleKey = 'clients' | 'products' | 'invoicing' | 'payments' | 'ai_advisor' | 'reports' | 'retail';
+export type ModuleKey = 'clients' | 'products' | 'invoicing' | 'payments' | 'ai_advisor' | 'reports' | 'retail' | 'marketing';
+
+// Marketing calendar
+export type MarketingContentType = 'story' | 'post' | 'reel';
+export type MarketingChannel = 'instagram' | 'facebook';
+export type MarketingStatus = 'idea' | 'draft' | 'scheduled' | 'published' | 'cancelled';
+
+export interface MarketingPost {
+  id: string;
+  business_id: string;
+  title: string;
+  copy: string | null;
+  content_type: MarketingContentType;
+  channels: MarketingChannel[];
+  status: MarketingStatus;
+  scheduled_at: string | null;
+  assignee_id: string | null;
+  reference_url: string | null;
+  hashtags: string | null;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
 
 // Plan keys for type safety (maps to plans.key in DB)
 export type PlanKey = 'free' | 'trial' | 'pro' | 'business';

@@ -376,6 +376,75 @@ export type Database = {
           },
         ]
       }
+      marketing_posts: {
+        Row: {
+          assignee_id: string | null
+          business_id: string
+          channels: string[]
+          content_type: string
+          copy: string | null
+          created_at: string
+          created_by: string | null
+          hashtags: string | null
+          id: string
+          notes: string | null
+          reference_url: string | null
+          scheduled_at: string | null
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          assignee_id?: string | null
+          business_id: string
+          channels?: string[]
+          content_type: string
+          copy?: string | null
+          created_at?: string
+          created_by?: string | null
+          hashtags?: string | null
+          id?: string
+          notes?: string | null
+          reference_url?: string | null
+          scheduled_at?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          assignee_id?: string | null
+          business_id?: string
+          channels?: string[]
+          content_type?: string
+          copy?: string | null
+          created_at?: string
+          created_by?: string | null
+          hashtags?: string | null
+          id?: string
+          notes?: string | null
+          reference_url?: string | null
+          scheduled_at?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_posts_assignee_id_fkey"
+            columns: ["assignee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_posts_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       modules: {
         Row: {
           created_at: string
