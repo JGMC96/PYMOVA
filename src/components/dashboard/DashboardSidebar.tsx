@@ -17,6 +17,7 @@ import {
   ShieldCheck,
   LucideIcon,
 } from "lucide-react";
+import { PymovaLogo } from "@/components/landing/PymovaLogo";
 import { cn } from "@/lib/utils";
 import { useBusiness } from "@/contexts/BusinessContext";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
