@@ -12,12 +12,12 @@ import {
   Clock,
   Settings,
   ChevronLeft,
-  Zap,
   Building2,
   Lock,
   ShieldCheck,
   LucideIcon,
 } from "lucide-react";
+import { PymovaLogo } from "@/components/landing/PymovaLogo";
 import { cn } from "@/lib/utils";
 import { useBusiness } from "@/contexts/BusinessContext";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
@@ -63,8 +63,8 @@ export const DashboardSidebar = ({ isOpen, onToggle }: DashboardSidebarProps) =>
       {/* Logo section */}
       <div className="p-4 border-b border-sidebar-border">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-primary flex items-center justify-center flex-shrink-0">
-            <Zap className="w-5 h-5 text-primary-foreground" />
+          <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center flex-shrink-0">
+            <PymovaLogo className="w-6 h-6" />
           </div>
           {isOpen && (
             <motion.span
