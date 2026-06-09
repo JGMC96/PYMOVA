@@ -165,17 +165,43 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user, activeBusinessId, fetchUserBusinesses]);
 
-  // Sign out
+  // Sign out — revoca sesión global + limpia storage + cierra sesión Google
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut();
+    // 1. Revocar sesión globalmente (invalida refresh tokens en el servidor)
+    try {
+      await supabase.auth.signOut({ scope: 'global' });
+    } catch (err) {
+      console.warn('signOut error:', err);
+    }
+
+    // 2. Reset estado local
     setUser(null);
     setActiveBusinessId(null);
     setActiveBusinessState(null);
     setUserBusinesses([]);
     setEnabledModules([]);
-    localStorage.removeItem(ACTIVE_BUSINESS_KEY);
+
+    // 3. Borrar TODO rastro de sesión (incluye claves sb-* de Supabase)
+    try {
+      localStorage.removeItem(ACTIVE_BUSINESS_KEY);
+      Object.keys(localStorage)
+        .filter((k) => k.startsWith('sb-') || k.includes('supabase'))
+        .forEach((k) => localStorage.removeItem(k));
+      Object.keys(sessionStorage)
+        .filter((k) => k.startsWith('sb-') || k.includes('supabase'))
+        .forEach((k) => sessionStorage.removeItem(k));
+    } catch {}
+
+    // 4. Revocar cookie de Google en background para evitar auto-login
+    try {
+      const img = new Image();
+      img.referrerPolicy = 'no-referrer';
+      img.src = 'https://accounts.google.com/Logout';
+    } catch {}
+
     navigate('/');
   }, [navigate]);
+
 
   // Initialize auth listener
   useEffect(() => {
