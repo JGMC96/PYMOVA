@@ -1,10 +1,10 @@
-# TotalBusiness
+# Pymova
 
 > Sistema operativo inteligente para pymes: clientes, facturación, pagos, RRHH y marketing en una sola plataforma.
 
-TotalBusiness es una plataforma SaaS multi-tenant que unifica la gestión de pequeñas y medianas empresas. Incluye CRM, facturación, cobros, punto de venta (retail), recursos humanos (fichaje, vacaciones, permisos, turnos) y planificación de marketing.
+Pymova es una plataforma SaaS multi-tenant que unifica la gestión de pequeñas y medianas empresas. Incluye CRM, facturación, cobros, punto de venta (retail), recursos humanos (fichaje, vacaciones, permisos, turnos) y planificación de marketing.
 
 ## Páginas
 
-- [Inicio](/): Descripción general, características y precios de TotalBusiness.
+- [Inicio](/): Descripción general, características y precios de Pymova.
 - [Acceder o crear cuenta](/auth): Iniciar sesión o registrarse en la plataforma.

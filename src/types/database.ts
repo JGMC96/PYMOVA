@@ -1,4 +1,4 @@
-// Database types for TotalBusiness AI
+// Database types for Pymova AI
 // These types mirror the Supabase schema
 
 export type AppRole = 'owner' | 'admin' | 'staff';

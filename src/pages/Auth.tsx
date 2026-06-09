@@ -161,7 +161,7 @@ const Auth = () => {
               <Zap className="w-5 h-5 text-primary-foreground" />
             </div>
             <span className="font-display font-bold text-xl text-foreground">
-              TotalBusiness
+              Pymova
             </span>
           </div>
           <h1 className="text-2xl font-display font-bold text-foreground mb-6">

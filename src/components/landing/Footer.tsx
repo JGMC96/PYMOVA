@@ -13,7 +13,7 @@ export const Footer = () => {
                 <Zap className="w-5 h-5 text-primary-foreground" />
               </div>
               <span className="font-display font-bold text-xl">
-                TotalBusiness
+                Pymova
               </span>
             </Link>
             <p className="text-sm text-sidebar-foreground/60 leading-relaxed">
@@ -57,7 +57,7 @@ export const Footer = () => {
 
         <div className="pt-8 border-t border-sidebar-border flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-sm text-sidebar-foreground/60">
-            © {new Date().getFullYear()} TotalBusiness AI. Todos los derechos reservados.
+            © {new Date().getFullYear()} Pymova AI. Todos los derechos reservados.
           </p>
           <div className="flex items-center gap-6">
             <a href="#" className="text-sm text-sidebar-foreground/60 hover:text-sidebar-foreground transition-colors">
