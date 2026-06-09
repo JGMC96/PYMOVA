@@ -92,13 +92,41 @@ export const DashboardHeader = ({ user, onLogout, onMenuToggle }: DashboardHeade
               Configuración
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={onLogout} className="text-destructive">
-              <LogOut className="w-4 h-4 mr-2" />
-              Cerrar sesión
+            <DropdownMenuItem
+              onClick={handleLogout}
+              disabled={isLoggingOut}
+              className="text-destructive"
+            >
+              {isLoggingOut ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <LogOut className="w-4 h-4 mr-2" />
+              )}
+              {isLoggingOut ? "Cerrando sesión..." : "Cerrar sesión"}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      {/* Modal bloqueante durante el cierre de sesión */}
+      <Dialog open={isLoggingOut}>
+        <DialogContent
+          className="sm:max-w-sm"
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
+          <div className="flex flex-col items-center gap-4 py-6 text-center">
+            <Loader2 className="w-10 h-10 animate-spin text-primary" />
+            <div>
+              <p className="font-semibold text-foreground">Cerrando sesión...</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Revocando acceso y limpiando datos locales.
+              </p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </header>
   );
 };
+
