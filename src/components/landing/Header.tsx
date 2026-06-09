@@ -53,6 +53,8 @@ export const Header = () => {
           {/* Mobile menu button */}
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
+            aria-label={isMenuOpen ? "Cerrar menú" : "Abrir menú"}
+            aria-expanded={isMenuOpen}
             className="md:hidden p-2 rounded-lg hover:bg-muted transition-colors"
           >
             {isMenuOpen ? (
