@@ -6,7 +6,97 @@ export type SubscriptionStatus = 'active' | 'cancelled' | 'past_due' | 'trialing
 export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled';
 
 // Module keys for type safety (maps to modules.key in DB)
-export type ModuleKey = 'clients' | 'products' | 'invoicing' | 'payments' | 'ai_advisor' | 'reports' | 'retail' | 'marketing';
+export type ModuleKey = 'clients' | 'products' | 'invoicing' | 'payments' | 'ai_advisor' | 'reports' | 'retail' | 'marketing' | 'hr';
+
+// HR module
+export type AbsenceType = 'vacation' | 'sick_leave' | 'personal' | 'other';
+export type AbsenceStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
+export type TimeEntryType = 'clock_in' | 'break_start' | 'break_end' | 'clock_out';
+export type WorkSessionStatus = 'open' | 'closed';
+
+export interface HrEmployee {
+  id: string;
+  business_id: string;
+  user_id: string;
+  hire_date: string | null;
+  weekly_hours: number;
+  annual_vacation_days: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface HrTimeEntry {
+  id: string;
+  business_id: string;
+  employee_id: string;
+  entry_type: TimeEntryType;
+  occurred_at: string;
+  latitude: number | null;
+  longitude: number | null;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface HrWorkSession {
+  id: string;
+  business_id: string;
+  employee_id: string;
+  session_date: string;
+  clock_in_at: string;
+  clock_out_at: string | null;
+  break_seconds: number;
+  worked_seconds: number;
+  status: WorkSessionStatus;
+  last_break_start: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface HrAbsence {
+  id: string;
+  business_id: string;
+  employee_id: string;
+  absence_type: AbsenceType;
+  custom_type_label: string | null;
+  status: AbsenceStatus;
+  start_date: string;
+  end_date: string;
+  days_count: number;
+  reason: string | null;
+  reviewer_id: string | null;
+  reviewed_at: string | null;
+  review_notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface HrSchedule {
+  id: string;
+  business_id: string;
+  employee_id: string;
+  shift_date: string;
+  start_time: string;
+  end_time: string;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface HrDashboard {
+  my_employee_id: string | null;
+  my_session_status: 'none' | 'open' | 'closed';
+  my_session_clock_in: string | null;
+  my_last_entry_type: TimeEntryType | null;
+  pending_absences: number;
+  team_on_vacation_today: number;
+  vacation_days_total: number;
+  vacation_days_used: number;
+  vacation_days_pending: number;
+}
 
 // Marketing calendar
 export type MarketingContentType = 'story' | 'post' | 'reel';

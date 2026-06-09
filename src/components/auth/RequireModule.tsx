@@ -20,6 +20,7 @@ const MODULE_NAMES: Record<ModuleKey, string> = {
   reports: 'Reportes',
   retail: 'Retail',
   marketing: 'Marketing',
+  hr: 'Recursos Humanos',
 };
 
 export function RequireModule({ module, children, fallback }: RequireModuleProps) {

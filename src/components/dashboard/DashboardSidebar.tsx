@@ -9,6 +9,7 @@ import {
   ShoppingCart,
   MessageSquare,
   CalendarDays,
+  Clock,
   Settings,
   ChevronLeft,
   Zap,
@@ -43,6 +44,7 @@ const menuItems: MenuItem[] = [
   { icon: CreditCard, label: "Pagos", path: "/dashboard/payments", moduleKey: "payments" },
   { icon: ShoppingCart, label: "Retail", path: "/dashboard/retail", moduleKey: "retail" },
   { icon: CalendarDays, label: "Marketing", path: "/dashboard/marketing", moduleKey: "marketing" },
+  { icon: Clock, label: "RRHH", path: "/dashboard/hr", moduleKey: "hr" },
   { icon: MessageSquare, label: "Asesor IA", path: "/dashboard/ai", moduleKey: "ai_advisor" },
 ];
 
