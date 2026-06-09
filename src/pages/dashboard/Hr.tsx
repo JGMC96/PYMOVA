@@ -15,6 +15,7 @@ import { EmployeesTable } from '@/components/hr/EmployeesTable';
 import { TeamAbsenceCalendar } from '@/components/hr/TeamAbsenceCalendar';
 import { ScheduleCalendar } from '@/components/hr/ScheduleCalendar';
 import { MonthlyReport } from '@/components/hr/MonthlyReport';
+import { MonthlyPermissionsSummary } from '@/components/hr/MonthlyPermissionsSummary';
 
 function HrInner() {
   const { userRole } = useBusiness();
