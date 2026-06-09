@@ -265,6 +265,290 @@ export type Database = {
           },
         ]
       }
+      hr_absences: {
+        Row: {
+          absence_type: Database["public"]["Enums"]["absence_type"]
+          business_id: string
+          created_at: string
+          created_by: string | null
+          custom_type_label: string | null
+          days_count: number
+          employee_id: string
+          end_date: string
+          id: string
+          reason: string | null
+          review_notes: string | null
+          reviewed_at: string | null
+          reviewer_id: string | null
+          start_date: string
+          status: Database["public"]["Enums"]["absence_status"]
+          updated_at: string
+        }
+        Insert: {
+          absence_type: Database["public"]["Enums"]["absence_type"]
+          business_id: string
+          created_at?: string
+          created_by?: string | null
+          custom_type_label?: string | null
+          days_count: number
+          employee_id: string
+          end_date: string
+          id?: string
+          reason?: string | null
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewer_id?: string | null
+          start_date: string
+          status?: Database["public"]["Enums"]["absence_status"]
+          updated_at?: string
+        }
+        Update: {
+          absence_type?: Database["public"]["Enums"]["absence_type"]
+          business_id?: string
+          created_at?: string
+          created_by?: string | null
+          custom_type_label?: string | null
+          days_count?: number
+          employee_id?: string
+          end_date?: string
+          id?: string
+          reason?: string | null
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewer_id?: string | null
+          start_date?: string
+          status?: Database["public"]["Enums"]["absence_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_absences_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_absences_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "hr_employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hr_employees: {
+        Row: {
+          annual_vacation_days: number
+          business_id: string
+          created_at: string
+          hire_date: string | null
+          id: string
+          is_active: boolean
+          updated_at: string
+          user_id: string
+          weekly_hours: number
+        }
+        Insert: {
+          annual_vacation_days?: number
+          business_id: string
+          created_at?: string
+          hire_date?: string | null
+          id?: string
+          is_active?: boolean
+          updated_at?: string
+          user_id: string
+          weekly_hours?: number
+        }
+        Update: {
+          annual_vacation_days?: number
+          business_id?: string
+          created_at?: string
+          hire_date?: string | null
+          id?: string
+          is_active?: boolean
+          updated_at?: string
+          user_id?: string
+          weekly_hours?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_employees_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hr_schedules: {
+        Row: {
+          business_id: string
+          created_at: string
+          created_by: string | null
+          employee_id: string
+          end_time: string
+          id: string
+          notes: string | null
+          shift_date: string
+          start_time: string
+          updated_at: string
+        }
+        Insert: {
+          business_id: string
+          created_at?: string
+          created_by?: string | null
+          employee_id: string
+          end_time: string
+          id?: string
+          notes?: string | null
+          shift_date: string
+          start_time: string
+          updated_at?: string
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          created_by?: string | null
+          employee_id?: string
+          end_time?: string
+          id?: string
+          notes?: string | null
+          shift_date?: string
+          start_time?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_schedules_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_schedules_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "hr_employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hr_time_entries: {
+        Row: {
+          business_id: string
+          created_at: string
+          created_by: string | null
+          employee_id: string
+          entry_type: Database["public"]["Enums"]["time_entry_type"]
+          id: string
+          latitude: number | null
+          longitude: number | null
+          notes: string | null
+          occurred_at: string
+        }
+        Insert: {
+          business_id: string
+          created_at?: string
+          created_by?: string | null
+          employee_id: string
+          entry_type: Database["public"]["Enums"]["time_entry_type"]
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          notes?: string | null
+          occurred_at?: string
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          created_by?: string | null
+          employee_id?: string
+          entry_type?: Database["public"]["Enums"]["time_entry_type"]
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          notes?: string | null
+          occurred_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_time_entries_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_time_entries_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "hr_employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hr_work_sessions: {
+        Row: {
+          break_seconds: number
+          business_id: string
+          clock_in_at: string
+          clock_out_at: string | null
+          created_at: string
+          employee_id: string
+          id: string
+          last_break_start: string | null
+          session_date: string
+          status: Database["public"]["Enums"]["work_session_status"]
+          updated_at: string
+          worked_seconds: number
+        }
+        Insert: {
+          break_seconds?: number
+          business_id: string
+          clock_in_at: string
+          clock_out_at?: string | null
+          created_at?: string
+          employee_id: string
+          id?: string
+          last_break_start?: string | null
+          session_date: string
+          status?: Database["public"]["Enums"]["work_session_status"]
+          updated_at?: string
+          worked_seconds?: number
+        }
+        Update: {
+          break_seconds?: number
+          business_id?: string
+          clock_in_at?: string
+          clock_out_at?: string | null
+          created_at?: string
+          employee_id?: string
+          id?: string
+          last_break_start?: string | null
+          session_date?: string
+          status?: Database["public"]["Enums"]["work_session_status"]
+          updated_at?: string
+          worked_seconds?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_work_sessions_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_work_sessions_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "hr_employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoice_items: {
         Row: {
           description: string
@@ -877,6 +1161,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      clock_action: {
+        Args: {
+          _business_id: string
+          _entry_type: Database["public"]["Enums"]["time_entry_type"]
+          _latitude?: number
+          _longitude?: number
+          _notes?: string
+        }
+        Returns: string
+      }
       create_invoice_with_items: {
         Args: {
           _business_id: string
@@ -901,6 +1195,7 @@ export type Database = {
         }
         Returns: string
       }
+      ensure_hr_employee: { Args: { _business_id: string }; Returns: string }
       generate_invoice_number: {
         Args: { _business_id: string }
         Returns: string
@@ -920,6 +1215,36 @@ export type Database = {
           prev_active_clients: number
           prev_monthly_payments_count: number
           prev_monthly_revenue: number
+        }[]
+      }
+      get_employee_monthly_report: {
+        Args: {
+          _business_id: string
+          _employee_id: string
+          _month: number
+          _year: number
+        }
+        Returns: {
+          break_seconds: number
+          clock_in_at: string
+          clock_out_at: string
+          session_date: string
+          status: Database["public"]["Enums"]["work_session_status"]
+          worked_seconds: number
+        }[]
+      }
+      get_hr_dashboard: {
+        Args: { _business_id: string }
+        Returns: {
+          my_employee_id: string
+          my_last_entry_type: Database["public"]["Enums"]["time_entry_type"]
+          my_session_clock_in: string
+          my_session_status: string
+          pending_absences: number
+          team_on_vacation_today: number
+          vacation_days_pending: number
+          vacation_days_total: number
+          vacation_days_used: number
         }[]
       }
       get_recent_activity: {
@@ -963,11 +1288,28 @@ export type Database = {
         Returns: boolean
       }
       is_super_admin: { Args: never; Returns: boolean }
+      request_absence: {
+        Args: {
+          _absence_type: Database["public"]["Enums"]["absence_type"]
+          _business_id: string
+          _custom_label?: string
+          _end_date: string
+          _reason?: string
+          _start_date: string
+        }
+        Returns: string
+      }
+      review_absence: {
+        Args: { _absence_id: string; _approve: boolean; _notes?: string }
+        Returns: undefined
+      }
       set_active_business: { Args: { _business_id: string }; Returns: boolean }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
     }
     Enums: {
+      absence_status: "pending" | "approved" | "rejected" | "cancelled"
+      absence_type: "vacation" | "sick_leave" | "personal" | "other"
       app_role: "owner" | "admin" | "staff"
       invoice_status: "draft" | "sent" | "paid" | "overdue" | "cancelled"
       module_type:
@@ -980,6 +1322,8 @@ export type Database = {
       platform_role: "super_admin" | "support"
       subscription_plan: "free" | "trial" | "pro" | "business"
       subscription_status: "active" | "cancelled" | "past_due" | "trialing"
+      time_entry_type: "clock_in" | "break_start" | "break_end" | "clock_out"
+      work_session_status: "open" | "closed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1107,6 +1451,8 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      absence_status: ["pending", "approved", "rejected", "cancelled"],
+      absence_type: ["vacation", "sick_leave", "personal", "other"],
       app_role: ["owner", "admin", "staff"],
       invoice_status: ["draft", "sent", "paid", "overdue", "cancelled"],
       module_type: [
@@ -1120,6 +1466,8 @@ export const Constants = {
       platform_role: ["super_admin", "support"],
       subscription_plan: ["free", "trial", "pro", "business"],
       subscription_status: ["active", "cancelled", "past_due", "trialing"],
+      time_entry_type: ["clock_in", "break_start", "break_end", "clock_out"],
+      work_session_status: ["open", "closed"],
     },
   },
 } as const
