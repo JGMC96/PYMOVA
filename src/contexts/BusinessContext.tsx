@@ -166,12 +166,14 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
   }, [user, activeBusinessId, fetchUserBusinesses]);
 
   // Sign out — revoca sesión global + limpia storage + cierra sesión Google
+  // Lanza error si la revocación falla, para que la UI pueda ofrecer reintento.
   const signOut = useCallback(async () => {
     // 1. Revocar sesión globalmente (invalida refresh tokens en el servidor)
-    try {
-      await supabase.auth.signOut({ scope: 'global' });
-    } catch (err) {
-      console.warn('signOut error:', err);
+    // Si esto falla, NO limpiamos nada y propagamos el error para reintento.
+    const { error } = await supabase.auth.signOut({ scope: 'global' });
+    if (error) {
+      console.error('signOut error:', error);
+      throw new Error(error.message || 'No se pudo revocar la sesión en el servidor');
     }
 
     // 2. Reset estado local
