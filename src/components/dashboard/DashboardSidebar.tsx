@@ -72,7 +72,7 @@ export const DashboardSidebar = ({ isOpen, onToggle }: DashboardSidebarProps) =>
               animate={{ opacity: 1 }}
               className="font-display font-bold text-lg text-sidebar-foreground"
             >
-              TotalBusiness
+              Pymova
             </motion.span>
           )}
         </div>
