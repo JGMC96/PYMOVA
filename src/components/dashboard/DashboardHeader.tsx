@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { User } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import {
@@ -8,18 +9,35 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Bell, Menu, Search, LogOut, User as UserIcon, Settings } from "lucide-react";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Bell, Menu, Search, LogOut, User as UserIcon, Settings, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
 
 interface DashboardHeaderProps {
   user: User | null;
-  onLogout: () => void;
+  onLogout: () => void | Promise<void>;
   onMenuToggle: () => void;
 }
 
 export const DashboardHeader = ({ user, onLogout, onMenuToggle }: DashboardHeaderProps) => {
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const userInitial = user?.email?.charAt(0).toUpperCase() || "U";
   const userName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Usuario";
+
+  const handleLogout = async () => {
+    if (isLoggingOut) return;
+    setIsLoggingOut(true);
+    try {
+      await onLogout();
+      toast.success("Sesión cerrada correctamente");
+    } catch (err: any) {
+      toast.error(err?.message || "Error al cerrar sesión");
+      setIsLoggingOut(false);
+    }
+    // No reset on success: el componente se desmonta tras navigate('/')
+  };
+
 
   return (
     <header className="sticky top-0 z-30 h-16 bg-background/95 backdrop-blur-sm border-b border-border flex items-center justify-between px-6">
@@ -74,13 +92,41 @@ export const DashboardHeader = ({ user, onLogout, onMenuToggle }: DashboardHeade
               Configuración
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={onLogout} className="text-destructive">
-              <LogOut className="w-4 h-4 mr-2" />
-              Cerrar sesión
+            <DropdownMenuItem
+              onClick={handleLogout}
+              disabled={isLoggingOut}
+              className="text-destructive"
+            >
+              {isLoggingOut ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <LogOut className="w-4 h-4 mr-2" />
+              )}
+              {isLoggingOut ? "Cerrando sesión..." : "Cerrar sesión"}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      {/* Modal bloqueante durante el cierre de sesión */}
+      <Dialog open={isLoggingOut}>
+        <DialogContent
+          className="sm:max-w-sm"
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
+          <div className="flex flex-col items-center gap-4 py-6 text-center">
+            <Loader2 className="w-10 h-10 animate-spin text-primary" />
+            <div>
+              <p className="font-semibold text-foreground">Cerrando sesión...</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Revocando acceso y limpiando datos locales.
+              </p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </header>
   );
 };
+
