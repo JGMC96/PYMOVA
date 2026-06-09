@@ -15,6 +15,7 @@ import { EmployeesTable } from '@/components/hr/EmployeesTable';
 import { TeamAbsenceCalendar } from '@/components/hr/TeamAbsenceCalendar';
 import { ScheduleCalendar } from '@/components/hr/ScheduleCalendar';
 import { MonthlyReport } from '@/components/hr/MonthlyReport';
+import { MonthlyPermissionsSummary } from '@/components/hr/MonthlyPermissionsSummary';
 
 function HrInner() {
   const { userRole } = useBusiness();
@@ -102,8 +103,9 @@ function HrInner() {
             <TabsContent value="schedule" className="mt-6">
               <ScheduleCalendar />
             </TabsContent>
-            <TabsContent value="reports" className="mt-6">
+            <TabsContent value="reports" className="mt-6 space-y-6">
               <MonthlyReport />
+              <MonthlyPermissionsSummary />
             </TabsContent>
           </>
         )}
