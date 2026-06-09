@@ -171,7 +171,7 @@ export default function Onboarding() {
             <Sparkles className="w-8 h-8 text-primary" />
           </div>
           <h1 className="text-3xl font-bold text-foreground mb-2">
-            ¡Bienvenido a TotalBusiness!
+            Configura tu negocio en TotalBusiness
           </h1>
           <p className="text-muted-foreground">
             Configura tu primer negocio para comenzar

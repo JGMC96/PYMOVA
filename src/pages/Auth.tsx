@@ -156,7 +156,7 @@ const Auth = () => {
         {/* Card */}
         <div className="bg-card rounded-2xl p-8 shadow-xl border border-border">
           {/* Logo */}
-          <div className="flex items-center gap-2 mb-8">
+          <div className="flex items-center gap-2 mb-4">
             <div className="w-10 h-10 rounded-xl bg-gradient-primary flex items-center justify-center">
               <Zap className="w-5 h-5 text-primary-foreground" />
             </div>
@@ -164,6 +164,9 @@ const Auth = () => {
               TotalBusiness
             </span>
           </div>
+          <h1 className="text-2xl font-display font-bold text-foreground mb-6">
+            Iniciar sesión o crear cuenta
+          </h1>
 
           {/* Tabs */}
           <div className="flex gap-4 mb-8">
