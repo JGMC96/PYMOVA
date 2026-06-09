@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Bell, Menu, Search, LogOut, User as UserIcon, Settings, Loader2 } from "lucide-react";
+import { Bell, Menu, Search, LogOut, User as UserIcon, Settings, Loader2, AlertCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 
@@ -20,24 +20,35 @@ interface DashboardHeaderProps {
   onMenuToggle: () => void;
 }
 
+type LogoutStatus = "idle" | "loading" | "error";
+
 export const DashboardHeader = ({ user, onLogout, onMenuToggle }: DashboardHeaderProps) => {
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [status, setStatus] = useState<LogoutStatus>("idle");
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const userInitial = user?.email?.charAt(0).toUpperCase() || "U";
   const userName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Usuario";
 
+  const isBusy = status === "loading";
+  const modalOpen = status === "loading" || status === "error";
+
   const handleLogout = async () => {
-    if (isLoggingOut) return;
-    setIsLoggingOut(true);
+    if (isBusy) return;
+    setStatus("loading");
+    setErrorMsg(null);
     try {
       await onLogout();
       toast.success("Sesión cerrada correctamente");
+      // El componente se desmonta tras navigate('/'), no reseteamos estado.
     } catch (err: any) {
-      toast.error(err?.message || "Error al cerrar sesión");
-      setIsLoggingOut(false);
+      setErrorMsg(err?.message || "No se pudo cerrar la sesión. Comprueba tu conexión e inténtalo de nuevo.");
+      setStatus("error");
     }
-    // No reset on success: el componente se desmonta tras navigate('/')
   };
 
+  const handleCancel = () => {
+    setStatus("idle");
+    setErrorMsg(null);
+  };
 
   return (
     <header className="sticky top-0 z-30 h-16 bg-background/95 backdrop-blur-sm border-b border-border flex items-center justify-between px-6">
@@ -61,13 +72,11 @@ export const DashboardHeader = ({ user, onLogout, onMenuToggle }: DashboardHeade
 
       {/* Right side */}
       <div className="flex items-center gap-3">
-        {/* Notifications */}
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="w-5 h-5" />
           <span className="absolute top-1 right-1 w-2 h-2 bg-destructive rounded-full" />
         </Button>
 
-        {/* User menu */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="flex items-center gap-3 p-1.5 rounded-lg hover:bg-muted transition-colors">
@@ -94,39 +103,60 @@ export const DashboardHeader = ({ user, onLogout, onMenuToggle }: DashboardHeade
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={handleLogout}
-              disabled={isLoggingOut}
+              disabled={isBusy}
               className="text-destructive"
             >
-              {isLoggingOut ? (
+              {isBusy ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               ) : (
                 <LogOut className="w-4 h-4 mr-2" />
               )}
-              {isLoggingOut ? "Cerrando sesión..." : "Cerrar sesión"}
+              {isBusy ? "Cerrando sesión..." : "Cerrar sesión"}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
 
-      {/* Modal bloqueante durante el cierre de sesión */}
-      <Dialog open={isLoggingOut}>
+      {/* Modal bloqueante durante el cierre de sesión / error */}
+      <Dialog open={modalOpen}>
         <DialogContent
           className="sm:max-w-sm"
           onPointerDownOutside={(e) => e.preventDefault()}
           onEscapeKeyDown={(e) => e.preventDefault()}
         >
-          <div className="flex flex-col items-center gap-4 py-6 text-center">
-            <Loader2 className="w-10 h-10 animate-spin text-primary" />
-            <div>
-              <p className="font-semibold text-foreground">Cerrando sesión...</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                Revocando acceso y limpiando datos locales.
-              </p>
+          {status === "loading" && (
+            <div className="flex flex-col items-center gap-4 py-6 text-center">
+              <Loader2 className="w-10 h-10 animate-spin text-primary" />
+              <div>
+                <p className="font-semibold text-foreground">Cerrando sesión...</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Revocando acceso y limpiando datos locales.
+                </p>
+              </div>
             </div>
-          </div>
+          )}
+
+          {status === "error" && (
+            <div className="flex flex-col items-center gap-4 py-4 text-center">
+              <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center">
+                <AlertCircle className="w-7 h-7 text-destructive" />
+              </div>
+              <div>
+                <p className="font-semibold text-foreground">No se pudo cerrar la sesión</p>
+                <p className="text-sm text-muted-foreground mt-1">{errorMsg}</p>
+              </div>
+              <div className="flex gap-2 w-full pt-2">
+                <Button variant="outline" className="flex-1" onClick={handleCancel}>
+                  Cancelar
+                </Button>
+                <Button className="flex-1" onClick={handleLogout}>
+                  Reintentar
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </header>
   );
 };
-
