@@ -1,92 +1,116 @@
-# Calendario de Marketing
 
-Nuevo módulo dentro del dashboard para que el equipo planifique y vea las publicaciones de Instagram y Facebook (historia, post, reel). Todos los miembros del negocio ven el calendario; solo `owner` y `admin` pueden crear, editar y eliminar.
+# Módulo de RRHH (Recursos Humanos)
 
-## Experiencia de usuario
+Módulo completo de gestión de personal con fichaje horario, control de ausencias y reportes mensuales. Gated por la clave de módulo `hr` (incluido en planes Pro y Business).
 
-- Nueva entrada **"Marketing"** en el sidebar (con icono calendario), gated por el módulo `marketing` igual que el resto.
-- Ruta `/dashboard/marketing` con dos vistas:
-  - **Calendario mensual** (default): grid tipo Google Calendar con chips de publicaciones por día, color por tipo (historia / post / reel) e icono por canal (IG / FB).
-  - **Lista / agenda**: tabla filtrable por rango, tipo, canal, estado y responsable.
-- Filtros superiores: tipo, canal, estado, responsable, rango de fechas.
-- Click en un día vacío → diálogo "Nueva publicación" prellenado con esa fecha.
-- Click en una publicación → diálogo de detalle con edición inline (solo admin/owner; staff ve en modo lectura).
-- Estados del workflow simple: `idea`, `borrador`, `programado`, `publicado`, `cancelado`. Badge de color.
-- Campos del formulario:
-  - Título, descripción/copy, tipo (historia/post/reel), canales (IG, FB, ambos), fecha y hora programada, estado, responsable (miembro del negocio), URL de referencia/asset, notas internas, hashtags.
+## 1. Base de datos
 
-## Modelo de datos
+### Nuevo módulo en catálogo
+- Registrar `hr` en `modules` y vincular a planes Pro y Business en `plan_modules`.
+- Añadir `'hr'` al tipo `ModuleKey` en `src/types/database.ts`.
 
-Tabla `marketing_posts` aislada por `business_id` con RLS:
+### Nuevos tipos enum
+- `absence_type`: `vacation`, `sick_leave`, `personal`, `other`
+- `absence_status`: `pending`, `approved`, `rejected`, `cancelled`
+- `time_entry_type`: `clock_in`, `break_start`, `break_end`, `clock_out`
 
-```text
-marketing_posts
-  id uuid pk
-  business_id uuid fk businesses
-  title text
-  copy text
-  content_type text   -- 'story' | 'post' | 'reel'
-  channels text[]     -- ['instagram','facebook']
-  status text         -- 'idea'|'draft'|'scheduled'|'published'|'cancelled'
-  scheduled_at timestamptz
-  assignee_id uuid    -- profiles.id (nullable)
-  reference_url text
-  hashtags text
-  notes text
-  created_by uuid
-  created_at, updated_at
-```
+### Tablas nuevas (en `public`, todas con RLS)
 
-- Índices: `(business_id, scheduled_at)`, `(business_id, status)`.
-- Trigger `update_updated_at_column`.
-- Trigger `audit_log_changes` (igual que clients/invoices) para trazabilidad.
+**`hr_employees`** — perfil laboral del miembro del negocio
+- `business_id`, `user_id`, `hire_date`, `weekly_hours` (default 40), `annual_vacation_days` (default 22), `is_active`
+- Unique (`business_id`, `user_id`)
 
-### RLS
+**`hr_time_entries`** — registros de fichaje
+- `business_id`, `employee_id`, `entry_type`, `occurred_at`, `latitude`, `longitude`, `notes`
+- Index por (`business_id`, `employee_id`, `occurred_at desc`)
 
-- `SELECT`: `is_member_of_business(business_id)` — todo el equipo ve.
-- `INSERT` / `UPDATE` / `DELETE`: `has_min_role(business_id, 'admin')` — solo owner/admin gestionan.
-- GRANTs estándar a `authenticated` y `service_role`.
+**`hr_work_sessions`** — sesiones diarias calculadas (entrada→salida con pausas)
+- `business_id`, `employee_id`, `session_date`, `clock_in_at`, `clock_out_at`, `break_seconds`, `worked_seconds`, `status` (`open`/`closed`)
+- Mantenida por trigger sobre `hr_time_entries`
 
-### Catálogo de módulo
+**`hr_absences`** — solicitudes de vacaciones/permisos
+- `business_id`, `employee_id`, `absence_type`, `custom_type_label`, `status`, `start_date`, `end_date`, `days_count`, `reason`, `reviewer_id`, `reviewed_at`, `review_notes`
 
-- Insertar `modules` row con `key='marketing'`, nombre "Calendario de marketing".
-- Asociar a planes `pro` y `business` vía `plan_modules` (free/trial quedan bloqueados → muestra `LockedModulePage` igual que el resto).
+**`hr_schedules`** — turnos planificados (Avanzado)
+- `business_id`, `employee_id`, `shift_date`, `start_time`, `end_time`, `notes`
 
-## Frontend
+### RLS y GRANTs
+- `SELECT`: miembros del negocio (`is_member_of_business`).
+- `INSERT/UPDATE` propios fichajes y solicitudes: cualquier miembro activo (sobre su `employee_id`).
+- `UPDATE` aprobación/rechazo de ausencias y gestión de empleados/turnos: `has_min_role(business_id, 'admin')`.
+- GRANT a `authenticated` y `service_role` en cada tabla.
 
-Archivos nuevos:
+### Funciones RPC (SECURITY DEFINER)
+- `clock_action(_business_id, _entry_type, _lat, _lng, _notes)` — registra fichaje y mantiene `hr_work_sessions`. Valida transiciones (no se puede salir sin haber entrado, etc.).
+- `request_absence(_business_id, _type, _custom_label, _start, _end, _reason)` — crea solicitud en estado `pending`, calcula `days_count`.
+- `review_absence(_absence_id, _approve boolean, _notes)` — solo admin/owner.
+- `get_hr_dashboard(_business_id)` — fichajes activos hoy, pendientes de aprobación, balance de vacaciones del usuario actual.
+- `get_employee_monthly_report(_business_id, _employee_id, _year, _month)` — horas trabajadas, ausencias, cumplimiento.
 
-```text
-src/types/database.ts                       -- añadir tipo MarketingPost y ModuleKey 'marketing'
-src/hooks/useMarketingPosts.ts              -- fetch + create/update/delete con requestIdRef
-src/pages/dashboard/Marketing.tsx           -- contenedor con tabs Calendario / Lista
-src/components/marketing/MarketingHeader.tsx
-src/components/marketing/MarketingCalendar.tsx   -- grid mensual (sin libs nuevas, usa date-fns ya disponible)
-src/components/marketing/MarketingList.tsx       -- tabla/agenda
-src/components/marketing/PostFormDialog.tsx      -- crear/editar (admin/owner)
-src/components/marketing/PostDetailDialog.tsx    -- ver/editar
-src/components/marketing/PostBadge.tsx           -- chip tipo+canal+estado
-```
+## 2. Frontend
 
-Cambios:
+### Tipos (`src/types/database.ts`)
+Interfaces `HrEmployee`, `HrTimeEntry`, `HrWorkSession`, `HrAbsence`, `HrSchedule` + enums.
 
-- `src/components/dashboard/DashboardSidebar.tsx`: añadir item Marketing con `moduleKey: 'marketing'` e icono `CalendarDays`.
-- `src/pages/Dashboard.tsx` (router del dashboard): nueva ruta `marketing` envuelta en `RequireModule` y `RequireRole` solo para mutaciones (lectura abierta a todos).
-- Usar `useRoleAccess` para ocultar/disable botones de crear/editar/eliminar en staff.
+### Hooks (`src/hooks/`)
+- `useHrEmployees.ts` — listado de empleados del negocio (admin only para edición).
+- `useTimeClock.ts` — estado actual del fichaje del usuario (open session), acciones `clockIn/breakStart/breakEnd/clockOut` con captura de geolocalización via `navigator.geolocation`.
+- `useAbsences.ts` — listar solicitudes (filtros por estado/tipo/empleado), crear, aprobar/rechazar.
+- `useSchedules.ts` — turnos planificados.
+- `useHrReports.ts` — datos de reportes mensuales.
+Todos con `requestIdRef` para evitar race conditions.
 
-## Detalles técnicos clave
+### Componentes (`src/components/hr/`)
+- `HrHeader.tsx` — header con tabs y botón rápido de fichaje.
+- `TimeClockCard.tsx` — widget grande con hora actual, estado (Fuera/Trabajando/Pausa), botones Entrada/Pausa/Reanudar/Salida; muestra estado de geolocalización.
+- `TimeEntriesList.tsx` — historial de fichajes del usuario.
+- `WorkSessionsTable.tsx` — vista admin: sesiones por empleado y día.
+- `AbsenceRequestDialog.tsx` — formulario con tipo, fechas (date-range picker), motivo, label personalizado si "Otros".
+- `AbsencesList.tsx` — tabla con filtros y acciones aprobar/rechazar (solo admin/owner).
+- `AbsenceBadge.tsx` — badges para tipo y estado.
+- `VacationBalanceCard.tsx` — días disponibles, usados, pendientes.
+- `TeamAbsenceCalendar.tsx` — calendario mensual con ausencias aprobadas del equipo (vista admin).
+- `ScheduleCalendar.tsx` — planificación de turnos (admin).
+- `MonthlyReport.tsx` — reporte exportable a CSV: horas trabajadas, ausencias, incumplimientos.
+- `EmployeeFormDialog.tsx` — admin edita `weekly_hours`, `annual_vacation_days`, `hire_date`.
 
-- Todas las queries filtran por `business_id` activo (regla core).
-- Hook `useMarketingPosts` con `requestIdRef` para evitar race conditions, igual patrón que `useClients` / `useInvoices`.
-- Calendario implementado con `date-fns` (`startOfMonth`, `eachDayOfInterval`, etc.); navegación mes anterior/siguiente, "Hoy".
-- Sin librerías nuevas: la vista mensual es un grid Tailwind 7-col responsive.
-- Colores por tipo usando tokens semánticos del design system (sin colores hardcoded).
-- Validación de formularios con `zod` + `react-hook-form` (ya usados en el proyecto).
-- Sin integración real con APIs de Meta en esta fase: el calendario es planificación interna; marcar como "publicado" es manual.
+### Páginas (`src/pages/dashboard/hr/`)
+- `HrLayout.tsx` con sub-rutas por tabs:
+  - `clock` — Mi fichaje (default)
+  - `absences` — Mis solicitudes + (admin) gestión de pendientes
+  - `team` — calendario del equipo y empleados (admin)
+  - `schedule` — turnos planificados (admin)
+  - `reports` — reportes mensuales (admin)
+- `src/pages/dashboard/Hr.tsx` — punto de entrada con `RequireModule module="hr"`.
 
-## Fuera de alcance (posibles siguientes pasos)
+### Navegación
+- Añadir item "RRHH" con icono `Clock` en `DashboardSidebar.tsx` (moduleKey `hr`).
+- Ruta `/dashboard/hr/*` en `Dashboard.tsx`.
 
-- Publicación automática vía Meta Graph API.
-- Comentarios/menciones en cada publicación.
-- Aprobaciones multi-paso, notificaciones por email.
-- Vista semanal / kanban por estado (fácil de añadir luego sobre el mismo modelo).
+### Permisos UI
+- Cualquier miembro activo puede fichar y solicitar ausencias propias.
+- Tabs `team`, `schedule`, `reports` y acciones de aprobación: ocultos/bloqueados para `staff` mediante `RequireRole`.
+
+## 3. Geolocalización
+- Solicitud opcional: si el usuario rechaza, el fichaje se guarda sin coords y se muestra aviso.
+- `navigator.geolocation.getCurrentPosition` con timeout corto (5s) antes de llamar al RPC.
+- Coordenadas mostradas en tooltip en historial admin (link a Google Maps).
+
+## 4. Cálculo de balance de vacaciones
+- Prorrateado por `hire_date` y `annual_vacation_days`.
+- Usados = suma de `days_count` de ausencias `vacation` aprobadas del año en curso.
+- Pendientes = ausencias `vacation` con estado `pending`.
+
+## 5. Fuera de alcance (futuro)
+- Fichaje por NFC/biometría, integración con relojes físicos.
+- Notificaciones email/push de aprobación.
+- Multi-aprobador o flujos por departamento.
+- Nómina y cálculo salarial.
+- Importación/exportación masiva más allá de CSV de reportes.
+
+## Detalles técnicos
+- Date utils: `date-fns` (ya en proyecto).
+- Date range picker: shadcn Calendar en modo `range` con `pointer-events-auto` dentro del Dialog.
+- Validación de formularios: `zod` + `react-hook-form`.
+- Audit log: las tablas pasan por `audit_log_changes` añadiendo triggers.
+- Memory: registrar nuevo memo `mem://features/hr-module` y actualizar índice.
