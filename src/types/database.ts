@@ -13,6 +13,27 @@ export type AbsenceType = 'vacation' | 'sick_leave' | 'personal' | 'other';
 export type AbsenceStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
 export type TimeEntryType = 'clock_in' | 'break_start' | 'break_end' | 'clock_out';
 export type WorkSessionStatus = 'open' | 'closed';
+export type PermissionType = 'late_arrival' | 'early_departure' | 'personal_errand' | 'other';
+
+export interface HrPermission {
+  id: string;
+  business_id: string;
+  employee_id: string;
+  permission_type: PermissionType;
+  custom_type_label: string | null;
+  status: AbsenceStatus;
+  permission_date: string;
+  start_time: string;
+  end_time: string;
+  hours_count: number;
+  reason: string | null;
+  reviewer_id: string | null;
+  reviewed_at: string | null;
+  review_notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
 
 export interface HrEmployee {
   id: string;

@@ -381,6 +381,81 @@ export type Database = {
           },
         ]
       }
+      hr_permissions: {
+        Row: {
+          business_id: string
+          created_at: string
+          created_by: string | null
+          custom_type_label: string | null
+          employee_id: string
+          end_time: string
+          hours_count: number
+          id: string
+          permission_date: string
+          permission_type: Database["public"]["Enums"]["permission_type"]
+          reason: string | null
+          review_notes: string | null
+          reviewed_at: string | null
+          reviewer_id: string | null
+          start_time: string
+          status: Database["public"]["Enums"]["absence_status"]
+          updated_at: string
+        }
+        Insert: {
+          business_id: string
+          created_at?: string
+          created_by?: string | null
+          custom_type_label?: string | null
+          employee_id: string
+          end_time: string
+          hours_count?: number
+          id?: string
+          permission_date: string
+          permission_type: Database["public"]["Enums"]["permission_type"]
+          reason?: string | null
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewer_id?: string | null
+          start_time: string
+          status?: Database["public"]["Enums"]["absence_status"]
+          updated_at?: string
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          created_by?: string | null
+          custom_type_label?: string | null
+          employee_id?: string
+          end_time?: string
+          hours_count?: number
+          id?: string
+          permission_date?: string
+          permission_type?: Database["public"]["Enums"]["permission_type"]
+          reason?: string | null
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewer_id?: string | null
+          start_time?: string
+          status?: Database["public"]["Enums"]["absence_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_permissions_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_permissions_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "hr_employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hr_schedules: {
         Row: {
           business_id: string
@@ -1299,8 +1374,24 @@ export type Database = {
         }
         Returns: string
       }
+      request_permission: {
+        Args: {
+          _business_id: string
+          _custom_label?: string
+          _end_time: string
+          _permission_date: string
+          _permission_type: Database["public"]["Enums"]["permission_type"]
+          _reason?: string
+          _start_time: string
+        }
+        Returns: string
+      }
       review_absence: {
         Args: { _absence_id: string; _approve: boolean; _notes?: string }
+        Returns: undefined
+      }
+      review_permission: {
+        Args: { _approve: boolean; _notes?: string; _permission_id: string }
         Returns: undefined
       }
       set_active_business: { Args: { _business_id: string }; Returns: boolean }
@@ -1319,6 +1410,11 @@ export type Database = {
         | "payments"
         | "ai_advisor"
         | "reports"
+      permission_type:
+        | "late_arrival"
+        | "early_departure"
+        | "personal_errand"
+        | "other"
       platform_role: "super_admin" | "support"
       subscription_plan: "free" | "trial" | "pro" | "business"
       subscription_status: "active" | "cancelled" | "past_due" | "trialing"
@@ -1462,6 +1558,12 @@ export const Constants = {
         "payments",
         "ai_advisor",
         "reports",
+      ],
+      permission_type: [
+        "late_arrival",
+        "early_departure",
+        "personal_errand",
+        "other",
       ],
       platform_role: ["super_admin", "support"],
       subscription_plan: ["free", "trial", "pro", "business"],

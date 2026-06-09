@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Clock, CalendarDays, Users, CalendarRange, FileText } from 'lucide-react';
+import { Clock, CalendarDays, Users, CalendarRange, FileText, Timer } from 'lucide-react';
 import { RequireModule } from '@/components/auth/RequireModule';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { useTimeClock } from '@/hooks/useTimeClock';
@@ -9,6 +9,8 @@ import { TimeEntriesList } from '@/components/hr/TimeEntriesList';
 import { VacationBalanceCard } from '@/components/hr/VacationBalanceCard';
 import { AbsenceRequestDialog } from '@/components/hr/AbsenceRequestDialog';
 import { AbsencesList } from '@/components/hr/AbsencesList';
+import { PermissionRequestDialog } from '@/components/hr/PermissionRequestDialog';
+import { PermissionsList } from '@/components/hr/PermissionsList';
 import { EmployeesTable } from '@/components/hr/EmployeesTable';
 import { TeamAbsenceCalendar } from '@/components/hr/TeamAbsenceCalendar';
 import { ScheduleCalendar } from '@/components/hr/ScheduleCalendar';
@@ -28,12 +30,15 @@ function HrInner() {
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="grid grid-cols-2 sm:grid-cols-5 w-full sm:w-auto">
+        <TabsList className="grid grid-cols-3 sm:grid-cols-6 w-full sm:w-auto">
           <TabsTrigger value="clock" className="gap-2">
             <Clock className="w-4 h-4" /> Fichaje
           </TabsTrigger>
           <TabsTrigger value="absences" className="gap-2">
             <CalendarDays className="w-4 h-4" /> Ausencias
+          </TabsTrigger>
+          <TabsTrigger value="permissions" className="gap-2">
+            <Timer className="w-4 h-4" /> Permisos
           </TabsTrigger>
           {isAdmin && (
             <>
@@ -70,6 +75,20 @@ function HrInner() {
             <>
               <h2 className="text-lg font-semibold pt-4">Solicitudes del equipo</h2>
               <AbsencesList scope="team" canReview />
+            </>
+          )}
+        </TabsContent>
+
+        <TabsContent value="permissions" className="space-y-4 mt-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-lg font-semibold">Mis permisos</h2>
+            <PermissionRequestDialog />
+          </div>
+          <PermissionsList scope="mine" />
+          {isAdmin && (
+            <>
+              <h2 className="text-lg font-semibold pt-4">Permisos del equipo</h2>
+              <PermissionsList scope="team" canReview />
             </>
           )}
         </TabsContent>
