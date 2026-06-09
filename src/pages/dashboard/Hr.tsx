@@ -103,8 +103,9 @@ function HrInner() {
             <TabsContent value="schedule" className="mt-6">
               <ScheduleCalendar />
             </TabsContent>
-            <TabsContent value="reports" className="mt-6">
+            <TabsContent value="reports" className="mt-6 space-y-6">
               <MonthlyReport />
+              <MonthlyPermissionsSummary />
             </TabsContent>
           </>
         )}
