@@ -64,6 +64,59 @@ export type Database = {
           },
         ]
       }
+      business_invitations: {
+        Row: {
+          accepted_at: string | null
+          accepted_by: string | null
+          business_id: string
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          invited_by: string | null
+          role: Database["public"]["Enums"]["app_role"]
+          status: string
+          token: string
+          updated_at: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          business_id: string
+          created_at?: string
+          email: string
+          expires_at?: string
+          id?: string
+          invited_by?: string | null
+          role?: Database["public"]["Enums"]["app_role"]
+          status?: string
+          token?: string
+          updated_at?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          business_id?: string
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          invited_by?: string | null
+          role?: Database["public"]["Enums"]["app_role"]
+          status?: string
+          token?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_invitations_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       business_members: {
         Row: {
           business_id: string
@@ -1440,6 +1493,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accept_business_invitation: { Args: { _token: string }; Returns: string }
       clock_action: {
         Args: {
           _business_id: string
@@ -1485,6 +1539,17 @@ export type Database = {
       }
       generate_sale_number: { Args: { _business_id: string }; Returns: string }
       get_active_business: { Args: never; Returns: string }
+      get_business_team: {
+        Args: { _business_id: string }
+        Returns: {
+          email: string
+          full_name: string
+          is_active: boolean
+          joined_at: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }[]
+      }
       get_dashboard_metrics: {
         Args: { _business_id: string }
         Returns: {
