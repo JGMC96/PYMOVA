@@ -188,6 +188,7 @@ export type Database = {
           logo_url: string | null
           name: string
           slug: string | null
+          store_profile: Database["public"]["Enums"]["store_profile"]
           timezone: string
           updated_at: string
         }
@@ -199,6 +200,7 @@ export type Database = {
           logo_url?: string | null
           name: string
           slug?: string | null
+          store_profile?: Database["public"]["Enums"]["store_profile"]
           timezone?: string
           updated_at?: string
         }
@@ -210,10 +212,70 @@ export type Database = {
           logo_url?: string | null
           name?: string
           slug?: string | null
+          store_profile?: Database["public"]["Enums"]["store_profile"]
           timezone?: string
           updated_at?: string
         }
         Relationships: []
+      }
+      cash_register_sessions: {
+        Row: {
+          business_id: string
+          closed_at: string | null
+          closed_by: string | null
+          counted_amount: number | null
+          created_at: string
+          difference: number | null
+          expected_amount: number | null
+          id: string
+          notes: string | null
+          opened_at: string
+          opened_by: string | null
+          opening_amount: number
+          status: Database["public"]["Enums"]["register_status"]
+          updated_at: string
+        }
+        Insert: {
+          business_id: string
+          closed_at?: string | null
+          closed_by?: string | null
+          counted_amount?: number | null
+          created_at?: string
+          difference?: number | null
+          expected_amount?: number | null
+          id?: string
+          notes?: string | null
+          opened_at?: string
+          opened_by?: string | null
+          opening_amount?: number
+          status?: Database["public"]["Enums"]["register_status"]
+          updated_at?: string
+        }
+        Update: {
+          business_id?: string
+          closed_at?: string | null
+          closed_by?: string | null
+          counted_amount?: number | null
+          created_at?: string
+          difference?: number | null
+          expected_amount?: number | null
+          id?: string
+          notes?: string | null
+          opened_at?: string
+          opened_by?: string | null
+          opening_amount?: number
+          status?: Database["public"]["Enums"]["register_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cash_register_sessions_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       clients: {
         Row: {
@@ -987,8 +1049,72 @@ export type Database = {
         }
         Relationships: []
       }
+      product_variants: {
+        Row: {
+          attributes: Json
+          barcode: string | null
+          business_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          name: string
+          price: number | null
+          product_id: string
+          sku: string | null
+          stock_quantity: number
+          updated_at: string
+        }
+        Insert: {
+          attributes?: Json
+          barcode?: string | null
+          business_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          price?: number | null
+          product_id: string
+          sku?: string | null
+          stock_quantity?: number
+          updated_at?: string
+        }
+        Update: {
+          attributes?: Json
+          barcode?: string | null
+          business_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          price?: number | null
+          product_id?: string
+          sku?: string | null
+          stock_quantity?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_variants_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_variants_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
+          barcode: string | null
           business_id: string
           category: string | null
           created_at: string
@@ -998,12 +1124,14 @@ export type Database = {
           is_active: boolean
           name: string
           price: number
+          sku: string | null
           stock_quantity: number | null
           track_inventory: boolean | null
           unit: string | null
           updated_at: string
         }
         Insert: {
+          barcode?: string | null
           business_id: string
           category?: string | null
           created_at?: string
@@ -1013,12 +1141,14 @@ export type Database = {
           is_active?: boolean
           name: string
           price?: number
+          sku?: string | null
           stock_quantity?: number | null
           track_inventory?: boolean | null
           unit?: string | null
           updated_at?: string
         }
         Update: {
+          barcode?: string | null
           business_id?: string
           category?: string | null
           created_at?: string
@@ -1028,6 +1158,7 @@ export type Database = {
           is_active?: boolean
           name?: string
           price?: number
+          sku?: string | null
           stock_quantity?: number | null
           track_inventory?: boolean | null
           unit?: string | null
@@ -1080,6 +1211,7 @@ export type Database = {
       }
       sale_items: {
         Row: {
+          discount: number
           id: string
           product_id: string | null
           product_name: string
@@ -1087,8 +1219,10 @@ export type Database = {
           sale_id: string
           total: number
           unit_price: number
+          variant_id: string | null
         }
         Insert: {
+          discount?: number
           id?: string
           product_id?: string | null
           product_name: string
@@ -1096,8 +1230,10 @@ export type Database = {
           sale_id: string
           total?: number
           unit_price?: number
+          variant_id?: string | null
         }
         Update: {
+          discount?: number
           id?: string
           product_id?: string | null
           product_name?: string
@@ -1105,6 +1241,7 @@ export type Database = {
           sale_id?: string
           total?: number
           unit_price?: number
+          variant_id?: string | null
         }
         Relationships: [
           {
@@ -1121,46 +1258,68 @@ export type Database = {
             referencedRelation: "sales"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "sale_items_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_variants"
+            referencedColumns: ["id"]
+          },
         ]
       }
       sales: {
         Row: {
           business_id: string
+          cash_received: number | null
+          change_given: number | null
           client_id: string | null
           created_at: string
           created_by: string | null
+          discount: number
           id: string
           notes: string | null
           payment_method: string | null
+          register_session_id: string | null
           sale_number: string
           subtotal: number
           tax: number
+          tip: number
           total: number
         }
         Insert: {
           business_id: string
+          cash_received?: number | null
+          change_given?: number | null
           client_id?: string | null
           created_at?: string
           created_by?: string | null
+          discount?: number
           id?: string
           notes?: string | null
           payment_method?: string | null
+          register_session_id?: string | null
           sale_number: string
           subtotal?: number
           tax?: number
+          tip?: number
           total?: number
         }
         Update: {
           business_id?: string
+          cash_received?: number | null
+          change_given?: number | null
           client_id?: string | null
           created_at?: string
           created_by?: string | null
+          discount?: number
           id?: string
           notes?: string | null
           payment_method?: string | null
+          register_session_id?: string | null
           sale_number?: string
           subtotal?: number
           tax?: number
+          tip?: number
           total?: number
         }
         Relationships: [
@@ -1176,6 +1335,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_register_session_id_fkey"
+            columns: ["register_session_id"]
+            isOneToOne: false
+            referencedRelation: "cash_register_sessions"
             referencedColumns: ["id"]
           },
         ]
@@ -1245,6 +1411,10 @@ export type Database = {
           _notes?: string
         }
         Returns: string
+      }
+      close_register_session: {
+        Args: { _counted_amount: number; _notes?: string; _session_id: string }
+        Returns: undefined
       }
       create_invoice_with_items: {
         Args: {
@@ -1333,6 +1503,14 @@ export type Database = {
           title: string
         }[]
       }
+      get_register_summary: {
+        Args: { _session_id: string }
+        Returns: {
+          payment_method: string
+          sales_count: number
+          total_amount: number
+        }[]
+      }
       get_user_role_in_business: {
         Args: { _business_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
@@ -1363,6 +1541,10 @@ export type Database = {
         Returns: boolean
       }
       is_super_admin: { Args: never; Returns: boolean }
+      open_register_session: {
+        Args: { _business_id: string; _opening_amount?: number }
+        Returns: string
+      }
       request_absence: {
         Args: {
           _absence_type: Database["public"]["Enums"]["absence_type"]
@@ -1416,6 +1598,14 @@ export type Database = {
         | "personal_errand"
         | "other"
       platform_role: "super_admin" | "support"
+      register_status: "open" | "closed"
+      store_profile:
+        | "general"
+        | "shoe_store"
+        | "bar"
+        | "florist"
+        | "bakery"
+        | "fashion"
       subscription_plan: "free" | "trial" | "pro" | "business"
       subscription_status: "active" | "cancelled" | "past_due" | "trialing"
       time_entry_type: "clock_in" | "break_start" | "break_end" | "clock_out"
@@ -1566,6 +1756,15 @@ export const Constants = {
         "other",
       ],
       platform_role: ["super_admin", "support"],
+      register_status: ["open", "closed"],
+      store_profile: [
+        "general",
+        "shoe_store",
+        "bar",
+        "florist",
+        "bakery",
+        "fashion",
+      ],
       subscription_plan: ["free", "trial", "pro", "business"],
       subscription_status: ["active", "cancelled", "past_due", "trialing"],
       time_entry_type: ["clock_in", "break_start", "break_end", "clock_out"],

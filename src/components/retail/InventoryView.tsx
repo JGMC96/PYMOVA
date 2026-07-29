@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Package, RefreshCw, Edit2, Check, X } from 'lucide-react';
+import { Package, RefreshCw, Edit2, Check, X, Layers } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,12 +13,15 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useInventory } from '@/hooks/useInventory';
+import { useInventory, type ProductWithStock } from '@/hooks/useInventory';
+import { VariantsDialog } from './VariantsDialog';
 
 export function InventoryView() {
   const { products, isLoading, isUpdating, updateStock, toggleTracking, refreshProducts } = useInventory();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>('');
+  const [variantProduct, setVariantProduct] = useState<ProductWithStock | null>(null);
+
 
   const startEditing = (productId: string, currentStock: number) => {
     setEditingId(productId);
@@ -76,12 +79,19 @@ export function InventoryView() {
                 <TableHead className="text-right">Precio</TableHead>
                 <TableHead className="text-center">Stock</TableHead>
                 <TableHead className="text-center">Seguimiento</TableHead>
+                <TableHead className="text-center">Variantes</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {products.map((product) => (
                 <TableRow key={product.id}>
-                  <TableCell className="font-medium">{product.name}</TableCell>
+                  <TableCell className="font-medium">
+                    {product.name}
+                    {product.barcode && (
+                      <span className="block text-xs text-muted-foreground">{product.barcode}</span>
+                    )}
+                  </TableCell>
+
                   <TableCell>
                     {product.category ? (
                       <Badge variant="outline">{product.category}</Badge>
@@ -148,12 +158,34 @@ export function InventoryView() {
                       disabled={isUpdating}
                     />
                   </TableCell>
+                  <TableCell className="text-center">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setVariantProduct(product)}
+                    >
+                      <Layers className="w-3.5 h-3.5 mr-1.5" />
+                      {product.variants.length}
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         )}
       </CardContent>
+
+      {variantProduct && (
+        <VariantsDialog
+          open={!!variantProduct}
+          onOpenChange={(o) => !o && setVariantProduct(null)}
+          productId={variantProduct.id}
+          productName={variantProduct.name}
+          basePrice={variantProduct.price}
+          onChanged={refreshProducts}
+        />
+      )}
     </Card>
   );
+
 }
