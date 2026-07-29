@@ -8,7 +8,7 @@ import { Check, ArrowRight } from "lucide-react";
 const TITLE = "Mejores ERP para pymes en España (2026): guía comparativa";
 const DESCRIPTION =
   "Comparativa de los mejores ERP para pymes en España: precios, funciones, TPV, facturación y RRHH. Descubre cuál encaja con tu negocio.";
-const CANONICAL = "https://cogent-business-os.lovable.app/blog/mejores-erp-pymes";
+const CANONICAL = "https://pymova.com/blog/mejores-erp-pymes";
 
 const solutions = [
   {

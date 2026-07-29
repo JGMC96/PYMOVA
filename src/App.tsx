@@ -12,6 +12,7 @@ import SelectBusiness from "./pages/SelectBusiness";
 import NotFound from "./pages/NotFound";
 import MejoresErpPymes from "./pages/blog/MejoresErpPymes";
 import NegociosRentables2026 from "./pages/blog/NegociosRentables2026";
+import GuiaVerifactu2026 from "./pages/blog/GuiaVerifactu2026";
 import AcceptInvitation from "./pages/AcceptInvitation";
 import Unsubscribe from "./pages/Unsubscribe";
 
@@ -40,6 +41,7 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/blog/mejores-erp-pymes" element={<MejoresErpPymes />} />
             <Route path="/blog/negocios-rentables-2026" element={<NegociosRentables2026 />} />
+            <Route path="/blog/guia-verifactu-2026" element={<GuiaVerifactu2026 />} />
             <Route path="/invite/:token" element={<AcceptInvitation />} />
             <Route path="/unsubscribe" element={<Unsubscribe />} />
 
