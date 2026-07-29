@@ -1,10 +1,10 @@
-import { useState } from 'react';
-import { Plug, ShoppingBag, Globe, Store, Table2, CreditCard, Sparkles } from 'lucide-react';
+import { Plug, ShoppingBag, Globe, Store, Table2, CreditCard, Sparkles, Loader2, Check } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { toast } from 'sonner';
+import { useIntegrationInterests } from '@/hooks/useIntegrationInterests';
 import type { LucideIcon } from 'lucide-react';
+
 
 interface Integration {
   key: string;
@@ -60,15 +60,15 @@ const INTEGRATIONS: Integration[] = [
 ];
 
 const Integrations = () => {
-  const [requested, setRequested] = useState<string[]>([]);
+  const { interests, isLoading, savingKey, toggleInterest } = useIntegrationInterests();
 
-  const handleRequest = (integration: Integration) => {
-    if (requested.includes(integration.key)) return;
-    setRequested((prev) => [...prev, integration.key]);
-    toast.success(`Interés registrado en ${integration.name}`, {
-      description: 'Te avisaremos en cuanto esta integración esté disponible.',
-    });
+  const priorityOf = (key: string) => {
+    const index = interests.findIndex((i) => i.integration_key === key);
+    return index === -1 ? null : index + 1;
   };
+
+  const requestedNames = interests
+    .map((i) => INTEGRATIONS.find((x) => x.key === i.integration_key)?.name ?? i.integration_key);
 
   return (
     <div className="space-y-6">
@@ -85,27 +85,56 @@ const Integrations = () => {
       <Card className="border-accent/30 bg-accent/5">
         <CardContent className="flex items-start gap-3 py-4">
           <Sparkles className="w-5 h-5 text-accent mt-0.5 flex-shrink-0" />
-          <div>
+          <div className="space-y-1">
             <p className="font-medium text-foreground">Próximamente</p>
             <p className="text-sm text-muted-foreground">
               Estamos preparando las importaciones automáticas. Marca las plataformas que usas
               para priorizarlas en el desarrollo.
             </p>
+            {isLoading ? (
+              <p className="text-sm text-muted-foreground flex items-center gap-2">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                Cargando tus prioridades…
+              </p>
+            ) : requestedNames.length > 0 ? (
+              <p className="text-sm text-foreground">
+                Prioridades de tu negocio:{' '}
+                <span className="font-medium">
+                  {requestedNames.map((n, i) => `${i + 1}. ${n}`).join(' · ')}
+                </span>
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Aún no has marcado ninguna integración como prioritaria.
+              </p>
+            )}
           </div>
         </CardContent>
       </Card>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {INTEGRATIONS.map((integration) => {
-          const isRequested = requested.includes(integration.key);
+          const priority = priorityOf(integration.key);
+          const isRequested = priority !== null;
+          const isSaving = savingKey === integration.key;
           return (
-            <Card key={integration.key} className="flex flex-col">
+            <Card
+              key={integration.key}
+              className={`flex flex-col ${isRequested ? 'border-accent/50' : ''}`}
+            >
               <CardHeader className="space-y-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="w-11 h-11 rounded-xl bg-muted flex items-center justify-center">
                     <integration.icon className="w-5 h-5 text-foreground" />
                   </div>
-                  <Badge variant="outline">{integration.category}</Badge>
+                  <div className="flex items-center gap-2">
+                    {isRequested && (
+                      <Badge className="bg-accent text-accent-foreground hover:bg-accent">
+                        Prioridad {priority}
+                      </Badge>
+                    )}
+                    <Badge variant="outline">{integration.category}</Badge>
+                  </div>
                 </div>
                 <div>
                   <CardTitle className="text-lg">{integration.name}</CardTitle>
@@ -117,9 +146,14 @@ const Integrations = () => {
                 <Button
                   variant={isRequested ? 'secondary' : 'outline'}
                   size="sm"
-                  disabled={isRequested}
-                  onClick={() => handleRequest(integration)}
+                  disabled={isSaving || isLoading}
+                  onClick={() => toggleInterest(integration.key, integration.name)}
                 >
+                  {isSaving ? (
+                    <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                  ) : isRequested ? (
+                    <Check className="w-3.5 h-3.5 mr-1.5" />
+                  ) : null}
                   {isRequested ? 'Solicitada' : 'Me interesa'}
                 </Button>
               </CardContent>
@@ -130,5 +164,6 @@ const Integrations = () => {
     </div>
   );
 };
+
 
 export default Integrations;

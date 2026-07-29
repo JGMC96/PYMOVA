@@ -686,6 +686,44 @@ export type Database = {
           },
         ]
       }
+      integration_interests: {
+        Row: {
+          business_id: string
+          created_at: string
+          id: string
+          integration_key: string
+          notes: string | null
+          requested_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          business_id: string
+          created_at?: string
+          id?: string
+          integration_key: string
+          notes?: string | null
+          requested_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          id?: string
+          integration_key?: string
+          notes?: string | null
+          requested_by?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_interests_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoice_items: {
         Row: {
           description: string
