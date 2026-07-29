@@ -115,10 +115,17 @@ export function SaleTicketDialog({ open, onOpenChange, ticket }: SaleTicketDialo
           <div ref={printRef} className="font-mono text-sm space-y-2">
             <div className="center text-center">
               <p className="bold xl font-bold text-base">
-                {activeBusiness?.name || 'Mi Negocio'}
+                {activeBusiness?.trade_name || activeBusiness?.name || 'Mi Negocio'}
               </p>
+              {activeBusiness?.legal_name && (
+                <p className="text-xs text-muted-foreground">{activeBusiness.legal_name}</p>
+              )}
+              {activeBusiness?.tax_id && (
+                <p className="text-xs text-muted-foreground">CIF: {activeBusiness.tax_id}</p>
+              )}
               <p className="text-xs text-muted-foreground">Ticket de venta</p>
             </div>
+
 
             <hr className="border-dashed border-border" />
 
