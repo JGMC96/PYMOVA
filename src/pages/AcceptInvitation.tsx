@@ -57,7 +57,9 @@ const AcceptInvitation = () => {
     <main className="flex min-h-screen items-center justify-center bg-background p-6">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>Invitación al equipo</CardTitle>
+          <CardTitle asChild>
+            <h1 className="text-2xl font-semibold leading-none tracking-tight">Invitación al equipo</h1>
+          </CardTitle>
           <CardDescription>Estamos procesando tu invitación</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col items-center gap-4 py-8 text-center">

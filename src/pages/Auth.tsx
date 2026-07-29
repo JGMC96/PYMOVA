@@ -13,6 +13,7 @@ import { checkIsSuperAdmin } from "@/lib/superAdmin";
 import { getPendingInvite } from "@/lib/inviteLink";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
+import { usePageMeta } from "@/hooks/usePageMeta";
 
 const Auth = () => {
   const [searchParams] = useSearchParams();
@@ -25,6 +26,14 @@ const Auth = () => {
   const navigate = useNavigate();
 
   const pendingInvite = getPendingInvite();
+
+  usePageMeta({
+    title: isLogin ? "Iniciar sesión — Pymova" : "Crear cuenta gratis — Pymova",
+    description: isLogin
+      ? "Accede a tu cuenta de Pymova para gestionar clientes, facturación, TPV, cobros y equipo desde un único panel."
+      : "Crea tu cuenta gratuita de Pymova y empieza a gestionar clientes, facturas, inventario y equipo desde el primer día.",
+    path: "/auth",
+  });
 
   useEffect(() => {
     // Helper function to check memberships and navigate

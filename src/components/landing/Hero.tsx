@@ -59,7 +59,7 @@ export const Hero = () => {
           className="flex flex-col sm:flex-row items-center gap-4"
         >
           <Link to="/auth?tab=register">
-            <button className="group relative px-8 py-4 bg-cyan-600 rounded-xl text-white font-bold text-base overflow-hidden transition-all hover:bg-cyan-500 hover:shadow-[0_0_40px_rgba(8,145,178,0.4)]">
+            <button className="group relative px-8 py-4 bg-cyan-700 rounded-xl text-white font-bold text-base overflow-hidden transition-all hover:bg-cyan-600 hover:shadow-[0_0_40px_rgba(8,145,178,0.4)]">
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
               <span className="relative flex items-center gap-2">
                 Comenzar gratis
