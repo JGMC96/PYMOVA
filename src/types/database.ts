@@ -188,6 +188,10 @@ export interface Business {
   name: string;
   slug: string | null;
   logo_url: string | null;
+  legal_name: string | null;
+  tax_id: string | null;
+  trade_name: string | null;
+
   industry: string | null;
   currency: string;
   timezone: string;
