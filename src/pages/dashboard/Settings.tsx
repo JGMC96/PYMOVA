@@ -3,6 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ProfileSettings } from '@/components/settings/ProfileSettings';
 import { BusinessSettings } from '@/components/settings/BusinessSettings';
 import { RoleSettings } from '@/components/settings/RoleSettings';
+import { TeamSettings } from '@/components/settings/TeamSettings';
 import { BillingSettings } from '@/components/settings/BillingSettings';
 
 const Settings = () => {
@@ -21,10 +22,11 @@ const Settings = () => {
 
       {/* Tabs */}
       <Tabs defaultValue="profile" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 lg:w-auto lg:inline-grid">
           <TabsTrigger value="profile">Mi Perfil</TabsTrigger>
           <TabsTrigger value="business">Mi Negocio</TabsTrigger>
           <TabsTrigger value="role">Mi Rol</TabsTrigger>
+          <TabsTrigger value="team">Equipo</TabsTrigger>
           <TabsTrigger value="billing">Facturación</TabsTrigger>
         </TabsList>
 
@@ -38,6 +40,10 @@ const Settings = () => {
 
         <TabsContent value="role" className="mt-6">
           <RoleSettings />
+        </TabsContent>
+
+        <TabsContent value="team" className="mt-6">
+          <TeamSettings />
         </TabsContent>
 
         <TabsContent value="billing" className="mt-6">
