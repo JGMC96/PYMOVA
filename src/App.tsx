@@ -12,6 +12,8 @@ import SelectBusiness from "./pages/SelectBusiness";
 import NotFound from "./pages/NotFound";
 import MejoresErpPymes from "./pages/blog/MejoresErpPymes";
 import AcceptInvitation from "./pages/AcceptInvitation";
+import Unsubscribe from "./pages/Unsubscribe";
+
 import { RequireAuth } from "./components/auth/RequireAuth";
 import { RequireBusiness } from "./components/auth/RequireBusiness";
 import { AuthRedirector } from "./components/auth/AuthRedirector";
