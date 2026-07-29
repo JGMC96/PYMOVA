@@ -238,11 +238,14 @@ export type Database = {
           currency: string
           id: string
           industry: string | null
+          legal_name: string | null
           logo_url: string | null
           name: string
           slug: string | null
           store_profile: Database["public"]["Enums"]["store_profile"]
+          tax_id: string | null
           timezone: string
+          trade_name: string | null
           updated_at: string
         }
         Insert: {
@@ -250,11 +253,14 @@ export type Database = {
           currency?: string
           id?: string
           industry?: string | null
+          legal_name?: string | null
           logo_url?: string | null
           name: string
           slug?: string | null
           store_profile?: Database["public"]["Enums"]["store_profile"]
+          tax_id?: string | null
           timezone?: string
+          trade_name?: string | null
           updated_at?: string
         }
         Update: {
@@ -262,11 +268,14 @@ export type Database = {
           currency?: string
           id?: string
           industry?: string | null
+          legal_name?: string | null
           logo_url?: string | null
           name?: string
           slug?: string | null
           store_profile?: Database["public"]["Enums"]["store_profile"]
+          tax_id?: string | null
           timezone?: string
+          trade_name?: string | null
           updated_at?: string
         }
         Relationships: []
