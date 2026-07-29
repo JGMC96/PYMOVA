@@ -142,6 +142,19 @@ export function BusinessSettings() {
 
   const watchedLogoUrl = form.watch('logo_url');
   const watchedName = form.watch('name');
+  const isDirty = form.formState.isDirty;
+
+  // Aviso al cerrar/recargar con cambios pendientes
+  useEffect(() => {
+    if (!isDirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isDirty]);
+
 
   if (!activeBusiness) {
     return (
