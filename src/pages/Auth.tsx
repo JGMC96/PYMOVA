@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import { setRememberSession, isRememberSession } from "@/lib/sessionPersistence";
 import { checkIsSuperAdmin } from "@/lib/superAdmin";
+import { getPendingInvite } from "@/lib/inviteLink";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 
