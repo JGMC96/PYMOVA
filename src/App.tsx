@@ -12,6 +12,7 @@ import SelectBusiness from "./pages/SelectBusiness";
 import NotFound from "./pages/NotFound";
 import MejoresErpPymes from "./pages/blog/MejoresErpPymes";
 import NegociosRentables2026 from "./pages/blog/NegociosRentables2026";
+import GuiaVerifactu2026 from "./pages/blog/GuiaVerifactu2026";
 import AcceptInvitation from "./pages/AcceptInvitation";
 import Unsubscribe from "./pages/Unsubscribe";
 
