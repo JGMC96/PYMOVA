@@ -21,6 +21,13 @@ export const AuthRedirector = () => {
       setTimeout(async () => {
         if (!PUBLIC_PATHS.includes(location.pathname)) return;
 
+        // Si venía de un enlace de invitación, completarlo primero
+        const pendingInvite = sessionStorage.getItem("pymova_pending_invite");
+        if (pendingInvite) {
+          navigate(`/invite/${pendingInvite}`, { replace: true });
+          return;
+        }
+
         const { data: memberships } = await supabase
           .from("business_members")
           .select("business_id")

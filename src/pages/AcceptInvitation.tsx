@@ -9,12 +9,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 const AcceptInvitation = () => {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
-  const { user, isLoading: authLoading, refreshBusinesses, setActiveBusiness } = useBusiness() as any;
+  const { user, isAuthLoading, refreshBusinesses, setActiveBusiness } = useBusiness();
   const [status, setStatus] = useState<'idle' | 'working' | 'done' | 'error'>('idle');
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    if (authLoading || !token) return;
+    if (isAuthLoading || !token) return;
 
     if (!user) {
       sessionStorage.setItem('pymova_pending_invite', token);
@@ -37,8 +37,8 @@ const AcceptInvitation = () => {
       }
 
       sessionStorage.removeItem('pymova_pending_invite');
-      await refreshBusinesses?.();
-      if (data) await setActiveBusiness?.(data as string);
+      await refreshBusinesses();
+      if (data) await setActiveBusiness(data as string);
       setStatus('done');
       setMessage('Te has unido al negocio correctamente.');
       setTimeout(() => navigate('/dashboard', { replace: true }), 1500);
@@ -48,7 +48,7 @@ const AcceptInvitation = () => {
     return () => {
       cancelled = true;
     };
-  }, [token, user, authLoading, navigate, refreshBusinesses, setActiveBusiness]);
+  }, [token, user, isAuthLoading, navigate, refreshBusinesses, setActiveBusiness]);
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-background p-6">
