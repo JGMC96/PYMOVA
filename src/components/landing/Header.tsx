@@ -13,7 +13,7 @@ export const Header = () => {
       <div className="max-w-7xl mx-auto px-6">
         <div className="flex items-center justify-between h-20">
           {/* Logo */}
-          <Link to="/" className="group flex items-center gap-3">
+          <Link to="/" aria-label="Pymova — inicio" className="group flex items-center gap-3">
             <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center border border-slate-800 shadow-lg group-hover:border-cyan-500/50 transition-colors">
               <PymovaLogo className="w-6 h-6" />
             </div>
