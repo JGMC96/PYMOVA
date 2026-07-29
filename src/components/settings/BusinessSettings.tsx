@@ -184,9 +184,14 @@ export function BusinessSettings() {
                 </AvatarFallback>
               </Avatar>
               <div className="text-sm text-muted-foreground">
-                <p className="font-medium text-foreground">{activeBusiness.name}</p>
+                <p className="font-medium text-foreground">
+                  {activeBusiness.trade_name || activeBusiness.name}
+                </p>
+                {activeBusiness.legal_name && <p>{activeBusiness.legal_name}</p>}
+                {activeBusiness.tax_id && <p>CIF: {activeBusiness.tax_id}</p>}
                 <p>ID: {activeBusiness.id.slice(0, 8)}...</p>
               </div>
+
             </div>
 
             <FormField
