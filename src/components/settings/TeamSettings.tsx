@@ -213,7 +213,21 @@ export function TeamSettings() {
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      disabled={sendingId === inv.id}
+                      onClick={() => resendInvitation(inv)}
+                    >
+                      {sendingId === inv.id ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Send className="mr-2 h-4 w-4" />
+                      )}
+                      {sendingId === inv.id ? 'Enviando...' : 'Reenviar'}
+                    </Button>
                     <Button variant="outline" size="sm" onClick={() => handleCopy(inv.token)}>
+
                       {copiedToken === inv.token ? (
                         <Check className="mr-2 h-4 w-4" />
                       ) : (
