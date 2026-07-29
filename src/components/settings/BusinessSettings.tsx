@@ -7,7 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { useRoleAccess } from '@/hooks/useRoleAccess';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -44,6 +44,9 @@ const TIMEZONES = [
 
 const businessSchema = z.object({
   name: z.string().min(2, 'Nombre requerido').max(100, 'Máximo 100 caracteres'),
+  legal_name: z.string().max(150, 'Máximo 150 caracteres').optional().or(z.literal('')),
+  tax_id: z.string().max(30, 'Máximo 30 caracteres').optional().or(z.literal('')),
+  trade_name: z.string().max(100, 'Máximo 100 caracteres').optional().or(z.literal('')),
   industry: z.string().optional(),
   currency: z.string(),
   timezone: z.string(),
@@ -61,6 +64,9 @@ export function BusinessSettings() {
     resolver: zodResolver(businessSchema),
     defaultValues: {
       name: '',
+      legal_name: '',
+      tax_id: '',
+      trade_name: '',
       industry: '',
       currency: 'MXN',
       timezone: 'America/Mexico_City',
@@ -73,6 +79,9 @@ export function BusinessSettings() {
     if (activeBusiness) {
       form.reset({
         name: activeBusiness.name || '',
+        legal_name: activeBusiness.legal_name || '',
+        tax_id: activeBusiness.tax_id || '',
+        trade_name: activeBusiness.trade_name || '',
         industry: activeBusiness.industry || '',
         currency: activeBusiness.currency || 'MXN',
         timezone: activeBusiness.timezone || 'America/Mexico_City',
@@ -81,31 +90,47 @@ export function BusinessSettings() {
     }
   }, [activeBusiness, form]);
 
+
   const onSubmit = async (data: BusinessFormData) => {
     if (!activeBusiness || !isAdmin) return;
 
     setIsUpdating(true);
     try {
-      const { error } = await supabase
+      // `.select()` nos permite confirmar que la fila realmente se actualizó
+      // (si RLS bloquea el update, Supabase no devuelve error pero tampoco filas).
+      const { data: updated, error } = await supabase
         .from('businesses')
         .update({
           name: data.name.trim(),
+          legal_name: data.legal_name?.trim() || null,
+          tax_id: data.tax_id?.trim().toUpperCase() || null,
+          trade_name: data.trade_name?.trim() || null,
           industry: data.industry || null,
           currency: data.currency,
           timezone: data.timezone,
           logo_url: data.logo_url?.trim() || null,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', activeBusiness.id);
+        .eq('id', activeBusiness.id)
+        .select('id')
+        .maybeSingle();
 
       if (error) {
         console.error('Error updating business:', error);
-        toast.error('Error al guardar negocio');
+        toast.error('Error al guardar negocio', { description: error.message });
+        return;
+      }
+
+      if (!updated) {
+        toast.error('No se guardaron los cambios', {
+          description: 'No tienes permisos para editar este negocio.',
+        });
         return;
       }
 
       await refreshBusinesses();
-      toast.success('Negocio actualizado');
+      form.reset(data, { keepValues: true });
+      toast.success('Negocio actualizado', { description: 'Los cambios se han guardado.' });
     } catch (err) {
       console.error('Error updating business:', err);
       toast.error('Error al guardar negocio');
@@ -114,8 +139,22 @@ export function BusinessSettings() {
     }
   };
 
+
   const watchedLogoUrl = form.watch('logo_url');
   const watchedName = form.watch('name');
+  const isDirty = form.formState.isDirty;
+
+  // Aviso al cerrar/recargar con cambios pendientes
+  useEffect(() => {
+    if (!isDirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isDirty]);
+
 
   if (!activeBusiness) {
     return (
@@ -158,9 +197,14 @@ export function BusinessSettings() {
                 </AvatarFallback>
               </Avatar>
               <div className="text-sm text-muted-foreground">
-                <p className="font-medium text-foreground">{activeBusiness.name}</p>
+                <p className="font-medium text-foreground">
+                  {activeBusiness.trade_name || activeBusiness.name}
+                </p>
+                {activeBusiness.legal_name && <p>{activeBusiness.legal_name}</p>}
+                {activeBusiness.tax_id && <p>CIF: {activeBusiness.tax_id}</p>}
                 <p>ID: {activeBusiness.id.slice(0, 8)}...</p>
               </div>
+
             </div>
 
             <FormField
@@ -168,7 +212,7 @@ export function BusinessSettings() {
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Nombre del negocio *</FormLabel>
+                  <FormLabel>Nombre del negocio (interno) *</FormLabel>
                   <FormControl>
                     <Input 
                       placeholder="Nombre de tu empresa" 
@@ -176,10 +220,77 @@ export function BusinessSettings() {
                       disabled={!isAdmin}
                     />
                   </FormControl>
+                  <FormDescription>
+                    Cómo identificas este negocio dentro de Pymova.
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="legal_name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Razón social (nombre legal)</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Codiarch Squad S.L."
+                        {...field}
+                        disabled={!isAdmin}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Aparecerá en facturas y documentos legales.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="tax_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>CIF / NIF</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="B12345678"
+                        {...field}
+                        disabled={!isAdmin}
+                      />
+                    </FormControl>
+                    <FormDescription>Identificación fiscal de la empresa.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <FormField
+              control={form.control}
+              name="trade_name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nombre comercial (marca)</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="TUILUS"
+                      {...field}
+                      disabled={!isAdmin}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    La marca que ven tus clientes en tickets, presupuestos y comunicaciones.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
 
             <div className="grid gap-4 md:grid-cols-2">
               <FormField
@@ -289,13 +400,19 @@ export function BusinessSettings() {
             />
 
             {isAdmin && (
-              <div className="flex justify-end">
-                <Button type="submit" disabled={isUpdating}>
+              <div className="flex items-center justify-end gap-3">
+                {isDirty && (
+                  <span className="text-sm text-amber-600 dark:text-amber-500">
+                    Tienes cambios sin guardar
+                  </span>
+                )}
+                <Button type="submit" disabled={isUpdating || !isDirty}>
                   {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Guardar cambios
                 </Button>
               </div>
             )}
+
           </form>
         </Form>
       </CardContent>
