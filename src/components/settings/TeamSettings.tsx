@@ -101,12 +101,13 @@ export function TeamSettings() {
               Equipo
             </CardTitle>
             <CardDescription>
-              Invita a nuevas personas y gestiona sus permisos. El enlace de invitación no se
-              envía por correo todavía: cópialo y compártelo (WhatsApp, email…). Quien lo abra
-              podrá entrar con Google usando ese mismo correo.
+              Invita a nuevas personas y gestiona sus permisos. Enviamos la invitación por
+              correo automáticamente; también puedes copiar el enlace y compartirlo tú
+              (WhatsApp, email…). Quien lo abra podrá entrar con Google usando ese mismo correo.
             </CardDescription>
 
           </div>
+
           {isAdmin && (
             <Button onClick={() => setDialogOpen(true)}>
               <UserPlus className="mr-2 h-4 w-4" />
