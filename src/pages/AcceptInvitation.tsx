@@ -17,8 +17,8 @@ const AcceptInvitation = () => {
     if (isAuthLoading || !token) return;
 
     if (!user) {
-      sessionStorage.setItem('pymova_pending_invite', token);
-      navigate('/auth', { replace: true });
+      setPendingInvite(token);
+      navigate('/auth?invite=1', { replace: true });
       return;
     }
 
@@ -31,18 +31,20 @@ const AcceptInvitation = () => {
       if (cancelled) return;
 
       if (error) {
+        clearPendingInvite();
         setStatus('error');
         setMessage(error.message);
         return;
       }
 
-      sessionStorage.removeItem('pymova_pending_invite');
+      clearPendingInvite();
       await refreshBusinesses();
       if (data) await setActiveBusiness(data as string);
       setStatus('done');
       setMessage('Te has unido al negocio correctamente.');
       setTimeout(() => navigate('/dashboard', { replace: true }), 1500);
     };
+
 
     accept();
     return () => {
