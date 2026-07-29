@@ -47,11 +47,14 @@ export function TeamSettings() {
     members,
     invitations,
     isLoading,
+    sendingId,
+    resendInvitation,
     inviteUser,
     revokeInvitation,
     updateMemberRole,
     setMemberActive,
   } = useTeam();
+
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [email, setEmail] = useState('');
