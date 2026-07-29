@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Users, UserPlus, Copy, Check, Ban, Crown, UserCog, User as UserIcon, Mail } from 'lucide-react';
+import { Users, UserPlus, Copy, Check, Ban, Crown, UserCog, User as UserIcon, Mail, Send, Loader2 } from 'lucide-react';
 import { useTeam } from '@/hooks/useTeam';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { useRoleAccess } from '@/hooks/useRoleAccess';
