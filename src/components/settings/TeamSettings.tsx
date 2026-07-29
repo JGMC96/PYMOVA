@@ -60,7 +60,7 @@ export function TeamSettings() {
 
   const pendingInvites = invitations.filter((i) => i.status === 'pending');
 
-  const inviteLink = (token: string) => `${window.location.origin}/invite/${token}`;
+  const inviteLink = (token: string) => buildInviteLink(token);
 
   const handleCopy = async (token: string) => {
     await navigator.clipboard.writeText(inviteLink(token));
