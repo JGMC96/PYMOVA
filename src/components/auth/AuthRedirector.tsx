@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { checkIsSuperAdmin } from "@/lib/superAdmin";
+import { getPendingInvite } from "@/lib/inviteLink";
 
 /**
  * Global listener that redirects authenticated users away from public
@@ -22,7 +23,7 @@ export const AuthRedirector = () => {
         if (!PUBLIC_PATHS.includes(location.pathname)) return;
 
         // Si venía de un enlace de invitación, completarlo primero
-        const pendingInvite = sessionStorage.getItem("pymova_pending_invite");
+        const pendingInvite = getPendingInvite();
         if (pendingInvite) {
           navigate(`/invite/${pendingInvite}`, { replace: true });
           return;

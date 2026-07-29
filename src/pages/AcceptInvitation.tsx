@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useBusiness } from '@/contexts/BusinessContext';
+import { setPendingInvite, clearPendingInvite } from '@/lib/inviteLink';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -17,8 +18,8 @@ const AcceptInvitation = () => {
     if (isAuthLoading || !token) return;
 
     if (!user) {
-      sessionStorage.setItem('pymova_pending_invite', token);
-      navigate('/auth', { replace: true });
+      setPendingInvite(token);
+      navigate('/auth?invite=1', { replace: true });
       return;
     }
 
@@ -31,18 +32,20 @@ const AcceptInvitation = () => {
       if (cancelled) return;
 
       if (error) {
+        clearPendingInvite();
         setStatus('error');
         setMessage(error.message);
         return;
       }
 
-      sessionStorage.removeItem('pymova_pending_invite');
+      clearPendingInvite();
       await refreshBusinesses();
       if (data) await setActiveBusiness(data as string);
       setStatus('done');
       setMessage('Te has unido al negocio correctamente.');
       setTimeout(() => navigate('/dashboard', { replace: true }), 1500);
     };
+
 
     accept();
     return () => {

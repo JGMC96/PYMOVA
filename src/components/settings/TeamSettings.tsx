@@ -3,6 +3,7 @@ import { Users, UserPlus, Copy, Check, Ban, Crown, UserCog, User as UserIcon, Ma
 import { useTeam } from '@/hooks/useTeam';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { useRoleAccess } from '@/hooks/useRoleAccess';
+import { buildInviteLink } from '@/lib/inviteLink';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -60,7 +61,7 @@ export function TeamSettings() {
 
   const pendingInvites = invitations.filter((i) => i.status === 'pending');
 
-  const inviteLink = (token: string) => `${window.location.origin}/invite/${token}`;
+  const inviteLink = (token: string) => buildInviteLink(token);
 
   const handleCopy = async (token: string) => {
     await navigator.clipboard.writeText(inviteLink(token));
@@ -97,8 +98,11 @@ export function TeamSettings() {
               Equipo
             </CardTitle>
             <CardDescription>
-              Invita a nuevas personas y gestiona sus permisos en el negocio
+              Invita a nuevas personas y gestiona sus permisos. El enlace de invitación no se
+              envía por correo todavía: cópialo y compártelo (WhatsApp, email…). Quien lo abra
+              podrá entrar con Google usando ese mismo correo.
             </CardDescription>
+
           </div>
           {isAdmin && (
             <Button onClick={() => setDialogOpen(true)}>

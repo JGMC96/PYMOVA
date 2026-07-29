@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import { setRememberSession, isRememberSession } from "@/lib/sessionPersistence";
 import { checkIsSuperAdmin } from "@/lib/superAdmin";
+import { getPendingInvite } from "@/lib/inviteLink";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 
@@ -23,11 +24,20 @@ const Auth = () => {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
+  const pendingInvite = getPendingInvite();
+
   useEffect(() => {
     // Helper function to check memberships and navigate
     const checkMembershipsAndNavigate = (userId: string) => {
       // Use setTimeout to avoid deadlocks in onAuthStateChange
       setTimeout(async () => {
+        // Si el usuario llegó desde un enlace de invitación, completarlo primero
+        const invite = getPendingInvite();
+        if (invite) {
+          navigate(`/invite/${invite}`, { replace: true });
+          return;
+        }
+
         const { data: memberships } = await supabase
           .from('business_members')
           .select('business_id')
@@ -49,6 +59,7 @@ const Auth = () => {
         }
       }, 0);
     };
+
 
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -168,8 +179,18 @@ const Auth = () => {
             </span>
           </div>
           <h1 className="text-2xl font-display font-bold text-foreground mb-6">
-            Iniciar sesión o crear cuenta
+            {pendingInvite ? "Acepta tu invitación" : "Iniciar sesión o crear cuenta"}
           </h1>
+
+          {pendingInvite && (
+            <div className="mb-6 rounded-lg border border-primary/30 bg-primary/10 p-3 text-sm text-foreground">
+              Tienes una invitación pendiente. Inicia sesión (o crea tu cuenta) con
+              <strong> el mismo correo al que se envió la invitación</strong> y te unirás al
+              equipo automáticamente.
+            </div>
+          )}
+
+
 
           {/* Tabs */}
           <div className="flex gap-4 mb-8">
