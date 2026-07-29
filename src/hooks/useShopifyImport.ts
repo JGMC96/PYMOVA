@@ -101,7 +101,7 @@ export function useShopifyImport() {
               category: product.productType || null,
               sku: firstVariant?.sku || null,
               barcode: firstVariant?.barcode || null,
-              track_inventory: true,
+              track_inventory: false,
               is_active: true,
             };
 
