@@ -387,13 +387,19 @@ export function BusinessSettings() {
             />
 
             {isAdmin && (
-              <div className="flex justify-end">
-                <Button type="submit" disabled={isUpdating}>
+              <div className="flex items-center justify-end gap-3">
+                {isDirty && (
+                  <span className="text-sm text-amber-600 dark:text-amber-500">
+                    Tienes cambios sin guardar
+                  </span>
+                )}
+                <Button type="submit" disabled={isUpdating || !isDirty}>
                   {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Guardar cambios
                 </Button>
               </div>
             )}
+
           </form>
         </Form>
       </CardContent>
