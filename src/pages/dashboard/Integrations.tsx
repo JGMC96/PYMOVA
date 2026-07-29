@@ -1,10 +1,10 @@
-import { useState } from 'react';
-import { Plug, ShoppingBag, Globe, Store, Table2, CreditCard, Sparkles } from 'lucide-react';
+import { Plug, ShoppingBag, Globe, Store, Table2, CreditCard, Sparkles, Loader2, Check } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { toast } from 'sonner';
+import { useIntegrationInterests } from '@/hooks/useIntegrationInterests';
 import type { LucideIcon } from 'lucide-react';
+
 
 interface Integration {
   key: string;
