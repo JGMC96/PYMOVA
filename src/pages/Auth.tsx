@@ -23,11 +23,20 @@ const Auth = () => {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
+  const pendingInvite = getPendingInvite();
+
   useEffect(() => {
     // Helper function to check memberships and navigate
     const checkMembershipsAndNavigate = (userId: string) => {
       // Use setTimeout to avoid deadlocks in onAuthStateChange
       setTimeout(async () => {
+        // Si el usuario llegó desde un enlace de invitación, completarlo primero
+        const invite = getPendingInvite();
+        if (invite) {
+          navigate(`/invite/${invite}`, { replace: true });
+          return;
+        }
+
         const { data: memberships } = await supabase
           .from('business_members')
           .select('business_id')
@@ -49,6 +58,7 @@ const Auth = () => {
         }
       }, 0);
     };
+
 
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
