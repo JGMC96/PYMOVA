@@ -194,7 +194,7 @@ export function BusinessSettings() {
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Nombre del negocio *</FormLabel>
+                  <FormLabel>Nombre del negocio (interno) *</FormLabel>
                   <FormControl>
                     <Input 
                       placeholder="Nombre de tu empresa" 
@@ -202,10 +202,77 @@ export function BusinessSettings() {
                       disabled={!isAdmin}
                     />
                   </FormControl>
+                  <FormDescription>
+                    Cómo identificas este negocio dentro de Pymova.
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="legal_name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Razón social (nombre legal)</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Codiarch Squad S.L."
+                        {...field}
+                        disabled={!isAdmin}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Aparecerá en facturas y documentos legales.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="tax_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>CIF / NIF</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="B12345678"
+                        {...field}
+                        disabled={!isAdmin}
+                      />
+                    </FormControl>
+                    <FormDescription>Identificación fiscal de la empresa.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <FormField
+              control={form.control}
+              name="trade_name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nombre comercial (marca)</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="TUILUS"
+                      {...field}
+                      disabled={!isAdmin}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    La marca que ven tus clientes en tickets, presupuestos y comunicaciones.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
 
             <div className="grid gap-4 md:grid-cols-2">
               <FormField
