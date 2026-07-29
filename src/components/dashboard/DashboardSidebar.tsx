@@ -46,6 +46,7 @@ const menuItems: MenuItem[] = [
   { icon: CalendarDays, label: "Marketing", path: "/dashboard/marketing", moduleKey: "marketing" },
   { icon: Clock, label: "RRHH", path: "/dashboard/hr", moduleKey: "hr" },
   { icon: MessageSquare, label: "Asesor IA", path: "/dashboard/ai", moduleKey: "ai_advisor" },
+  { icon: Plug, label: "Integraciones", path: "/dashboard/integrations" },
 ];
 
 export const DashboardSidebar = ({ isOpen, onToggle }: DashboardSidebarProps) => {
