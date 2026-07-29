@@ -47,7 +47,9 @@ const Dashboard = () => {
               <Route path="retail/*" element={<Retail />} />
               <Route path="marketing/*" element={<Marketing />} />
               <Route path="hr/*" element={<Hr />} />
+              <Route path="integrations/*" element={<Integrations />} />
               <Route path="ai/*" element={
+
                 <LockedModulePage moduleName="Asesor IA" moduleKey="ai_advisor" icon={MessageSquare} />
               } />
               <Route path="settings/*" element={<Settings />} />
