@@ -44,6 +44,9 @@ const TIMEZONES = [
 
 const businessSchema = z.object({
   name: z.string().min(2, 'Nombre requerido').max(100, 'Máximo 100 caracteres'),
+  legal_name: z.string().max(150, 'Máximo 150 caracteres').optional().or(z.literal('')),
+  tax_id: z.string().max(30, 'Máximo 30 caracteres').optional().or(z.literal('')),
+  trade_name: z.string().max(100, 'Máximo 100 caracteres').optional().or(z.literal('')),
   industry: z.string().optional(),
   currency: z.string(),
   timezone: z.string(),
@@ -61,6 +64,9 @@ export function BusinessSettings() {
     resolver: zodResolver(businessSchema),
     defaultValues: {
       name: '',
+      legal_name: '',
+      tax_id: '',
+      trade_name: '',
       industry: '',
       currency: 'MXN',
       timezone: 'America/Mexico_City',
@@ -73,6 +79,9 @@ export function BusinessSettings() {
     if (activeBusiness) {
       form.reset({
         name: activeBusiness.name || '',
+        legal_name: activeBusiness.legal_name || '',
+        tax_id: activeBusiness.tax_id || '',
+        trade_name: activeBusiness.trade_name || '',
         industry: activeBusiness.industry || '',
         currency: activeBusiness.currency || 'MXN',
         timezone: activeBusiness.timezone || 'America/Mexico_City',
@@ -80,6 +89,7 @@ export function BusinessSettings() {
       });
     }
   }, [activeBusiness, form]);
+
 
   const onSubmit = async (data: BusinessFormData) => {
     if (!activeBusiness || !isAdmin) return;
