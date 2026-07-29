@@ -13,6 +13,7 @@ import Payments from "@/pages/dashboard/Payments";
 import Retail from "@/pages/dashboard/Retail";
 import Marketing from "@/pages/dashboard/Marketing";
 import Hr from "@/pages/dashboard/Hr";
+import Integrations from "@/pages/dashboard/Integrations";
 import Settings from "@/pages/dashboard/Settings";
 import LockedModulePage from "@/pages/dashboard/LockedModulePage";
 
@@ -46,7 +47,9 @@ const Dashboard = () => {
               <Route path="retail/*" element={<Retail />} />
               <Route path="marketing/*" element={<Marketing />} />
               <Route path="hr/*" element={<Hr />} />
+              <Route path="integrations/*" element={<Integrations />} />
               <Route path="ai/*" element={
+
                 <LockedModulePage moduleName="Asesor IA" moduleKey="ai_advisor" icon={MessageSquare} />
               } />
               <Route path="settings/*" element={<Settings />} />
