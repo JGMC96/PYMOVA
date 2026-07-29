@@ -14,6 +14,7 @@ import {
   ChevronLeft,
   Building2,
   Lock,
+  Plug,
   ShieldCheck,
   LucideIcon,
 } from "lucide-react";
