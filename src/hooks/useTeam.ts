@@ -140,12 +140,49 @@ export function useTeam() {
         return null;
       }
 
-      toast({ title: 'Invitación creada', description: `Comparte el enlace con ${cleanEmail}.` });
+      const invitation = data as TeamInvitation;
+      const sent = await sendInvitationEmail(invitation);
+
+      toast({
+        title: 'Invitación creada',
+        description: sent.ok
+          ? `Hemos enviado un correo a ${cleanEmail}.`
+          : `No pudimos enviar el correo automáticamente. Copia el enlace y compártelo con ${cleanEmail}.`,
+        variant: sent.ok ? undefined : 'destructive',
+      });
       await fetchAll();
-      return data as TeamInvitation;
+      return invitation;
     },
-    [activeBusinessId, user, fetchAll],
+    [activeBusinessId, user, fetchAll, sendInvitationEmail],
   );
+
+  const resendInvitation = useCallback(
+    async (invitation: TeamInvitation) => {
+      setSendingId(invitation.id);
+      const sent = await sendInvitationEmail(invitation);
+      setSendingId(null);
+
+      if (sent.ok) {
+        toast({
+          title: 'Invitación reenviada',
+          description: `Correo enviado a ${invitation.email}.`,
+        });
+        return true;
+      }
+
+      toast({
+        title: 'No se pudo reenviar',
+        description:
+          sent.reason === 'email_suppressed'
+            ? 'Ese correo está dado de baja o rebotó. Comparte el enlace manualmente.'
+            : 'Revisa el estado del envío de correos e inténtalo de nuevo, o comparte el enlace manualmente.',
+        variant: 'destructive',
+      });
+      return false;
+    },
+    [sendInvitationEmail],
+  );
+
 
   const revokeInvitation = useCallback(
     async (id: string) => {
