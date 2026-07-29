@@ -246,7 +246,10 @@ export function useTeam() {
     members,
     invitations,
     isLoading,
+    sendingId,
+    resendInvitation,
     refetch: fetchAll,
+
     inviteUser,
     revokeInvitation,
     updateMemberRole,
