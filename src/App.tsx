@@ -37,6 +37,8 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/blog/mejores-erp-pymes" element={<MejoresErpPymes />} />
             <Route path="/invite/:token" element={<AcceptInvitation />} />
+            <Route path="/unsubscribe" element={<Unsubscribe />} />
+
             
             {/* Auth required routes */}
             <Route path="/onboarding" element={
