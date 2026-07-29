@@ -96,26 +96,41 @@ export function BusinessSettings() {
 
     setIsUpdating(true);
     try {
-      const { error } = await supabase
+      // `.select()` nos permite confirmar que la fila realmente se actualizó
+      // (si RLS bloquea el update, Supabase no devuelve error pero tampoco filas).
+      const { data: updated, error } = await supabase
         .from('businesses')
         .update({
           name: data.name.trim(),
+          legal_name: data.legal_name?.trim() || null,
+          tax_id: data.tax_id?.trim().toUpperCase() || null,
+          trade_name: data.trade_name?.trim() || null,
           industry: data.industry || null,
           currency: data.currency,
           timezone: data.timezone,
           logo_url: data.logo_url?.trim() || null,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', activeBusiness.id);
+        .eq('id', activeBusiness.id)
+        .select('id')
+        .maybeSingle();
 
       if (error) {
         console.error('Error updating business:', error);
-        toast.error('Error al guardar negocio');
+        toast.error('Error al guardar negocio', { description: error.message });
+        return;
+      }
+
+      if (!updated) {
+        toast.error('No se guardaron los cambios', {
+          description: 'No tienes permisos para editar este negocio.',
+        });
         return;
       }
 
       await refreshBusinesses();
-      toast.success('Negocio actualizado');
+      form.reset(data, { keepValues: true });
+      toast.success('Negocio actualizado', { description: 'Los cambios se han guardado.' });
     } catch (err) {
       console.error('Error updating business:', err);
       toast.error('Error al guardar negocio');
@@ -123,6 +138,7 @@ export function BusinessSettings() {
       setIsUpdating(false);
     }
   };
+
 
   const watchedLogoUrl = form.watch('logo_url');
   const watchedName = form.watch('name');
