@@ -12,6 +12,8 @@ import SelectBusiness from "./pages/SelectBusiness";
 import NotFound from "./pages/NotFound";
 import MejoresErpPymes from "./pages/blog/MejoresErpPymes";
 import AcceptInvitation from "./pages/AcceptInvitation";
+import Unsubscribe from "./pages/Unsubscribe";
+
 import { RequireAuth } from "./components/auth/RequireAuth";
 import { RequireBusiness } from "./components/auth/RequireBusiness";
 import { AuthRedirector } from "./components/auth/AuthRedirector";
@@ -37,6 +39,8 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/blog/mejores-erp-pymes" element={<MejoresErpPymes />} />
             <Route path="/invite/:token" element={<AcceptInvitation />} />
+            <Route path="/unsubscribe" element={<Unsubscribe />} />
+
             
             {/* Auth required routes */}
             <Route path="/onboarding" element={

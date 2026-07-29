@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Users, UserPlus, Copy, Check, Ban, Crown, UserCog, User as UserIcon, Mail } from 'lucide-react';
+import { Users, UserPlus, Copy, Check, Ban, Crown, UserCog, User as UserIcon, Mail, Send, Loader2 } from 'lucide-react';
 import { useTeam } from '@/hooks/useTeam';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { useRoleAccess } from '@/hooks/useRoleAccess';
@@ -47,11 +47,14 @@ export function TeamSettings() {
     members,
     invitations,
     isLoading,
+    sendingId,
+    resendInvitation,
     inviteUser,
     revokeInvitation,
     updateMemberRole,
     setMemberActive,
   } = useTeam();
+
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [email, setEmail] = useState('');
@@ -98,12 +101,13 @@ export function TeamSettings() {
               Equipo
             </CardTitle>
             <CardDescription>
-              Invita a nuevas personas y gestiona sus permisos. El enlace de invitación no se
-              envía por correo todavía: cópialo y compártelo (WhatsApp, email…). Quien lo abra
-              podrá entrar con Google usando ese mismo correo.
+              Invita a nuevas personas y gestiona sus permisos. Enviamos la invitación por
+              correo automáticamente; también puedes copiar el enlace y compartirlo tú
+              (WhatsApp, email…). Quien lo abra podrá entrar con Google usando ese mismo correo.
             </CardDescription>
 
           </div>
+
           {isAdmin && (
             <Button onClick={() => setDialogOpen(true)}>
               <UserPlus className="mr-2 h-4 w-4" />
@@ -209,7 +213,21 @@ export function TeamSettings() {
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      disabled={sendingId === inv.id}
+                      onClick={() => resendInvitation(inv)}
+                    >
+                      {sendingId === inv.id ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Send className="mr-2 h-4 w-4" />
+                      )}
+                      {sendingId === inv.id ? 'Enviando...' : 'Reenviar'}
+                    </Button>
                     <Button variant="outline" size="sm" onClick={() => handleCopy(inv.token)}>
+
                       {copiedToken === inv.token ? (
                         <Check className="mr-2 h-4 w-4" />
                       ) : (
