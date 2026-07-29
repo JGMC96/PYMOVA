@@ -12,5 +12,11 @@ Allow: /
 
 User-agent: *
 Allow: /
+Disallow: /dashboard
+Disallow: /admin
+Disallow: /onboarding
+Disallow: /select-business
+Disallow: /invite/
+Disallow: /unsubscribe
 
-Sitemap: https://cogent-business-os.lovable.app/sitemap.xml
+Sitemap: https://pymova.com/sitemap.xml
