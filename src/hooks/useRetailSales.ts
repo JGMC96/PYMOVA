@@ -33,9 +33,11 @@ export interface SaleWithClient extends Sale {
 
 export interface CartItem {
   product_id: string;
+  variant_id?: string | null;
   product_name: string;
   quantity: number;
   unit_price: number;
+  discount?: number;
   total: number;
 }
 
@@ -47,7 +49,13 @@ export interface CreateSaleData {
   subtotal: number;
   tax: number;
   total: number;
+  discount?: number;
+  tip?: number;
+  cash_received?: number | null;
+  change_given?: number | null;
+  register_session_id?: string | null;
 }
+
 
 export function useRetailSales() {
   const { activeBusiness } = useBusiness();
@@ -117,6 +125,11 @@ export function useRetailSales() {
           subtotal: data.subtotal,
           tax: data.tax,
           total: data.total,
+          discount: data.discount ?? 0,
+          tip: data.tip ?? 0,
+          cash_received: data.cash_received ?? null,
+          change_given: data.change_given ?? null,
+          register_session_id: data.register_session_id ?? null,
           payment_method: data.payment_method,
           notes: data.notes || null,
           created_by: user?.id || null,
@@ -130,9 +143,11 @@ export function useRetailSales() {
       const saleItems = data.items.map(item => ({
         sale_id: sale.id,
         product_id: item.product_id,
+        variant_id: item.variant_id ?? null,
         product_name: item.product_name,
         quantity: item.quantity,
         unit_price: item.unit_price,
+        discount: item.discount ?? 0,
         total: item.total,
       }));
 
@@ -141,6 +156,7 @@ export function useRetailSales() {
         .insert(saleItems);
 
       if (itemsError) throw itemsError;
+
 
       toast.success(`Venta ${saleNumber} registrada`);
       fetchSales();
