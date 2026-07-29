@@ -60,6 +60,10 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
           name,
           slug,
           logo_url,
+          legal_name,
+          tax_id,
+          trade_name,
+
           industry,
           currency,
           timezone,
