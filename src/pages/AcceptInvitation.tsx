@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -13,6 +13,7 @@ const AcceptInvitation = () => {
   const { user, isAuthLoading, refreshBusinesses, setActiveBusiness } = useBusiness();
   const [status, setStatus] = useState<'idle' | 'working' | 'done' | 'error'>('idle');
   const [message, setMessage] = useState('');
+  const attemptedRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (isAuthLoading || !token) return;
@@ -23,6 +24,10 @@ const AcceptInvitation = () => {
       return;
     }
 
+    // Evita ejecutar la aceptación dos veces (StrictMode / re-render)
+    if (attemptedRef.current === `${token}:${user.id}`) return;
+    attemptedRef.current = `${token}:${user.id}`;
+
     let cancelled = false;
 
     const accept = async () => {
@@ -30,6 +35,7 @@ const AcceptInvitation = () => {
       const { data, error } = await supabase.rpc('accept_business_invitation', { _token: token });
 
       if (cancelled) return;
+
 
       if (error) {
         clearPendingInvite();
