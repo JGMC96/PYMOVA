@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Building2, ChevronRight, Plus, Crown, Shield, User } from 'lucide-react';
 import type { AppRole } from '@/types/database';
+import { usePageMeta } from '@/hooks/usePageMeta';
 
 const ROLE_CONFIG: Record<AppRole, { label: string; icon: typeof Crown; color: string }> = {
   owner: { label: 'Propietario', icon: Crown, color: 'bg-amber-500/10 text-amber-600' },
@@ -14,6 +15,11 @@ const ROLE_CONFIG: Record<AppRole, { label: string; icon: typeof Crown; color: s
 };
 
 export default function SelectBusiness() {
+  usePageMeta({
+    title: 'Selecciona un negocio — Pymova',
+    description: 'Cambia entre los negocios que gestionas en Pymova y accede al panel del que quieras administrar.',
+    path: '/select-business',
+  });
   const navigate = useNavigate();
   const { userBusinesses, setActiveBusiness } = useBusiness();
 

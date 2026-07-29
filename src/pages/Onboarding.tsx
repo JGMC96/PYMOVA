@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { Building2, Sparkles, ArrowRight, Loader2, ShieldCheck } from 'lucide-react';
+import { usePageMeta } from '@/hooks/usePageMeta';
 
 const INDUSTRIES = [
   { value: 'retail', label: 'Comercio / Retail' },
@@ -26,6 +27,11 @@ const INDUSTRIES = [
 ];
 
 export default function Onboarding() {
+  usePageMeta({
+    title: 'Configura tu negocio — Pymova',
+    description: 'Da de alta tu negocio en Pymova en un minuto: nombre, sector, moneda y zona horaria para empezar a facturar y vender.',
+    path: '/onboarding',
+  });
   const navigate = useNavigate();
   const { user, refreshBusinesses } = useBusiness();
   const { isSuperAdmin } = useSuperAdmin();
