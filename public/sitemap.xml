@@ -19,5 +19,9 @@
     <loc>https://pymova.com/blog/negocios-rentables-2026</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
+  <url>
+    <loc>https://pymova.com/blog/guia-verifactu-2026</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
   </url>
 </urlset>
