@@ -32,11 +32,42 @@ export interface TeamInvitation {
 }
 
 export function useTeam() {
-  const { activeBusinessId, user } = useBusiness();
+  const { activeBusinessId, activeBusiness, user } = useBusiness();
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [invitations, setInvitations] = useState<TeamInvitation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [sendingId, setSendingId] = useState<string | null>(null);
   const requestIdRef = useRef(0);
+
+  /** Envía (o reenvía) el correo de invitación al destinatario. */
+  const sendInvitationEmail = useCallback(
+    async (invitation: TeamInvitation) => {
+      const { data, error } = await supabase.functions.invoke('send-transactional-email', {
+        body: {
+          templateName: 'team-invitation',
+          recipientEmail: invitation.email,
+          idempotencyKey: `team-invitation-${invitation.id}-${Date.now()}`,
+          templateData: {
+            businessName: activeBusiness?.name ?? 'tu equipo',
+            inviteUrl: buildInviteLink(invitation.token),
+            roleLabel: ROLE_LABEL[invitation.role],
+            inviterName: user?.user_metadata?.full_name ?? undefined,
+          },
+        },
+      });
+
+      if (error) {
+        console.error('send-transactional-email failed:', error);
+        return { ok: false, reason: 'error' as const };
+      }
+      if (data?.success === false) {
+        return { ok: false, reason: (data?.reason as string) ?? 'error' };
+      }
+      return { ok: true, reason: null };
+    },
+    [activeBusiness?.name, user],
+  );
+
 
   const fetchAll = useCallback(async () => {
     if (!activeBusinessId) {
