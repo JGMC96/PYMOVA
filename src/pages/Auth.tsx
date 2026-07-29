@@ -179,8 +179,18 @@ const Auth = () => {
             </span>
           </div>
           <h1 className="text-2xl font-display font-bold text-foreground mb-6">
-            Iniciar sesión o crear cuenta
+            {pendingInvite ? "Acepta tu invitación" : "Iniciar sesión o crear cuenta"}
           </h1>
+
+          {pendingInvite && (
+            <div className="mb-6 rounded-lg border border-primary/30 bg-primary/10 p-3 text-sm text-foreground">
+              Tienes una invitación pendiente. Inicia sesión (o crea tu cuenta) con
+              <strong> el mismo correo al que se envió la invitación</strong> y te unirás al
+              equipo automáticamente.
+            </div>
+          )}
+
+
 
           {/* Tabs */}
           <div className="flex gap-4 mb-8">
