@@ -3,6 +3,7 @@ import { Users, UserPlus, Copy, Check, Ban, Crown, UserCog, User as UserIcon, Ma
 import { useTeam } from '@/hooks/useTeam';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { useRoleAccess } from '@/hooks/useRoleAccess';
+import { buildInviteLink } from '@/lib/inviteLink';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
