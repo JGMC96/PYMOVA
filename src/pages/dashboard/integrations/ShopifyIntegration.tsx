@@ -210,11 +210,6 @@ const ShopifyIntegration = () => {
                             {variants.length} variantes
                           </Badge>
                         )}
-                        {product.totalInventory !== null && (
-                          <Badge variant="secondary" className="text-xs">
-                            Stock {product.totalInventory}
-                          </Badge>
-                        )}
                       </div>
                     </div>
                   </button>

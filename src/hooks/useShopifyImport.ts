@@ -92,7 +92,6 @@ export function useShopifyImport() {
             const variants = product.variants.edges.map((e) => e.node);
             const firstVariant = variants[0];
             const price = Number(product.priceRange.minVariantPrice.amount) || 0;
-            const stock = product.totalInventory ?? firstVariant?.quantityAvailable ?? 0;
 
             const payload = {
               business_id: activeBusinessId,
@@ -102,7 +101,6 @@ export function useShopifyImport() {
               category: product.productType || null,
               sku: firstVariant?.sku || null,
               barcode: firstVariant?.barcode || null,
-              stock_quantity: stock,
               track_inventory: true,
               is_active: true,
             };
@@ -151,7 +149,6 @@ export function useShopifyImport() {
                   sku: variant.sku || null,
                   barcode: variant.barcode || null,
                   price: Number(variant.price.amount) || null,
-                  stock_quantity: variant.quantityAvailable ?? 0,
                   is_active: variant.availableForSale,
                 };
 
