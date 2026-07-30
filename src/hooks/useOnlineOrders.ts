@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { toast } from 'sonner';
+import { pushShopifyOrderStatus } from '@/hooks/useShopifyOrdersSync';
 
 export type OnlineOrderStatus =
   | 'pending'
