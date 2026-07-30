@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useShopifyImport } from '@/hooks/useShopifyImport';
+import { useShopifyOrdersSync } from '@/hooks/useShopifyOrdersSync';
 import { SHOPIFY_STORE_PERMANENT_DOMAIN } from '@/lib/shopify';
 
 const ShopifyIntegration = () => {
