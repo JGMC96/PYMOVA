@@ -1,8 +1,20 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { toast } from 'sonner';
-import { fetchShopifyProducts, type ShopifyProduct } from '@/lib/shopify';
+import { fetchShopifyProducts, fetchAllShopifyProducts, type ShopifyProduct } from '@/lib/shopify';
+
+export interface SyncRun {
+  id: string;
+  scope: string;
+  status: string;
+  created_count: number;
+  updated_count: number;
+  failed_count: number;
+  message: string | null;
+  started_at: string;
+  finished_at: string | null;
+}
 
 export interface ImportSummary {
   created: number;
@@ -26,6 +38,9 @@ export function useShopifyImport() {
   const [hasNextPage, setHasNextPage] = useState(false);
   const [cursor, setCursor] = useState<string | null>(null);
   const [lastSummary, setLastSummary] = useState<ImportSummary | null>(null);
+  const [runs, setRuns] = useState<SyncRun[]>([]);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState(0);
   const requestIdRef = useRef(0);
 
   const search = useCallback(async (query: string) => {
@@ -92,6 +107,11 @@ export function useShopifyImport() {
             const variants = product.variants.edges.map((e) => e.node);
             const firstVariant = variants[0];
             const price = Number(product.priceRange.minVariantPrice.amount) || 0;
+            const productStock = variants.reduce(
+              (sum, v) => sum + (typeof v.quantityAvailable === 'number' ? v.quantityAvailable : 0),
+              0,
+            );
+            const tracksStock = variants.some((v) => typeof v.quantityAvailable === 'number');
 
             const payload = {
               business_id: activeBusinessId,
@@ -101,7 +121,8 @@ export function useShopifyImport() {
               category: product.productType || null,
               sku: firstVariant?.sku || null,
               barcode: firstVariant?.barcode || null,
-              track_inventory: false,
+              track_inventory: tracksStock,
+              stock_quantity: tracksStock ? productStock : null,
               is_active: true,
             };
 
@@ -150,6 +171,8 @@ export function useShopifyImport() {
                   barcode: variant.barcode || null,
                   price: Number(variant.price.amount) || null,
                   is_active: variant.availableForSale,
+                  stock_quantity:
+                    typeof variant.quantityAvailable === 'number' ? variant.quantityAvailable : 0,
                 };
 
                 const currentId = variantByName.get(variant.title);
@@ -191,8 +214,85 @@ export function useShopifyImport() {
     [activeBusinessId, user?.id],
   );
 
+  const fetchRuns = useCallback(async () => {
+    if (!activeBusinessId) return;
+    const { data } = await supabase
+      .from('integration_sync_runs')
+      .select('id, scope, status, created_count, updated_count, failed_count, message, started_at, finished_at')
+      .eq('business_id', activeBusinessId)
+      .eq('integration_key', 'shopify')
+      .order('started_at', { ascending: false })
+      .limit(5);
+    setRuns((data ?? []) as SyncRun[]);
+  }, [activeBusinessId]);
+
+  useEffect(() => {
+    fetchRuns();
+  }, [fetchRuns]);
+
+  const forceSync = useCallback(
+    async (query = '') => {
+      if (!activeBusinessId) {
+        toast.error('Selecciona un negocio activo antes de sincronizar.');
+        return;
+      }
+      setIsSyncing(true);
+      setSyncProgress(0);
+
+      const { data: run } = await supabase
+        .from('integration_sync_runs')
+        .insert({
+          business_id: activeBusinessId,
+          integration_key: 'shopify',
+          scope: query ? `catalogo:${query}` : 'catalogo-completo',
+          status: 'running',
+          created_by: user?.id ?? null,
+        })
+        .select('id')
+        .single();
+
+      try {
+        const all = await fetchAllShopifyProducts(query, setSyncProgress);
+        const summary = await importProducts(all);
+        if (run) {
+          await supabase
+            .from('integration_sync_runs')
+            .update({
+              status: !summary ? 'error' : summary.failed > 0 ? 'partial' : 'success',
+              created_count: summary?.created ?? 0,
+              updated_count: summary?.updated ?? 0,
+              failed_count: summary?.failed ?? 0,
+              message: summary
+                ? `${all.length} productos de Shopify procesados (${summary.variants} variantes).`
+                : 'No se pudo completar la sincronización.',
+              finished_at: new Date().toISOString(),
+            })
+            .eq('id', run.id);
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Error desconocido';
+        toast.error(`Error sincronizando con Shopify: ${message}`);
+        if (run) {
+          await supabase
+            .from('integration_sync_runs')
+            .update({ status: 'error', message, finished_at: new Date().toISOString() })
+            .eq('id', run.id);
+        }
+      } finally {
+        setIsSyncing(false);
+        fetchRuns();
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [activeBusinessId, user?.id, fetchRuns],
+  );
+
   return {
     products,
+    runs,
+    isSyncing,
+    syncProgress,
+    forceSync,
     isLoading,
     isImporting,
     error,
