@@ -35,6 +35,17 @@ const ShopifyIntegration = () => {
     importProducts,
   } = useShopifyImport();
 
+  const {
+    connection,
+    isSyncing: isOrdersSyncing,
+    isRegistering,
+    lastSummary: ordersSummary,
+    syncOrders,
+    registerWebhooks,
+  } = useShopifyOrdersSync();
+
+
+
   const [term, setTerm] = useState('');
   const [appliedTerm, setAppliedTerm] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
