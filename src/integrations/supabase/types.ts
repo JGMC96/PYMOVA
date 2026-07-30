@@ -1454,6 +1454,111 @@ export type Database = {
           },
         ]
       }
+      sale_return_items: {
+        Row: {
+          id: string
+          product_id: string | null
+          product_name: string
+          quantity: number
+          return_id: string
+          sale_item_id: string | null
+          total: number
+          unit_price: number
+          variant_id: string | null
+        }
+        Insert: {
+          id?: string
+          product_id?: string | null
+          product_name: string
+          quantity: number
+          return_id: string
+          sale_item_id?: string | null
+          total?: number
+          unit_price?: number
+          variant_id?: string | null
+        }
+        Update: {
+          id?: string
+          product_id?: string | null
+          product_name?: string
+          quantity?: number
+          return_id?: string
+          sale_item_id?: string | null
+          total?: number
+          unit_price?: number
+          variant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sale_return_items_return_id_fkey"
+            columns: ["return_id"]
+            isOneToOne: false
+            referencedRelation: "sale_returns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sale_return_items_sale_item_id_fkey"
+            columns: ["sale_item_id"]
+            isOneToOne: false
+            referencedRelation: "sale_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sale_returns: {
+        Row: {
+          business_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          reason: string | null
+          refund_method: string | null
+          restock: boolean
+          return_number: string
+          sale_id: string
+          total: number
+        }
+        Insert: {
+          business_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          reason?: string | null
+          refund_method?: string | null
+          restock?: boolean
+          return_number: string
+          sale_id: string
+          total?: number
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          reason?: string | null
+          refund_method?: string | null
+          restock?: boolean
+          return_number?: string
+          sale_id?: string
+          total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sale_returns_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sale_returns_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sales: {
         Row: {
           business_id: string
@@ -1652,6 +1757,41 @@ export type Database = {
         }
         Returns: string
       }
+      create_sale_return: {
+        Args: {
+          _business_id: string
+          _items: Json
+          _reason?: string
+          _refund_method?: string
+          _restock?: boolean
+          _sale_id: string
+        }
+        Returns: {
+          return_id: string
+          return_number: string
+        }[]
+      }
+      create_sale_with_items: {
+        Args: {
+          _business_id: string
+          _cash_received?: number
+          _change_given?: number
+          _client_id?: string
+          _discount?: number
+          _items: Json
+          _notes?: string
+          _payment_method?: string
+          _register_session_id?: string
+          _subtotal?: number
+          _tax?: number
+          _tip?: number
+          _total?: number
+        }
+        Returns: {
+          sale_id: string
+          sale_number: string
+        }[]
+      }
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
@@ -1741,6 +1881,19 @@ export type Database = {
           payment_method: string
           sales_count: number
           total_amount: number
+        }[]
+      }
+      get_sale_detail: {
+        Args: { _sale_id: string }
+        Returns: {
+          product_id: string
+          product_name: string
+          quantity: number
+          returned_quantity: number
+          sale_item_id: string
+          total: number
+          unit_price: number
+          variant_id: string
         }[]
       }
       get_user_role_in_business: {

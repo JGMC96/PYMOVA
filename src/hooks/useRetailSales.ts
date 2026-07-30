@@ -104,58 +104,37 @@ export function useRetailSales() {
     setIsCreating(true);
 
     try {
-      // Generate sale number
-      const { data: saleNumberData, error: saleNumberError } = await supabase
-        .rpc('generate_sale_number', { _business_id: activeBusiness.id });
+      // Atomic: sale + items in a single transaction (stock is decremented by trigger)
+      const { data: result, error } = await supabase.rpc('create_sale_with_items', {
+        _business_id: activeBusiness.id,
+        _items: data.items.map((item) => ({
+          product_id: item.product_id || null,
+          variant_id: item.variant_id ?? null,
+          product_name: item.product_name,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          discount: item.discount ?? 0,
+          total: item.total,
+        })) as any,
+        _payment_method: data.payment_method,
+        _client_id: data.client_id || null,
+        _notes: data.notes || null,
+        _subtotal: data.subtotal,
+        _tax: data.tax,
+        _total: data.total,
+        _discount: data.discount ?? 0,
+        _tip: data.tip ?? 0,
+        _cash_received: data.cash_received ?? null,
+        _change_given: data.change_given ?? null,
+        _register_session_id: data.register_session_id ?? null,
+      });
 
-      if (saleNumberError) throw saleNumberError;
+      if (error) throw error;
 
-      const saleNumber = saleNumberData as string;
+      const row = Array.isArray(result) ? result[0] : (result as any);
+      const sale = { id: row.sale_id as string };
+      const saleNumber = row.sale_number as string;
 
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
-
-      // Insert sale
-      const { data: sale, error: saleError } = await supabase
-        .from('sales')
-        .insert({
-          business_id: activeBusiness.id,
-          sale_number: saleNumber,
-          client_id: data.client_id || null,
-          subtotal: data.subtotal,
-          tax: data.tax,
-          total: data.total,
-          discount: data.discount ?? 0,
-          tip: data.tip ?? 0,
-          cash_received: data.cash_received ?? null,
-          change_given: data.change_given ?? null,
-          register_session_id: data.register_session_id ?? null,
-          payment_method: data.payment_method,
-          notes: data.notes || null,
-          created_by: user?.id || null,
-        })
-        .select()
-        .single();
-
-      if (saleError) throw saleError;
-
-      // Insert sale items
-      const saleItems = data.items.map(item => ({
-        sale_id: sale.id,
-        product_id: item.product_id,
-        variant_id: item.variant_id ?? null,
-        product_name: item.product_name,
-        quantity: item.quantity,
-        unit_price: item.unit_price,
-        discount: item.discount ?? 0,
-        total: item.total,
-      }));
-
-      const { error: itemsError } = await supabase
-        .from('sale_items')
-        .insert(saleItems);
-
-      if (itemsError) throw itemsError;
 
 
       toast.success(`Venta ${saleNumber} registrada`);
@@ -163,8 +142,9 @@ export function useRetailSales() {
       return { id: sale.id, sale_number: saleNumber };
     } catch (error: any) {
       console.error('Error creating sale:', error);
-      toast.error('Error al registrar venta');
+      toast.error(error?.message || 'Error al registrar venta');
       return null;
+
     } finally {
       setIsCreating(false);
     }
