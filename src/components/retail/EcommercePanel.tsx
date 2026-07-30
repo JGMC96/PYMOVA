@@ -14,6 +14,7 @@ import {
 import {
   useOnlineOrders, ORDER_STATUS_LABEL, type OnlineOrder, type OnlineOrderStatus,
 } from '@/hooks/useOnlineOrders';
+import { useShopifyOrdersSync } from '@/hooks/useShopifyOrdersSync';
 import { OnlineOrderDialog } from './OnlineOrderDialog';
 import { OnlineOrderReturnDialog } from './OnlineOrderReturnDialog';
 
