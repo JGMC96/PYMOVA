@@ -11,6 +11,7 @@ export interface ShopifyVariant {
   sku: string | null;
   barcode: string | null;
   availableForSale: boolean;
+  quantityAvailable: number | null;
   price: { amount: string; currencyCode: string };
   selectedOptions: Array<{ name: string; value: string }>;
 }
@@ -55,6 +56,7 @@ const PRODUCTS_QUERY = `
                 sku
                 barcode
                 availableForSale
+                quantityAvailable
                 price { amount currencyCode }
                 selectedOptions { name value }
               }
@@ -118,4 +120,21 @@ export async function fetchShopifyProducts(
     hasNextPage: Boolean(connection.pageInfo?.hasNextPage),
     endCursor: connection.pageInfo?.endCursor ?? null,
   };
+}
+
+export async function fetchAllShopifyProducts(
+  query?: string,
+  onProgress?: (loaded: number) => void,
+  maxPages = 20,
+): Promise<ShopifyProduct[]> {
+  const all: ShopifyProduct[] = [];
+  let after: string | null = null;
+  for (let i = 0; i < maxPages; i++) {
+    const page = await fetchShopifyProducts({ first: 100, after, query });
+    all.push(...page.products);
+    onProgress?.(all.length);
+    if (!page.hasNextPage || !page.endCursor) break;
+    after = page.endCursor;
+  }
+  return all;
 }

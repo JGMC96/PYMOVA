@@ -873,6 +873,59 @@ export type Database = {
           },
         ]
       }
+      integration_sync_runs: {
+        Row: {
+          business_id: string
+          created_by: string | null
+          created_count: number
+          failed_count: number
+          finished_at: string | null
+          id: string
+          integration_key: string
+          message: string | null
+          scope: string
+          started_at: string
+          status: string
+          updated_count: number
+        }
+        Insert: {
+          business_id: string
+          created_by?: string | null
+          created_count?: number
+          failed_count?: number
+          finished_at?: string | null
+          id?: string
+          integration_key: string
+          message?: string | null
+          scope: string
+          started_at?: string
+          status?: string
+          updated_count?: number
+        }
+        Update: {
+          business_id?: string
+          created_by?: string | null
+          created_count?: number
+          failed_count?: number
+          finished_at?: string | null
+          id?: string
+          integration_key?: string
+          message?: string | null
+          scope?: string
+          started_at?: string
+          status?: string
+          updated_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_sync_runs_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoice_items: {
         Row: {
           description: string
@@ -1082,6 +1135,214 @@ export type Database = {
           name?: string
         }
         Relationships: []
+      }
+      online_order_items: {
+        Row: {
+          id: string
+          order_id: string
+          product_id: string | null
+          product_name: string
+          quantity: number
+          total: number
+          unit_price: number
+          variant_id: string | null
+        }
+        Insert: {
+          id?: string
+          order_id: string
+          product_id?: string | null
+          product_name: string
+          quantity?: number
+          total?: number
+          unit_price?: number
+          variant_id?: string | null
+        }
+        Update: {
+          id?: string
+          order_id?: string
+          product_id?: string | null
+          product_name?: string
+          quantity?: number
+          total?: number
+          unit_price?: number
+          variant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "online_order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "online_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "online_order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "online_order_items_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      online_order_returns: {
+        Row: {
+          business_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          kind: string
+          order_id: string
+          reason: string | null
+          refund_method: string | null
+          restock: boolean
+          return_number: string
+          total: number
+        }
+        Insert: {
+          business_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind?: string
+          order_id: string
+          reason?: string | null
+          refund_method?: string | null
+          restock?: boolean
+          return_number: string
+          total?: number
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind?: string
+          order_id?: string
+          reason?: string | null
+          refund_method?: string | null
+          restock?: boolean
+          return_number?: string
+          total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "online_order_returns_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "online_order_returns_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "online_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      online_orders: {
+        Row: {
+          business_id: string
+          client_id: string | null
+          created_at: string
+          created_by: string | null
+          customer_email: string | null
+          customer_name: string
+          customer_phone: string | null
+          discount: number
+          external_id: string | null
+          id: string
+          notes: string | null
+          order_number: string
+          payment_method: string | null
+          payment_status: string
+          shipping_address: string | null
+          shipping_cost: number
+          source: string
+          status: Database["public"]["Enums"]["online_order_status"]
+          stock_applied: boolean
+          subtotal: number
+          tax: number
+          total: number
+          tracking_number: string | null
+          updated_at: string
+        }
+        Insert: {
+          business_id: string
+          client_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_email?: string | null
+          customer_name: string
+          customer_phone?: string | null
+          discount?: number
+          external_id?: string | null
+          id?: string
+          notes?: string | null
+          order_number: string
+          payment_method?: string | null
+          payment_status?: string
+          shipping_address?: string | null
+          shipping_cost?: number
+          source?: string
+          status?: Database["public"]["Enums"]["online_order_status"]
+          stock_applied?: boolean
+          subtotal?: number
+          tax?: number
+          total?: number
+          tracking_number?: string | null
+          updated_at?: string
+        }
+        Update: {
+          business_id?: string
+          client_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_email?: string | null
+          customer_name?: string
+          customer_phone?: string | null
+          discount?: number
+          external_id?: string | null
+          id?: string
+          notes?: string | null
+          order_number?: string
+          payment_method?: string | null
+          payment_status?: string
+          shipping_address?: string | null
+          shipping_cost?: number
+          source?: string
+          status?: Database["public"]["Enums"]["online_order_status"]
+          stock_applied?: boolean
+          subtotal?: number
+          tax?: number
+          total?: number
+          tracking_number?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "online_orders_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "online_orders_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       payments: {
         Row: {
@@ -1719,6 +1980,10 @@ export type Database = {
     }
     Functions: {
       accept_business_invitation: { Args: { _token: string }; Returns: string }
+      apply_online_order_stock: {
+        Args: { _direction: number; _order_id: string }
+        Returns: undefined
+      }
       clock_action: {
         Args: {
           _business_id: string
@@ -1744,6 +2009,42 @@ export type Database = {
         Returns: {
           invoice_id: string
           invoice_number: string
+        }[]
+      }
+      create_online_order: {
+        Args: {
+          _business_id: string
+          _client_id?: string
+          _customer_email?: string
+          _customer_name: string
+          _customer_phone?: string
+          _discount?: number
+          _items: Json
+          _notes?: string
+          _payment_method?: string
+          _payment_status?: string
+          _shipping_address?: string
+          _shipping_cost?: number
+          _source?: string
+          _tax?: number
+        }
+        Returns: {
+          order_id: string
+          order_number: string
+        }[]
+      }
+      create_online_order_return: {
+        Args: {
+          _kind?: string
+          _order_id: string
+          _reason?: string
+          _refund_method?: string
+          _restock?: boolean
+          _total?: number
+        }
+        Returns: {
+          return_id: string
+          return_number: string
         }[]
       }
       create_payment_and_recalc_invoice: {
@@ -1803,6 +2104,10 @@ export type Database = {
       }
       ensure_hr_employee: { Args: { _business_id: string }; Returns: string }
       generate_invoice_number: {
+        Args: { _business_id: string }
+        Returns: string
+      }
+      generate_online_order_number: {
         Args: { _business_id: string }
         Returns: string
       }
@@ -1979,6 +2284,14 @@ export type Database = {
         Returns: undefined
       }
       set_active_business: { Args: { _business_id: string }; Returns: boolean }
+      set_online_order_status: {
+        Args: {
+          _order_id: string
+          _status: Database["public"]["Enums"]["online_order_status"]
+          _tracking_number?: string
+        }
+        Returns: undefined
+      }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
     }
@@ -1994,6 +2307,14 @@ export type Database = {
         | "payments"
         | "ai_advisor"
         | "reports"
+      online_order_status:
+        | "pending"
+        | "accepted"
+        | "preparing"
+        | "shipped"
+        | "delivered"
+        | "cancelled"
+        | "returned"
       permission_type:
         | "late_arrival"
         | "early_departure"
@@ -2150,6 +2471,15 @@ export const Constants = {
         "payments",
         "ai_advisor",
         "reports",
+      ],
+      online_order_status: [
+        "pending",
+        "accepted",
+        "preparing",
+        "shipped",
+        "delivered",
+        "cancelled",
+        "returned",
       ],
       permission_type: [
         "late_arrival",

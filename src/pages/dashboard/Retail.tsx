@@ -1,4 +1,4 @@
-import { ShoppingCart, Receipt, Package, Wallet } from 'lucide-react';
+import { ShoppingCart, Receipt, Package, Wallet, Globe } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -8,6 +8,7 @@ import { POSPanel } from '@/components/retail/POSPanel';
 import { SalesHistory } from '@/components/retail/SalesHistory';
 import { InventoryView } from '@/components/retail/InventoryView';
 import { CashRegisterPanel } from '@/components/retail/CashRegisterPanel';
+import { EcommercePanel } from '@/components/retail/EcommercePanel';
 import { useStoreProfile } from '@/hooks/useStoreProfile';
 import { STORE_PROFILE_LIST, type StoreProfile } from '@/lib/storeProfiles';
 
@@ -55,6 +56,10 @@ const Retail = () => {
               <Wallet className="w-4 h-4" />
               Caja
             </TabsTrigger>
+            <TabsTrigger value="ecommerce" className="flex items-center gap-2">
+              <Globe className="w-4 h-4" />
+              E-commerce
+            </TabsTrigger>
             <TabsTrigger value="history" className="flex items-center gap-2">
               <Receipt className="w-4 h-4" />
               Historial
@@ -71,6 +76,10 @@ const Retail = () => {
 
           <TabsContent value="register" className="mt-6">
             <CashRegisterPanel />
+          </TabsContent>
+
+          <TabsContent value="ecommerce" className="mt-6">
+            <EcommercePanel />
           </TabsContent>
 
           <TabsContent value="history" className="mt-6">
