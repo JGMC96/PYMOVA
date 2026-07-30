@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { toast } from 'sonner';
+import { pushShopifyOrderStatus } from '@/hooks/useShopifyOrdersSync';
 
 export type OnlineOrderStatus =
   | 'pending'
@@ -169,6 +170,30 @@ export function useOnlineOrders() {
         });
         if (error) throw error;
         toast.success(`Pedido marcado como ${ORDER_STATUS_LABEL[status].toLowerCase()}`);
+
+        const order = orders.find((o) => o.id === orderId);
+        if (
+          activeBusinessId &&
+          order?.source === 'shopify' &&
+          (status === 'shipped' || status === 'cancelled')
+        ) {
+          try {
+            await pushShopifyOrderStatus({
+              businessId: activeBusinessId,
+              orderId,
+              status,
+              trackingNumber: trackingNumber || null,
+            });
+            toast.success('Estado sincronizado con Shopify');
+          } catch (err) {
+            toast.warning(
+              `El pedido se actualizó en Pymova, pero no en Shopify: ${
+                err instanceof Error ? err.message : 'error desconocido'
+              }`,
+            );
+          }
+        }
+
         await fetchOrders();
         return true;
       } catch (err) {
@@ -179,7 +204,7 @@ export function useOnlineOrders() {
         setIsSubmitting(false);
       }
     },
-    [fetchOrders],
+    [activeBusinessId, fetchOrders, orders],
   );
 
   const createReturn = useCallback(

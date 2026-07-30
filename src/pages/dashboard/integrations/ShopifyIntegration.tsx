@@ -8,6 +8,7 @@ import {
   Search,
   ShoppingBag,
   Store,
+  Webhook,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useShopifyImport } from '@/hooks/useShopifyImport';
+import { useShopifyOrdersSync } from '@/hooks/useShopifyOrdersSync';
 import { SHOPIFY_STORE_PERMANENT_DOMAIN } from '@/lib/shopify';
 
 const ShopifyIntegration = () => {
@@ -33,6 +35,17 @@ const ShopifyIntegration = () => {
     loadMore,
     importProducts,
   } = useShopifyImport();
+
+  const {
+    connection,
+    isSyncing: isOrdersSyncing,
+    isRegistering,
+    lastSummary: ordersSummary,
+    syncOrders,
+    registerWebhooks,
+  } = useShopifyOrdersSync();
+
+
 
   const [term, setTerm] = useState('');
   const [appliedTerm, setAppliedTerm] = useState('');
@@ -155,6 +168,68 @@ const ShopifyIntegration = () => {
           )}
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Pedidos de Shopify</CardTitle>
+          <CardDescription>
+            Importa los pedidos de tu tienda con la Admin API y actívalos en tiempo real con avisos
+            automáticos (webhooks). Los pedidos aparecerán en Retail → E-commerce, donde podrás
+            aceptarlos, prepararlos, enviarlos (crea el fulfillment en Shopify) o cancelarlos.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button onClick={() => syncOrders(30)} disabled={isOrdersSyncing}>
+              {isOrdersSyncing ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <RefreshCw className="w-4 h-4 mr-2" />
+              )}
+              Sincronizar pedidos (30 días)
+            </Button>
+            <Button variant="outline" onClick={() => syncOrders(365)} disabled={isOrdersSyncing}>
+              Último año
+            </Button>
+            <Button variant="outline" onClick={registerWebhooks} disabled={isRegistering}>
+              {isRegistering ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Webhook className="w-4 h-4 mr-2" />
+              )}
+              {connection?.webhooks_registered_at ? 'Reactivar avisos' : 'Activar avisos automáticos'}
+            </Button>
+          </div>
+
+          <div className="text-sm text-muted-foreground space-y-1">
+            <p>
+              Avisos automáticos:{' '}
+              {connection?.webhooks_registered_at ? (
+                <Badge className="bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/15">
+                  Activos desde {new Date(connection.webhooks_registered_at).toLocaleString('es-ES')}
+                </Badge>
+              ) : (
+                <Badge variant="secondary">Sin activar</Badge>
+              )}
+            </p>
+            <p>
+              Última sincronización de pedidos:{' '}
+              {connection?.last_orders_sync_at
+                ? new Date(connection.last_orders_sync_at).toLocaleString('es-ES')
+                : 'nunca'}
+            </p>
+            {ordersSummary && (
+              <p>
+                Último resultado: {ordersSummary.created} nuevos · {ordersSummary.updated}{' '}
+                actualizados
+                {ordersSummary.failed > 0 ? ` · ${ordersSummary.failed} con error` : ''}.
+              </p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+
 
       {lastSummary && (
         <Card className="border-accent/30 bg-accent/5">

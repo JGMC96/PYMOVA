@@ -14,3 +14,9 @@ verify_jwt = false
 
 [functions.handle-email-suppression]
 verify_jwt = false
+
+[functions.shopify-orders]
+verify_jwt = true
+
+[functions.shopify-orders-webhook]
+verify_jwt = false

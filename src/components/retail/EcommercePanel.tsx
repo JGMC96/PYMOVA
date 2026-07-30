@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import {
-  Ban, Check, Loader2, Package, PackageCheck, RotateCcw, ShoppingBag, Truck,
+  Ban, Check, Loader2, Package, PackageCheck, RefreshCw, RotateCcw, ShoppingBag, Truck,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ import {
 import {
   useOnlineOrders, ORDER_STATUS_LABEL, type OnlineOrder, type OnlineOrderStatus,
 } from '@/hooks/useOnlineOrders';
+import { useShopifyOrdersSync } from '@/hooks/useShopifyOrdersSync';
 import { OnlineOrderDialog } from './OnlineOrderDialog';
 import { OnlineOrderReturnDialog } from './OnlineOrderReturnDialog';
 
@@ -40,8 +41,17 @@ const currency = (value: number) =>
 export function EcommercePanel() {
   const {
     orders, isLoading, isSubmitting, statusFilter, setStatusFilter,
-    createOrder, setStatus, createReturn,
+    createOrder, setStatus, createReturn, fetchOrders,
   } = useOnlineOrders();
+
+  const { isSyncing: isShopifySyncing, syncOrders: runShopifySync } = useShopifyOrdersSync();
+
+  const syncShopifyOrders = async (days: number) => {
+    const result = await runShopifySync(days);
+    if (result) await fetchOrders();
+  };
+
+
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [returnOrder, setReturnOrder] = useState<OnlineOrder | null>(null);
@@ -100,6 +110,14 @@ export function EcommercePanel() {
                 ))}
               </SelectContent>
             </Select>
+            <Button variant="outline" onClick={() => syncShopifyOrders(30)} disabled={isShopifySyncing}>
+              {isShopifySyncing ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <RefreshCw className="w-4 h-4 mr-2" />
+              )}
+              Sincronizar Shopify
+            </Button>
             <Button onClick={() => setIsFormOpen(true)}>Nuevo pedido</Button>
           </div>
         </CardHeader>
