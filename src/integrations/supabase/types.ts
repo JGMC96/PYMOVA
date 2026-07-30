@@ -926,6 +926,53 @@ export type Database = {
           },
         ]
       }
+      integration_webhook_events: {
+        Row: {
+          business_id: string | null
+          created_at: string
+          event_id: string | null
+          external_id: string | null
+          id: string
+          integration_key: string
+          message: string | null
+          payload: Json | null
+          status: string
+          topic: string
+        }
+        Insert: {
+          business_id?: string | null
+          created_at?: string
+          event_id?: string | null
+          external_id?: string | null
+          id?: string
+          integration_key: string
+          message?: string | null
+          payload?: Json | null
+          status?: string
+          topic: string
+        }
+        Update: {
+          business_id?: string | null
+          created_at?: string
+          event_id?: string | null
+          external_id?: string | null
+          id?: string
+          integration_key?: string
+          message?: string | null
+          payload?: Json | null
+          status?: string
+          topic?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_webhook_events_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoice_items: {
         Row: {
           description: string
@@ -1259,6 +1306,8 @@ export type Database = {
           customer_phone: string | null
           discount: number
           external_id: string | null
+          external_synced_at: string | null
+          external_updated_at: string | null
           id: string
           notes: string | null
           order_number: string
@@ -1285,6 +1334,8 @@ export type Database = {
           customer_phone?: string | null
           discount?: number
           external_id?: string | null
+          external_synced_at?: string | null
+          external_updated_at?: string | null
           id?: string
           notes?: string | null
           order_number: string
@@ -1311,6 +1362,8 @@ export type Database = {
           customer_phone?: string | null
           discount?: number
           external_id?: string | null
+          external_synced_at?: string | null
+          external_updated_at?: string | null
           id?: string
           notes?: string | null
           order_number?: string
@@ -1899,6 +1952,50 @@ export type Database = {
           },
         ]
       }
+      shopify_connections: {
+        Row: {
+          business_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          last_orders_sync_at: string | null
+          orders_sync_enabled: boolean
+          shop_domain: string
+          updated_at: string
+          webhooks_registered_at: string | null
+        }
+        Insert: {
+          business_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          last_orders_sync_at?: string | null
+          orders_sync_enabled?: boolean
+          shop_domain: string
+          updated_at?: string
+          webhooks_registered_at?: string | null
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          last_orders_sync_at?: string | null
+          orders_sync_enabled?: boolean
+          shop_domain?: string
+          updated_at?: string
+          webhooks_registered_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shopify_connections_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subscriptions: {
         Row: {
           business_id: string
@@ -2294,6 +2391,34 @@ export type Database = {
       }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      upsert_external_order: {
+        Args: {
+          _business_id: string
+          _customer_email: string
+          _customer_name: string
+          _customer_phone: string
+          _discount: number
+          _external_id: string
+          _external_updated_at: string
+          _items: Json
+          _notes: string
+          _order_number: string
+          _payment_method: string
+          _payment_status: string
+          _shipping_address: string
+          _shipping_cost: number
+          _source: string
+          _status: Database["public"]["Enums"]["online_order_status"]
+          _subtotal: number
+          _tax: number
+          _total: number
+          _tracking_number: string
+        }
+        Returns: {
+          order_id: string
+          was_created: boolean
+        }[]
+      }
     }
     Enums: {
       absence_status: "pending" | "approved" | "rejected" | "cancelled"
