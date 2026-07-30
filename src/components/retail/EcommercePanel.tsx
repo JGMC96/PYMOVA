@@ -100,6 +100,14 @@ export function EcommercePanel() {
                 ))}
               </SelectContent>
             </Select>
+            <Button variant="outline" onClick={() => syncShopifyOrders(30)} disabled={isShopifySyncing}>
+              {isShopifySyncing ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <RefreshCw className="w-4 h-4 mr-2" />
+              )}
+              Sincronizar Shopify
+            </Button>
             <Button onClick={() => setIsFormOpen(true)}>Nuevo pedido</Button>
           </div>
         </CardHeader>
