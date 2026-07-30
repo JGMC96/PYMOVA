@@ -144,7 +144,7 @@ export function mapOrderStatus(order: ShopifyAdminOrder): LocalOrderStatus {
   if (order.displayFinancialStatus === 'REFUNDED') return 'returned';
   switch (order.displayFulfillmentStatus) {
     case 'FULFILLED':
-ುತ್ತ      return 'shipped';
+return 'shipped';
     case 'PARTIALLY_FULFILLED':
     case 'IN_PROGRESS':
       return 'preparing';
