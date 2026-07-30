@@ -20,6 +20,10 @@ import { SHOPIFY_STORE_PERMANENT_DOMAIN } from '@/lib/shopify';
 const ShopifyIntegration = () => {
   const {
     products,
+    runs,
+    isSyncing,
+    syncProgress,
+    forceSync,
     isLoading,
     isImporting,
     error,
@@ -91,6 +95,19 @@ const ShopifyIntegration = () => {
             </Badge>
           </p>
         </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => forceSync(appliedTerm)}
+            disabled={isSyncing || isImporting}
+          >
+            {isSyncing ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <RefreshCw className="w-4 h-4 mr-2" />
+            )}
+            {isSyncing ? `Sincronizando… (${syncProgress})` : 'Forzar sincronización'}
+          </Button>
         <Button onClick={handleImport} disabled={isImporting || selected.size === 0}>
           {isImporting ? (
             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -99,7 +116,45 @@ const ShopifyIntegration = () => {
           )}
           Importar {selected.size > 0 ? `(${selected.size})` : 'seleccionados'}
         </Button>
+        </div>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Sincronización</CardTitle>
+          <CardDescription>
+            «Forzar sincronización» recorre todo el catálogo de Shopify (o el filtro de búsqueda
+            aplicado) y actualiza productos, variantes, precios y stock en Pymova. Los pedidos y
+            ventas de Shopify se gestionan desde Retail → E-commerce.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {runs.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Aún no has lanzado ninguna sincronización.</p>
+          ) : (
+            <ul className="space-y-2 text-sm">
+              {runs.map((run) => (
+                <li key={run.id} className="flex items-center justify-between gap-3 border-b pb-2 last:border-0">
+                  <span className="text-muted-foreground">
+                    {new Date(run.started_at).toLocaleString('es-ES')} · {run.scope}
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <span>
+                      {run.created_count} nuevos · {run.updated_count} actualizados
+                      {run.failed_count > 0 ? ` · ${run.failed_count} con error` : ''}
+                    </span>
+                    <Badge
+                      variant={run.status === 'success' ? 'default' : run.status === 'error' ? 'destructive' : 'secondary'}
+                    >
+                      {run.status}
+                    </Badge>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
 
       {lastSummary && (
         <Card className="border-accent/30 bg-accent/5">
