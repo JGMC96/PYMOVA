@@ -142,8 +142,9 @@ export function useRetailSales() {
       return { id: sale.id, sale_number: saleNumber };
     } catch (error: any) {
       console.error('Error creating sale:', error);
-      toast.error('Error al registrar venta');
+      toast.error(error?.message || 'Error al registrar venta');
       return null;
+
     } finally {
       setIsCreating(false);
     }
