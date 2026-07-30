@@ -40,8 +40,17 @@ const currency = (value: number) =>
 export function EcommercePanel() {
   const {
     orders, isLoading, isSubmitting, statusFilter, setStatusFilter,
-    createOrder, setStatus, createReturn,
+    createOrder, setStatus, createReturn, fetchOrders,
   } = useOnlineOrders();
+
+  const { isSyncing: isShopifySyncing, syncOrders: runShopifySync } = useShopifyOrdersSync();
+
+  const syncShopifyOrders = async (days: number) => {
+    const result = await runShopifySync(days);
+    if (result) await fetchOrders();
+  };
+
+
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [returnOrder, setReturnOrder] = useState<OnlineOrder | null>(null);
