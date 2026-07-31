@@ -873,6 +873,63 @@ export type Database = {
           },
         ]
       }
+      integration_sync_issues: {
+        Row: {
+          attempts: number
+          business_id: string
+          created_at: string
+          entity_name: string
+          entity_type: string
+          error_message: string
+          external_id: string | null
+          id: string
+          resolved: boolean
+          run_id: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          business_id: string
+          created_at?: string
+          entity_name: string
+          entity_type?: string
+          error_message: string
+          external_id?: string | null
+          id?: string
+          resolved?: boolean
+          run_id: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          business_id?: string
+          created_at?: string
+          entity_name?: string
+          entity_type?: string
+          error_message?: string
+          external_id?: string | null
+          id?: string
+          resolved?: boolean
+          run_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_sync_issues_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_sync_issues_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "integration_sync_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       integration_sync_runs: {
         Row: {
           business_id: string
@@ -883,9 +940,11 @@ export type Database = {
           id: string
           integration_key: string
           message: string | null
+          processed_count: number
           scope: string
           started_at: string
           status: string
+          total_count: number
           updated_count: number
         }
         Insert: {
@@ -897,9 +956,11 @@ export type Database = {
           id?: string
           integration_key: string
           message?: string | null
+          processed_count?: number
           scope: string
           started_at?: string
           status?: string
+          total_count?: number
           updated_count?: number
         }
         Update: {
@@ -911,9 +972,11 @@ export type Database = {
           id?: string
           integration_key?: string
           message?: string | null
+          processed_count?: number
           scope?: string
           started_at?: string
           status?: string
+          total_count?: number
           updated_count?: number
         }
         Relationships: [
