@@ -25,8 +25,12 @@ const ShopifyIntegration = () => {
   const {
     status: connectionStatus,
     isVerifying,
+    isClaiming,
     verify: verifyConnection,
+    claim: claimShop,
+    processWebhooks,
   } = useShopifyConnection();
+
   const {
     products,
     runs,
@@ -168,10 +172,46 @@ const ShopifyIntegration = () => {
         </div>
       </div>
 
+      {connectionStatus && !connectionStatus.claimed && (
+        <Card className="border-amber-500/40 bg-amber-500/5">
+          <CardHeader>
+            <CardTitle className="text-lg">Vincular la tienda a este negocio</CardTitle>
+            <CardDescription>
+              {connectionStatus.owned_by_other_business
+                ? `La tienda ${connectionStatus.shop_domain} ya está vinculada a otro negocio. Cada tienda de Shopify sólo puede pertenecer a un negocio, así que no es posible sincronizar sus datos aquí.`
+                : `Antes de sincronizar nada, vincula ${connectionStatus.shop_domain} a este negocio. El vínculo es permanente: garantiza que los datos de la tienda no se mezclen con los de otro negocio.`}
+            </CardDescription>
+          </CardHeader>
+          {!connectionStatus.owned_by_other_business && (
+            <CardContent>
+              <Button onClick={claimShop} disabled={isClaiming}>
+                {isClaiming && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Vincular tienda
+              </Button>
+            </CardContent>
+          )}
+        </Card>
+      )}
+
+      {connectionStatus?.claimed && connectionStatus.pending_webhooks > 0 && (
+        <Card className="border-accent/30 bg-accent/5">
+          <CardContent className="py-4 flex flex-wrap items-center justify-between gap-3 text-sm">
+            <span>
+              Hay <strong>{connectionStatus.pending_webhooks}</strong> avisos de Shopify pendientes
+              de procesar.
+            </span>
+            <Button variant="outline" size="sm" onClick={processWebhooks}>
+              Procesar ahora
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Sincronización</CardTitle>
           <CardDescription>
+
             «Forzar sincronización» recorre todo el catálogo de Shopify (o el filtro de búsqueda
             aplicado) y actualiza productos, variantes, precios y stock en Pymova. Los pedidos y
             ventas de Shopify se gestionan desde Retail → E-commerce.

@@ -1,26 +1,15 @@
-// Webhooks de Shopify: verificación HMAC con el client secret de la app.
-// No se aceptan tokens en la URL ni se registran datos sensibles.
+// Webhooks de Shopify: HMAC + encolado inmediato.
+// Responde 200 en cuanto el evento queda registrado; el trabajo real ocurre
+// después (drainWebhookQueue), de modo que Shopify nunca ve un timeout.
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import {
-  adminGraphql,
-  buildUpsertArgs,
-  ORDER_BY_ID_QUERY,
-  type ShopifyAdminOrder,
-} from '../_shared/shopify-admin.ts';
-import { verifyWebhookHmac } from '../_shared/shopify-client.ts';
+import { verifyWebhookHmac, normalizeShopDomain } from '../_shared/shopify-client.ts';
+import { webhookDedupeKey } from '../_shared/shopify-core.ts';
+import { drainWebhookQueue } from '../_shared/shopify-webhooks.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-const ORDER_TOPICS = [
-  'orders/create',
-  'orders/updated',
-  'orders/cancelled',
-  'orders/fulfilled',
-  'fulfillments/create',
-  'fulfillments/update',
-  'refunds/create',
-];
+declare const EdgeRuntime: { waitUntil?: (p: Promise<unknown>) => void } | undefined;
 
 Deno.serve(async (req) => {
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
@@ -33,7 +22,7 @@ Deno.serve(async (req) => {
   }
 
   const topic = (req.headers.get('x-shopify-topic') ?? 'unknown').toLowerCase();
-  const shopDomain = req.headers.get('x-shopify-shop-domain') ?? '';
+  const shopDomain = normalizeShopDomain(req.headers.get('x-shopify-shop-domain') ?? '');
   const eventId = req.headers.get('x-shopify-webhook-id');
 
   let payload: Record<string, unknown> = {};
@@ -43,100 +32,71 @@ Deno.serve(async (req) => {
     return new Response('Bad request', { status: 400 });
   }
 
-  const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+  const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
 
   try {
     const { data: connection } = await admin
       .from('shopify_connections')
-      .select('business_id, orders_sync_enabled')
+      .select('business_id')
       .eq('shop_domain', shopDomain)
       .maybeSingle();
 
-    if (!connection) return new Response('ok', { status: 200 });
+    const dedupeKey = webhookDedupeKey(eventId, topic, payload);
 
-    // Idempotencia: un mismo webhook nunca se procesa dos veces.
-    if (eventId) {
-      const { data: seen } = await admin
-        .from('integration_webhook_events')
-        .select('id')
-        .eq('integration_key', 'shopify')
-        .eq('event_id', eventId)
-        .maybeSingle();
-      if (seen) return new Response('ok', { status: 200 });
-    }
+    // Idempotencia: un mismo webhook nunca se encola dos veces.
+    const { data: seen } = await admin
+      .from('integration_webhook_events')
+      .select('id')
+      .eq('integration_key', 'shopify')
+      .eq('event_id', dedupeKey)
+      .maybeSingle();
+    if (seen) return new Response('ok', { status: 200 });
 
-    let status = 'ignored';
-    let message: string | null = `Evento ${topic} sin acción asociada`;
+    const { data: inserted } = await admin
+      .from('integration_webhook_events')
+      .insert({
+        business_id: connection?.business_id ?? null,
+        integration_key: 'shopify',
+        topic,
+        shop_domain: shopDomain,
+        external_id:
+          typeof payload.admin_graphql_api_id === 'string' ? payload.admin_graphql_api_id : null,
+        event_id: dedupeKey,
+        status: 'pending',
+        message: 'En cola',
+        payload,
+      })
+      .select('id')
+      .maybeSingle();
 
-    if (topic === 'app/uninstalled') {
-      await admin
-        .from('shopify_connections')
-        .update({ uninstalled_at: new Date().toISOString(), last_sync_status: 'disconnected' })
-        .eq('shop_domain', shopDomain);
-      await admin.from('shopify_app_tokens').delete().eq('shop_domain', shopDomain);
-      status = 'processed';
-      message = 'La aplicación se ha desinstalado de la tienda';
-    } else if (ORDER_TOPICS.includes(topic) && connection.orders_sync_enabled) {
-      const orderGid =
-        typeof payload.admin_graphql_api_id === 'string' && payload.admin_graphql_api_id.includes('/Order/')
-          ? payload.admin_graphql_api_id
-          : payload.order_id !== undefined && payload.order_id !== null
-            ? `gid://shopify/Order/${payload.order_id}`
-            : payload.id !== undefined && payload.id !== null
-              ? `gid://shopify/Order/${payload.id}`
-              : null;
-
-      if (orderGid) {
-        const data = await adminGraphql<{ order: ShopifyAdminOrder | null }>(ORDER_BY_ID_QUERY, {
-          id: orderGid,
-        });
-        if (data.order) {
-          const { data: result, error } = await admin.rpc(
-            'upsert_external_order',
-            buildUpsertArgs(connection.business_id, data.order) as never,
-          );
-          if (error) throw error;
-          const row = Array.isArray(result) ? result[0] : result;
-          if (row?.order_id) {
-            await admin.from('online_orders').update({ stock_applied: true }).eq('id', row.order_id);
-          }
-          status = 'processed';
-          message = `${topic} · ${data.order.name}`;
-        } else {
-          message = 'Pedido no encontrado en Shopify';
-        }
-      } else {
-        message = 'Sin identificador de pedido';
+    // Procesado en segundo plano: la respuesta 200 no espera a Shopify.
+    if (inserted) {
+      const work = drainWebhookQueue(admin, 5).catch((err) =>
+        console.error('drainWebhookQueue error:', err instanceof Error ? err.message : err),
+      );
+      if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime?.waitUntil) {
+        EdgeRuntime.waitUntil(work);
       }
-    } else if (topic.startsWith('products/') || topic.startsWith('inventory_levels/')) {
-      // Los cambios de catálogo se consolidan en la próxima sincronización.
-      status = 'queued';
-      message = `${topic} registrado para la próxima sincronización de catálogo`;
     }
-
-    await admin.from('integration_webhook_events').insert({
-      business_id: connection.business_id,
-      integration_key: 'shopify',
-      topic,
-      external_id: typeof payload.admin_graphql_api_id === 'string' ? payload.admin_graphql_api_id : null,
-      event_id: eventId,
-      status,
-      message,
-      payload: { id: payload.id ?? null, topic },
-    });
 
     return new Response('ok', { status: 200 });
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
     console.error('shopify-orders-webhook error:', errorMessage);
+    // Se responde 200 para que Shopify no reintente indefinidamente un fallo propio;
+    // el evento queda registrado como error para su revisión.
     await admin.from('integration_webhook_events').insert({
       integration_key: 'shopify',
       topic,
-      event_id: eventId,
+      shop_domain: shopDomain,
+      event_id: eventId ? `${eventId}:error` : null,
       status: 'error',
       message: errorMessage.slice(0, 500),
       payload: { topic },
+      processed_at: new Date().toISOString(),
     });
-    return new Response('error', { status: 500 });
+    return new Response('ok', { status: 200 });
   }
 });

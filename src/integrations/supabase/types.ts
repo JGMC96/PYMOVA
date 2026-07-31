@@ -346,6 +346,8 @@ export type Database = {
           created_at: string
           created_by: string | null
           email: string | null
+          external_id: string | null
+          external_source: string | null
           id: string
           is_active: boolean
           name: string
@@ -359,6 +361,8 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           email?: string | null
+          external_id?: string | null
+          external_source?: string | null
           id?: string
           is_active?: boolean
           name: string
@@ -372,6 +376,8 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           email?: string | null
+          external_id?: string | null
+          external_source?: string | null
           id?: string
           is_active?: boolean
           name?: string
@@ -1066,6 +1072,7 @@ export type Database = {
       }
       integration_webhook_events: {
         Row: {
+          attempts: number
           business_id: string | null
           created_at: string
           event_id: string | null
@@ -1073,11 +1080,15 @@ export type Database = {
           id: string
           integration_key: string
           message: string | null
+          next_attempt_at: string
           payload: Json | null
+          processed_at: string | null
+          shop_domain: string | null
           status: string
           topic: string
         }
         Insert: {
+          attempts?: number
           business_id?: string | null
           created_at?: string
           event_id?: string | null
@@ -1085,11 +1096,15 @@ export type Database = {
           id?: string
           integration_key: string
           message?: string | null
+          next_attempt_at?: string
           payload?: Json | null
+          processed_at?: string | null
+          shop_domain?: string | null
           status?: string
           topic: string
         }
         Update: {
+          attempts?: number
           business_id?: string | null
           created_at?: string
           event_id?: string | null
@@ -1097,7 +1112,10 @@ export type Database = {
           id?: string
           integration_key?: string
           message?: string | null
+          next_attempt_at?: string
           payload?: Json | null
+          processed_at?: string | null
+          shop_domain?: string | null
           status?: string
           topic?: string
         }
@@ -2212,6 +2230,142 @@ export type Database = {
           },
         ]
       }
+      shopify_fulfillments: {
+        Row: {
+          business_id: string
+          created_at: string
+          delivered_at: string | null
+          external_id: string
+          id: string
+          line_item_count: number
+          order_external_id: string
+          order_id: string | null
+          shipped_at: string | null
+          status: string
+          tracking_company: string | null
+          tracking_number: string | null
+          tracking_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          business_id: string
+          created_at?: string
+          delivered_at?: string | null
+          external_id: string
+          id?: string
+          line_item_count?: number
+          order_external_id: string
+          order_id?: string | null
+          shipped_at?: string | null
+          status?: string
+          tracking_company?: string | null
+          tracking_number?: string | null
+          tracking_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          delivered_at?: string | null
+          external_id?: string
+          id?: string
+          line_item_count?: number
+          order_external_id?: string
+          order_id?: string | null
+          shipped_at?: string | null
+          status?: string
+          tracking_company?: string | null
+          tracking_number?: string | null
+          tracking_url?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shopify_fulfillments_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shopify_fulfillments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "online_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shopify_inventory_levels: {
+        Row: {
+          available: number
+          business_id: string
+          created_at: string
+          external_key: string | null
+          id: string
+          inventory_item_gid: string
+          local_product_id: string | null
+          local_variant_id: string | null
+          location_gid: string
+          location_name: string | null
+          synced_at: string
+          updated_at: string
+          variant_external_id: string | null
+        }
+        Insert: {
+          available?: number
+          business_id: string
+          created_at?: string
+          external_key?: string | null
+          id?: string
+          inventory_item_gid: string
+          local_product_id?: string | null
+          local_variant_id?: string | null
+          location_gid: string
+          location_name?: string | null
+          synced_at?: string
+          updated_at?: string
+          variant_external_id?: string | null
+        }
+        Update: {
+          available?: number
+          business_id?: string
+          created_at?: string
+          external_key?: string | null
+          id?: string
+          inventory_item_gid?: string
+          local_product_id?: string | null
+          local_variant_id?: string | null
+          location_gid?: string
+          location_name?: string | null
+          synced_at?: string
+          updated_at?: string
+          variant_external_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shopify_inventory_levels_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shopify_inventory_levels_local_product_id_fkey"
+            columns: ["local_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shopify_inventory_levels_local_variant_id_fkey"
+            columns: ["local_variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subscriptions: {
         Row: {
           business_id: string
@@ -2296,6 +2450,37 @@ export type Database = {
       apply_online_order_stock: {
         Args: { _direction: number; _order_id: string }
         Returns: undefined
+      }
+      claim_shopify_shop: {
+        Args: {
+          _api_version?: string
+          _business_id: string
+          _shop_domain: string
+        }
+        Returns: {
+          api_version: string
+          business_id: string
+          created_at: string
+          created_by: string | null
+          granted_scopes: string[]
+          id: string
+          last_catalog_sync_at: string | null
+          last_orders_sync_at: string | null
+          last_sync_error: string | null
+          last_sync_status: string | null
+          last_verified_at: string | null
+          orders_sync_enabled: boolean
+          shop_domain: string
+          uninstalled_at: string | null
+          updated_at: string
+          webhooks_registered_at: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "shopify_connections"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       clock_action: {
         Args: {
