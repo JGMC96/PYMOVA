@@ -19,6 +19,7 @@ import { useShopifyImport } from '@/hooks/useShopifyImport';
 import { useShopifyOrdersSync } from '@/hooks/useShopifyOrdersSync';
 import { SHOPIFY_STORE_PERMANENT_DOMAIN } from '@/lib/shopify';
 import { SyncQueuePanel } from '@/components/integrations/SyncQueuePanel';
+import { VariantMappingReport } from '@/components/integrations/VariantMappingReport';
 
 const ShopifyIntegration = () => {
   const {
@@ -185,6 +186,8 @@ const ShopifyIntegration = () => {
           )}
         </CardContent>
       </Card>
+
+      <VariantMappingReport query={appliedTerm} />
 
       <SyncQueuePanel
         queue={queue}

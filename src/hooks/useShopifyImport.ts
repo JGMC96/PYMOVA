@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { toast } from 'sonner';
 import { fetchShopifyProducts, fetchAllShopifyProducts, type ShopifyProduct } from '@/lib/shopify';
+import { buildVariantIndex, matchVariant, type LocalVariant } from '@/lib/variantMapping';
 
 export interface SyncRun {
   id: string;
@@ -158,14 +159,28 @@ export function useShopifyImport() {
         track_inventory: tracksStock,
         stock_quantity: tracksStock ? productStock : null,
         is_active: true,
+        external_id: product.id,
+        external_source: 'shopify',
       };
 
-      const { data: existing } = await supabase
+      const { data: byExternal } = await supabase
         .from('products')
         .select('id')
         .eq('business_id', businessId)
-        .eq('name', product.title)
+        .eq('external_source', 'shopify')
+        .eq('external_id', product.id)
         .maybeSingle();
+
+      const existing =
+        byExternal ??
+        (
+          await supabase
+            .from('products')
+            .select('id')
+            .eq('business_id', businessId)
+            .eq('name', product.title)
+            .maybeSingle()
+        ).data;
 
       let productId: string;
       let outcome: 'created' | 'updated';
@@ -193,11 +208,11 @@ export function useShopifyImport() {
       if (hasRealVariants(product)) {
         const { data: currentVariants } = await supabase
           .from('product_variants')
-          .select('id, name')
+          .select('id, product_id, name, sku, barcode, stock_quantity, external_id')
           .eq('business_id', businessId)
           .eq('product_id', productId);
 
-        const variantByName = new Map((currentVariants ?? []).map((v) => [v.name, v.id]));
+        const variantIndex = buildVariantIndex((currentVariants ?? []) as LocalVariant[]);
 
         for (const variant of variants) {
           const attributes = Object.fromEntries(
@@ -214,9 +229,16 @@ export function useShopifyImport() {
             is_active: variant.availableForSale,
             stock_quantity:
               typeof variant.quantityAvailable === 'number' ? variant.quantityAvailable : 0,
+            external_id: variant.id,
+            external_source: 'shopify',
           };
 
-          const currentId = variantByName.get(variant.title);
+          const currentId = matchVariant(variantIndex, {
+            externalId: variant.id,
+            sku: variant.sku,
+            barcode: variant.barcode,
+            name: variant.title,
+          }).variant?.id;
           const { error: variantError } = currentId
             ? await supabase
                 .from('product_variants')
