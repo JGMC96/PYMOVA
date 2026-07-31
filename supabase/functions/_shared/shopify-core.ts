@@ -29,8 +29,9 @@ export class ShopifyError extends Error {
 }
 
 export function normalizeShopDomain(domain: string): string {
-  return domain.trim().replace(/^https?:\/\//, '').replace(/\/+$/, '').toLowerCase();
+  return domain.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/+$/, '');
 }
+
 
 // ---------------------------------------------------------------------------
 // HMAC de webhooks
