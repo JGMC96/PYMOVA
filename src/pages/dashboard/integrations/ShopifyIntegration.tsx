@@ -18,11 +18,16 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useShopifyImport } from '@/hooks/useShopifyImport';
 import { useShopifyOrdersSync } from '@/hooks/useShopifyOrdersSync';
 import { SHOPIFY_STORE_PERMANENT_DOMAIN } from '@/lib/shopify';
+import { SyncQueuePanel } from '@/components/integrations/SyncQueuePanel';
 
 const ShopifyIntegration = () => {
   const {
     products,
     runs,
+    issues,
+    queue,
+    cancelSync,
+    fetchIssues,
     isSyncing,
     syncProgress,
     forceSync,
@@ -119,7 +124,11 @@ const ShopifyIntegration = () => {
             ) : (
               <RefreshCw className="w-4 h-4 mr-2" />
             )}
-            {isSyncing ? `Sincronizando… (${syncProgress})` : 'Forzar sincronización'}
+            {isSyncing
+              ? queue.phase === 'processing'
+                ? `Sincronizando… (${queue.processed}/${queue.total})`
+                : `Descargando… (${syncProgress})`
+              : 'Forzar sincronización'}
           </Button>
         <Button onClick={handleImport} disabled={isImporting || selected.size === 0}>
           {isImporting ? (
@@ -147,12 +156,20 @@ const ShopifyIntegration = () => {
           ) : (
             <ul className="space-y-2 text-sm">
               {runs.map((run) => (
-                <li key={run.id} className="flex items-center justify-between gap-3 border-b pb-2 last:border-0">
+                <li
+                  key={run.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => fetchIssues(run.id)}
+                  onKeyDown={(e) => e.key === 'Enter' && fetchIssues(run.id)}
+                  className="flex items-center justify-between gap-3 border-b pb-2 last:border-0 cursor-pointer hover:text-foreground"
+                >
                   <span className="text-muted-foreground">
                     {new Date(run.started_at).toLocaleString('es-ES')} · {run.scope}
                   </span>
                   <span className="flex items-center gap-2">
                     <span>
+                      {run.processed_count > 0 ? `${run.processed_count}/${run.total_count} · ` : ''}
                       {run.created_count} nuevos · {run.updated_count} actualizados
                       {run.failed_count > 0 ? ` · ${run.failed_count} con error` : ''}
                     </span>
@@ -168,6 +185,14 @@ const ShopifyIntegration = () => {
           )}
         </CardContent>
       </Card>
+
+      <SyncQueuePanel
+        queue={queue}
+        issues={issues}
+        isSyncing={isSyncing}
+        fetchedCount={syncProgress}
+        onCancel={cancelSync}
+      />
 
       <Card>
         <CardHeader>
