@@ -1381,6 +1381,11 @@ export type Database = {
           business_id: string
           created_at: string
           created_by: string | null
+          external_refund_id: string | null
+          external_source: string | null
+          external_sync_error: string | null
+          external_sync_status: string
+          external_synced_at: string | null
           id: string
           kind: string
           order_id: string
@@ -1394,6 +1399,11 @@ export type Database = {
           business_id: string
           created_at?: string
           created_by?: string | null
+          external_refund_id?: string | null
+          external_source?: string | null
+          external_sync_error?: string | null
+          external_sync_status?: string
+          external_synced_at?: string | null
           id?: string
           kind?: string
           order_id: string
@@ -1407,6 +1417,11 @@ export type Database = {
           business_id?: string
           created_at?: string
           created_by?: string | null
+          external_refund_id?: string | null
+          external_source?: string | null
+          external_sync_error?: string | null
+          external_sync_status?: string
+          external_synced_at?: string | null
           id?: string
           kind?: string
           order_id?: string
