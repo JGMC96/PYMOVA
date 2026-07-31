@@ -63,6 +63,25 @@ Deno.serve(async (req) => {
       return json({ shop_domain: shop, connection });
     }
 
+    if (action === 'diagnose') {
+      try {
+        const data = await adminGraphql<{
+          currentAppInstallation: { accessScopes: Array<{ handle: string }> };
+        }>(`query { currentAppInstallation { accessScopes { handle } } }`);
+        const scopes = data.currentAppInstallation.accessScopes.map((s) => s.handle);
+        const required = ['read_orders', 'write_orders'];
+        return json({
+          ok: true,
+          shop_domain: shop,
+          scopes,
+          missing: required.filter((r) => !scopes.includes(r)),
+        });
+      } catch (err) {
+        return json({ error: err instanceof Error ? err.message : 'Error desconocido' }, 500);
+      }
+    }
+
+
     if (action === 'register-webhooks') {
       const callbackUrl = `${SUPABASE_URL}/functions/v1/shopify-orders-webhook?token=${
         Deno.env.get('SHOPIFY_WEBHOOK_TOKEN') ?? ''
