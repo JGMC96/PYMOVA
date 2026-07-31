@@ -7,6 +7,11 @@ export interface ShopifyConnectionStatus {
   shop_domain: string;
   api_version: string;
   required_scopes: string[];
+  /** La tienda está vinculada a este negocio. */
+  claimed: boolean;
+  /** La tienda pertenece a otro negocio: esta cuenta no puede usarla. */
+  owned_by_other_business: boolean;
+  pending_webhooks: number;
   connection: {
     granted_scopes: string[] | null;
     last_verified_at: string | null;
@@ -22,8 +27,11 @@ export interface ShopifyConnectionStatus {
     orders: number;
     clients: number;
     open_issues: number;
+    inventory_levels: number;
+    fulfillments: number;
   };
 }
+
 
 /** Estado de la conexión con Shopify (solo lectura) y acciones de verificación/sincronización. */
 export function useShopifyConnection() {
