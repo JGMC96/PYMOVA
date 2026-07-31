@@ -183,8 +183,13 @@ export function useOnlineOrders() {
               orderId,
               status,
               trackingNumber: trackingNumber || null,
+              refund: status === 'cancelled' && order.payment_status === 'paid',
             });
-            toast.success('Estado sincronizado con Shopify');
+            toast.success(
+              status === 'cancelled' && order.payment_status === 'paid'
+                ? 'Pedido cancelado y reembolsado en Shopify'
+                : 'Estado sincronizado con Shopify',
+            );
           } catch (err) {
             toast.warning(
               `El pedido se actualizó en Pymova, pero no en Shopify: ${
@@ -210,7 +215,14 @@ export function useOnlineOrders() {
   const createReturn = useCallback(
     async (
       orderId: string,
-      payload: { kind: 'return' | 'exchange'; reason?: string; refund_method?: string; total: number; restock: boolean },
+      payload: {
+        kind: 'return' | 'exchange';
+        reason?: string;
+        refund_method?: string;
+        total: number;
+        restock: boolean;
+        sync_shopify?: boolean;
+      },
     ) => {
       setIsSubmitting(true);
       try {
@@ -223,10 +235,36 @@ export function useOnlineOrders() {
           _restock: payload.restock,
         });
         if (error) throw error;
-        const row = Array.isArray(data) ? data[0] : (data as { return_number?: string });
+        const row = Array.isArray(data)
+          ? data[0]
+          : (data as { return_number?: string; return_id?: string });
         toast.success(
           `${payload.kind === 'exchange' ? 'Cambio' : 'Devolución'} ${row?.return_number ?? ''} registrado`,
         );
+
+        const order = orders.find((o) => o.id === orderId);
+        if (
+          activeBusinessId &&
+          payload.sync_shopify &&
+          order?.source === 'shopify' &&
+          row?.return_id
+        ) {
+          try {
+            const result = await pushShopifyRefund({
+              businessId: activeBusinessId,
+              returnId: row.return_id,
+            });
+            if (result?.skipped) toast.info(result.skipped);
+            else toast.success('Reembolso registrado en Shopify');
+          } catch (err) {
+            toast.warning(
+              `La devolución se registró en Pymova, pero el reembolso no llegó a Shopify: ${
+                err instanceof Error ? err.message : 'error desconocido'
+              }`,
+            );
+          }
+        }
+
         await fetchOrders();
         return true;
       } catch (err) {
@@ -237,8 +275,9 @@ export function useOnlineOrders() {
         setIsSubmitting(false);
       }
     },
-    [fetchOrders],
+    [activeBusinessId, fetchOrders, orders],
   );
+
 
   return {
     orders,
