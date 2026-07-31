@@ -18,5 +18,8 @@ verify_jwt = false
 [functions.shopify-orders]
 verify_jwt = true
 
+[functions.shopify-sync]
+verify_jwt = true
+
 [functions.shopify-orders-webhook]
 verify_jwt = false
