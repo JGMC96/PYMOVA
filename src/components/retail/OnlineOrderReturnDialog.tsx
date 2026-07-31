@@ -19,7 +19,14 @@ interface Props {
   isSubmitting: boolean;
   onSubmit: (
     orderId: string,
-    payload: { kind: 'return' | 'exchange'; reason?: string; refund_method?: string; total: number; restock: boolean },
+    payload: {
+      kind: 'return' | 'exchange';
+      reason?: string;
+      refund_method?: string;
+      total: number;
+      restock: boolean;
+      sync_shopify?: boolean;
+    },
   ) => Promise<boolean>;
 }
 
@@ -29,6 +36,7 @@ export function OnlineOrderReturnDialog({ order, onOpenChange, isSubmitting, onS
   const [refundMethod, setRefundMethod] = useState('original');
   const [amount, setAmount] = useState('0');
   const [restock, setRestock] = useState(true);
+  const [syncShopify, setSyncShopify] = useState(true);
 
   useEffect(() => {
     if (order) {
@@ -37,6 +45,7 @@ export function OnlineOrderReturnDialog({ order, onOpenChange, isSubmitting, onS
       setRefundMethod('original');
       setAmount(String(order.total));
       setRestock(true);
+      setSyncShopify(order.source === 'shopify');
     }
   }, [order]);
 
@@ -48,6 +57,7 @@ export function OnlineOrderReturnDialog({ order, onOpenChange, isSubmitting, onS
       refund_method: refundMethod,
       total: Number(amount || 0),
       restock,
+      sync_shopify: syncShopify && order.source === 'shopify',
     });
     if (ok) onOpenChange(false);
   };
@@ -103,6 +113,18 @@ export function OnlineOrderReturnDialog({ order, onOpenChange, isSubmitting, onS
               Devolver las unidades al inventario
             </Label>
           </div>
+          {order?.source === 'shopify' && (
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="sync-shopify"
+                checked={syncShopify}
+                onCheckedChange={(v) => setSyncShopify(!!v)}
+              />
+              <Label htmlFor="sync-shopify" className="cursor-pointer font-normal">
+                Crear el reembolso (nota de crédito) en Shopify
+              </Label>
+            </div>
+          )}
         </div>
 
         <DialogFooter>
