@@ -119,6 +119,9 @@ export function EcommercePanel() {
               )}
               Sincronizar Shopify
             </Button>
+            <Button variant="ghost" onClick={() => diagnoseShopify()}>
+              Comprobar permisos
+            </Button>
             <Button onClick={() => setIsFormOpen(true)}>Nuevo pedido</Button>
           </div>
         </CardHeader>
