@@ -4,53 +4,81 @@ export function getShopDomain(): string {
   return Deno.env.get('SHOPIFY_STORE_DOMAIN') ?? 'tuilus-shop.myshopify.com';
 }
 
+function getTokenCandidates(): string[] {
+  const env = Deno.env.toObject();
+  const online = Object.entries(env)
+    .filter(([name, value]) => name.startsWith('SHOPIFY_ONLINE_ACCESS_TOKEN') && Boolean(value))
+    .map(([, value]) => value);
+  const offline = env['SHOPIFY_ACCESS_TOKEN'];
+  const tokens = [...online, offline].filter(Boolean) as string[];
+  const unique = [...new Set(tokens)];
+  if (unique.length === 0) {
+    throw new Error('Falta el token de administración de Shopify (SHOPIFY_ACCESS_TOKEN).');
+  }
+  return unique;
+}
+
 export function getAdminToken(): string {
-  const onlineTokenEntry = Object.entries(Deno.env.toObject()).find(([name, value]) =>
-    name.startsWith('SHOPIFY_ONLINE_ACCESS_TOKEN:') && Boolean(value)
-  );
-  const token = onlineTokenEntry?.[1] ?? Deno.env.get('SHOPIFY_ACCESS_TOKEN');
-  if (!token) throw new Error('Falta el token de administración de Shopify (SHOPIFY_ACCESS_TOKEN).');
-  return token;
+  return getTokenCandidates()[0];
 }
 
 export async function adminGraphql<T = unknown>(
   query: string,
   variables: Record<string, unknown> = {},
 ): Promise<T> {
-  const response = await fetch(
-    `https://${getShopDomain()}/admin/api/${SHOPIFY_API_VERSION}/graphql.json`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Shopify-Access-Token': getAdminToken(),
-      },
-      body: JSON.stringify({ query, variables }),
-    },
-  );
+  const tokens = getTokenCandidates();
+  let lastAuthDetail = '';
 
-  if (!response.ok) {
-    const detail = await response.text().catch(() => '');
-    console.error(`Shopify Admin API ${response.status}: ${detail}`);
+  for (let i = 0; i < tokens.length; i++) {
+    const response = await fetch(
+      `https://${getShopDomain()}/admin/api/${SHOPIFY_API_VERSION}/graphql.json`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Shopify-Access-Token': tokens[i],
+        },
+        body: JSON.stringify({ query, variables }),
+      },
+    );
+
     if (response.status === 401 || response.status === 403) {
+      lastAuthDetail = await response.text().catch(() => '');
+      console.error(`Shopify Admin API ${response.status} (token ${i + 1}/${tokens.length}): ${lastAuthDetail}`);
+      if (i < tokens.length - 1) continue;
       throw new Error(
         response.status === 401
           ? 'La sesión de Shopify ha caducado o no es válida. Vuelve a conectar la cuenta de Shopify.'
           : 'Shopify no ha concedido los permisos read_orders y write_orders necesarios para gestionar pedidos.',
       );
     }
-    throw new Error(`Error HTTP de Shopify Admin API: ${response.status} ${detail.slice(0, 300)}`);
+
+    if (!response.ok) {
+      const detail = await response.text().catch(() => '');
+      console.error(`Shopify Admin API ${response.status}: ${detail}`);
+      throw new Error(`Error HTTP de Shopify Admin API: ${response.status} ${detail.slice(0, 300)}`);
+    }
+
+    const json = await response.json();
+    if (json.errors) {
+      const message = Array.isArray(json.errors)
+        ? json.errors.map((e: { message: string }) => e.message).join(', ')
+        : JSON.stringify(json.errors);
+      // Token inválido devuelto como 200 con errors
+      if (/invalid api key|access token/i.test(message) && i < tokens.length - 1) {
+        console.error(`Token ${i + 1} rechazado: ${message}`);
+        continue;
+      }
+      throw new Error(`Error de Shopify Admin API: ${message}`);
+    }
+    return json.data as T;
   }
 
-  const json = await response.json();
-  if (json.errors) {
-    const message = Array.isArray(json.errors)
-      ? json.errors.map((e: { message: string }) => e.message).join(', ')
-      : JSON.stringify(json.errors);
-    throw new Error(`Error de Shopify Admin API: ${message}`);
-  }
-  return json.data as T;
+  throw new Error(
+    `La sesión de Shopify ha caducado o no es válida. Vuelve a conectar la cuenta de Shopify. ${lastAuthDetail.slice(0, 200)}`,
+  );
 }
+
 
 const ORDER_FIELDS = `
   id
