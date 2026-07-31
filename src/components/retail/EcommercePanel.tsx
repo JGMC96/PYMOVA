@@ -44,7 +44,8 @@ export function EcommercePanel() {
     createOrder, setStatus, createReturn, fetchOrders,
   } = useOnlineOrders();
 
-  const { isSyncing: isShopifySyncing, syncOrders: runShopifySync } = useShopifyOrdersSync();
+  const { isSyncing: isShopifySyncing, syncOrders: runShopifySync, diagnose: diagnoseShopify } =
+    useShopifyOrdersSync();
 
   const syncShopifyOrders = async (days: number) => {
     const result = await runShopifySync(days);
