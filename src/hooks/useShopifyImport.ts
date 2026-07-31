@@ -97,8 +97,13 @@ export function useShopifyImport() {
     const requestId = ++requestIdRef.current;
     setIsLoading(true);
     setError(null);
+    if (!activeBusinessId) {
+      setError('Selecciona un negocio activo.');
+      setIsLoading(false);
+      return;
+    }
     try {
-      const page = await fetchShopifyProducts({ first: 50, query });
+      const page = await fetchShopifyProducts(activeBusinessId, { first: 50, query });
       if (requestId !== requestIdRef.current) return;
       setProducts(page.products);
       setHasNextPage(page.hasNextPage);
@@ -111,14 +116,14 @@ export function useShopifyImport() {
     } finally {
       if (requestId === requestIdRef.current) setIsLoading(false);
     }
-  }, []);
+  }, [activeBusinessId]);
 
   const loadMore = useCallback(async (query: string) => {
-    if (!hasNextPage || !cursor) return;
+    if (!hasNextPage || !cursor || !activeBusinessId) return;
     const requestId = ++requestIdRef.current;
     setIsLoading(true);
     try {
-      const page = await fetchShopifyProducts({ first: 50, after: cursor, query });
+      const page = await fetchShopifyProducts(activeBusinessId, { first: 50, after: cursor, query });
       if (requestId !== requestIdRef.current) return;
       setProducts((prev) => [...prev, ...page.products]);
       setHasNextPage(page.hasNextPage);
@@ -387,7 +392,7 @@ export function useShopifyImport() {
       }[] = [];
 
       try {
-        const all = await fetchAllShopifyProducts(query, setSyncProgress);
+        const all = await fetchAllShopifyProducts(activeBusinessId, query, setSyncProgress);
 
         setQueue({
           items: all.map((p) => ({
