@@ -125,6 +125,7 @@ export async function pushShopifyOrderStatus(params: {
   orderId: string;
   status: string;
   trackingNumber?: string | null;
+  refund?: boolean;
 }) {
   return invoke({
     action: 'push-status',
@@ -132,5 +133,15 @@ export async function pushShopifyOrderStatus(params: {
     order_id: params.orderId,
     status: params.status,
     tracking_number: params.trackingNumber ?? null,
+    refund: params.refund ?? false,
   });
 }
+
+export async function pushShopifyRefund(params: { businessId: string; returnId: string }) {
+  return invoke<{ ok: boolean; refund_id?: string | null; skipped?: string }>({
+    action: 'push-refund',
+    business_id: params.businessId,
+    return_id: params.returnId,
+  });
+}
+
