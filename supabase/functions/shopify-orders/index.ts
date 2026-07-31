@@ -277,15 +277,16 @@ Deno.serve(async (req) => {
       }
 
       if (status === 'cancelled') {
+        const withRefund = body.refund === true;
         const result = await adminGraphql<{
           orderCancel: { userErrors: Array<{ message: string }> };
         }>(
-          `mutation Cancel($orderId: ID!) {
-             orderCancel(orderId: $orderId, reason: OTHER, refund: false, restock: true, notifyCustomer: true) {
+          `mutation Cancel($orderId: ID!, $refund: Boolean!) {
+             orderCancel(orderId: $orderId, reason: OTHER, refund: $refund, restock: true, notifyCustomer: true) {
                userErrors { message }
              }
            }`,
-          { orderId: order.external_id },
+          { orderId: order.external_id, refund: withRefund },
         );
         const errors = result.orderCancel?.userErrors ?? [];
         if (errors.length) throw new Error(errors.map((e) => e.message).join(', '));
@@ -293,6 +294,139 @@ Deno.serve(async (req) => {
 
       return json({ ok: true });
     }
+
+    if (action === 'push-refund') {
+      const returnId = String(body.return_id ?? '');
+      if (!returnId) return json({ error: 'Falta la devolución' }, 400);
+
+      const { data: ret } = await admin
+        .from('online_order_returns')
+        .select('id, business_id, order_id, total, reason, return_number, kind')
+        .eq('id', returnId)
+        .eq('business_id', businessId)
+        .maybeSingle();
+
+      if (!ret) return json({ error: 'Devolución no encontrada' }, 404);
+
+      const { data: order } = await admin
+        .from('online_orders')
+        .select('id, external_id, source, order_number')
+        .eq('id', ret.order_id)
+        .maybeSingle();
+
+      if (!order || order.source !== 'shopify' || !order.external_id) {
+        await admin
+          .from('online_order_returns')
+          .update({ external_sync_status: 'not_applicable' })
+          .eq('id', returnId);
+        return json({ ok: true, skipped: 'El pedido no proviene de Shopify' });
+      }
+
+      const markError = async (message: string) => {
+        await admin
+          .from('online_order_returns')
+          .update({
+            external_source: 'shopify',
+            external_sync_status: 'error',
+            external_sync_error: message,
+          })
+          .eq('id', returnId);
+      };
+
+      try {
+        const data = await adminGraphql<{
+          order: {
+            currencyCode: string;
+            transactions: Array<{ id: string; kind: string; status: string; gateway: string }>;
+            lineItems: { edges: Array<{ node: { id: string; refundableQuantity: number } }> };
+          } | null;
+        }>(
+          `query($id: ID!) {
+             order(id: $id) {
+               currencyCode
+               transactions(first: 20) { id kind status gateway }
+               lineItems(first: 100) { edges { node { id refundableQuantity } } }
+             }
+           }`,
+          { id: order.external_id },
+        );
+
+        if (!data.order) throw new Error('El pedido ya no existe en Shopify');
+
+        const parent = data.order.transactions.find(
+          (t) => ['SALE', 'CAPTURE'].includes(t.kind) && t.status === 'SUCCESS',
+        );
+
+        const amount = Number(ret.total ?? 0);
+        const note = `${ret.kind === 'exchange' ? 'Cambio' : 'Devolución'} ${ret.return_number} · Pymova${
+          ret.reason ? ` · ${ret.reason}` : ''
+        }`;
+
+        const input: Record<string, unknown> = {
+          orderId: order.external_id,
+          note,
+          notifyCustomer: true,
+        };
+
+        if (parent && amount > 0) {
+          input.transactions = [
+            {
+              orderId: order.external_id,
+              gateway: parent.gateway,
+              kind: 'REFUND',
+              amount: amount.toFixed(2),
+              parentId: parent.id,
+            },
+          ];
+        } else {
+          const refundLineItems = data.order.lineItems.edges
+            .filter((e) => e.node.refundableQuantity > 0)
+            .map((e) => ({
+              lineItemId: e.node.id,
+              quantity: e.node.refundableQuantity,
+              restockType: 'NO_RESTOCK',
+            }));
+          if (refundLineItems.length === 0) {
+            throw new Error('No hay importe ni líneas reembolsables en Shopify');
+          }
+          input.refundLineItems = refundLineItems;
+        }
+
+        const result = await adminGraphql<{
+          refundCreate: { refund: { id: string } | null; userErrors: Array<{ message: string }> };
+        }>(
+          `mutation Refund($input: RefundInput!) {
+             refundCreate(input: $input) {
+               refund { id }
+               userErrors { message }
+             }
+           }`,
+          { input },
+        );
+
+        const errors = result.refundCreate?.userErrors ?? [];
+        if (errors.length) throw new Error(errors.map((e) => e.message).join(', '));
+
+        await admin
+          .from('online_order_returns')
+          .update({
+            external_source: 'shopify',
+            external_refund_id: result.refundCreate.refund?.id ?? null,
+            external_sync_status: 'synced',
+            external_sync_error: null,
+            external_synced_at: new Date().toISOString(),
+          })
+          .eq('id', returnId);
+
+        return json({ ok: true, refund_id: result.refundCreate.refund?.id ?? null });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Error desconocido';
+        await markError(message);
+        return json({ error: message }, 500);
+      }
+    }
+
+
 
     return json({ error: 'Acción no soportada' }, 400);
   } catch (err) {
