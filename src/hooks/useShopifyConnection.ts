@@ -119,5 +119,52 @@ export function useShopifyConnection() {
     [activeBusinessId, refresh],
   );
 
-  return { status, isLoading, isVerifying, isSyncing, error, refresh, verify, sync };
+  /** Vincula la tienda a este negocio (una tienda = un negocio, para siempre). */
+  const claim = useCallback(async () => {
+    if (!activeBusinessId) return;
+    setIsClaiming(true);
+    try {
+      await invokeShopifySync({ action: 'claim', business_id: activeBusinessId });
+      toast.success('Tienda vinculada a este negocio');
+      await refresh();
+    } catch (err) {
+      toast.error('No se pudo vincular la tienda', {
+        description: err instanceof Error ? err.message : undefined,
+      });
+    } finally {
+      setIsClaiming(false);
+    }
+  }, [activeBusinessId, refresh]);
+
+  /** Procesa los webhooks pendientes en cola. */
+  const processWebhooks = useCallback(async () => {
+    if (!activeBusinessId) return;
+    try {
+      const result = await invokeShopifySync<{ handled: number }>({
+        action: 'process-webhooks',
+        business_id: activeBusinessId,
+      });
+      toast.success(`${result.handled} avisos procesados`);
+      await refresh();
+    } catch (err) {
+      toast.error('No se pudieron procesar los avisos pendientes', {
+        description: err instanceof Error ? err.message : undefined,
+      });
+    }
+  }, [activeBusinessId, refresh]);
+
+  return {
+    status,
+    isLoading,
+    isVerifying,
+    isSyncing,
+    isClaiming,
+    error,
+    refresh,
+    verify,
+    sync,
+    claim,
+    processWebhooks,
+  };
 }
+
