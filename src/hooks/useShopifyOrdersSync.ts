@@ -137,6 +137,7 @@ export function useShopifyOrdersSync() {
     lastSummary,
     refresh,
     syncOrders,
+    diagnose,
     registerWebhooks,
   };
 }
