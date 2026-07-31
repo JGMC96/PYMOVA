@@ -2117,37 +2117,88 @@ export type Database = {
           },
         ]
       }
+      shopify_app_tokens: {
+        Row: {
+          access_token: string
+          created_at: string
+          expires_at: string | null
+          id: string
+          scopes: string[]
+          shop_domain: string
+          updated_at: string
+        }
+        Insert: {
+          access_token: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          scopes?: string[]
+          shop_domain: string
+          updated_at?: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          scopes?: string[]
+          shop_domain?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       shopify_connections: {
         Row: {
+          api_version: string
           business_id: string
           created_at: string
           created_by: string | null
+          granted_scopes: string[]
           id: string
+          last_catalog_sync_at: string | null
           last_orders_sync_at: string | null
+          last_sync_error: string | null
+          last_sync_status: string | null
+          last_verified_at: string | null
           orders_sync_enabled: boolean
           shop_domain: string
+          uninstalled_at: string | null
           updated_at: string
           webhooks_registered_at: string | null
         }
         Insert: {
+          api_version?: string
           business_id: string
           created_at?: string
           created_by?: string | null
+          granted_scopes?: string[]
           id?: string
+          last_catalog_sync_at?: string | null
           last_orders_sync_at?: string | null
+          last_sync_error?: string | null
+          last_sync_status?: string | null
+          last_verified_at?: string | null
           orders_sync_enabled?: boolean
           shop_domain: string
+          uninstalled_at?: string | null
           updated_at?: string
           webhooks_registered_at?: string | null
         }
         Update: {
+          api_version?: string
           business_id?: string
           created_at?: string
           created_by?: string | null
+          granted_scopes?: string[]
           id?: string
+          last_catalog_sync_at?: string | null
           last_orders_sync_at?: string | null
+          last_sync_error?: string | null
+          last_sync_status?: string | null
+          last_verified_at?: string | null
           orders_sync_enabled?: boolean
           shop_domain?: string
+          uninstalled_at?: string | null
           updated_at?: string
           webhooks_registered_at?: string | null
         }
