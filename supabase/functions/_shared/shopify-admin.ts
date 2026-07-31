@@ -1,56 +1,20 @@
-export const SHOPIFY_API_VERSION = '2025-07';
+// Consultas y mapeos de pedidos. La autenticación vive en shopify-client.ts.
+import {
+  SHOPIFY_API_VERSION,
+  getShopDomain,
+  shopifyGraphql,
+} from './shopify-client.ts';
 
-export function getShopDomain(): string {
-  return Deno.env.get('SHOPIFY_STORE_DOMAIN') ?? 'tuilus-shop.myshopify.com';
-}
+export { SHOPIFY_API_VERSION, getShopDomain };
 
-export function getAdminToken(): string {
-  const onlineTokenEntry = Object.entries(Deno.env.toObject()).find(([name, value]) =>
-    name.startsWith('SHOPIFY_ONLINE_ACCESS_TOKEN:') && Boolean(value)
-  );
-  const token = onlineTokenEntry?.[1] ?? Deno.env.get('SHOPIFY_ACCESS_TOKEN');
-  if (!token) throw new Error('Falta el token de administración de Shopify (SHOPIFY_ACCESS_TOKEN).');
-  return token;
-}
-
+/** Compatibilidad: todas las llamadas pasan por el cliente centralizado. */
 export async function adminGraphql<T = unknown>(
   query: string,
   variables: Record<string, unknown> = {},
 ): Promise<T> {
-  const response = await fetch(
-    `https://${getShopDomain()}/admin/api/${SHOPIFY_API_VERSION}/graphql.json`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Shopify-Access-Token': getAdminToken(),
-      },
-      body: JSON.stringify({ query, variables }),
-    },
-  );
-
-  if (!response.ok) {
-    const detail = await response.text().catch(() => '');
-    console.error(`Shopify Admin API ${response.status}: ${detail}`);
-    if (response.status === 401 || response.status === 403) {
-      throw new Error(
-        response.status === 401
-          ? 'La sesión de Shopify ha caducado o no es válida. Vuelve a conectar la cuenta de Shopify.'
-          : 'Shopify no ha concedido los permisos read_orders y write_orders necesarios para gestionar pedidos.',
-      );
-    }
-    throw new Error(`Error HTTP de Shopify Admin API: ${response.status} ${detail.slice(0, 300)}`);
-  }
-
-  const json = await response.json();
-  if (json.errors) {
-    const message = Array.isArray(json.errors)
-      ? json.errors.map((e: { message: string }) => e.message).join(', ')
-      : JSON.stringify(json.errors);
-    throw new Error(`Error de Shopify Admin API: ${message}`);
-  }
-  return json.data as T;
+  return await shopifyGraphql<T>(query, variables);
 }
+
 
 const ORDER_FIELDS = `
   id
