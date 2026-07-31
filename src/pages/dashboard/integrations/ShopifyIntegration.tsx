@@ -17,11 +17,16 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useShopifyImport } from '@/hooks/useShopifyImport';
 import { useShopifyOrdersSync } from '@/hooks/useShopifyOrdersSync';
-import { SHOPIFY_STORE_PERMANENT_DOMAIN } from '@/lib/shopify';
+import { useShopifyConnection } from '@/hooks/useShopifyConnection';
 import { SyncQueuePanel } from '@/components/integrations/SyncQueuePanel';
 import { VariantMappingReport } from '@/components/integrations/VariantMappingReport';
 
 const ShopifyIntegration = () => {
+  const {
+    status: connectionStatus,
+    isVerifying,
+    verify: verifyConnection,
+  } = useShopifyConnection();
   const {
     products,
     runs,
@@ -108,13 +113,34 @@ const ShopifyIntegration = () => {
           </h1>
           <p className="text-muted-foreground mt-1 flex items-center gap-2">
             <Store className="w-4 h-4" />
-            {SHOPIFY_STORE_PERMANENT_DOMAIN}
-            <Badge className="bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/15">
-              Conectada
+            {connectionStatus?.shop_domain ?? 'Cargando tienda…'}
+            <Badge
+              className={
+                connectionStatus?.connection?.last_verified_at && !connectionStatus.connection.uninstalled_at
+                  ? 'bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/15'
+                  : 'bg-amber-500/15 text-amber-500 hover:bg-amber-500/15'
+              }
+            >
+              {connectionStatus?.connection?.uninstalled_at
+                ? 'Desinstalada'
+                : connectionStatus?.connection?.last_verified_at
+                  ? 'Conectada'
+                  : 'Sin verificar'}
             </Badge>
+            {connectionStatus?.api_version && (
+              <Badge variant="outline">API {connectionStatus.api_version}</Badge>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={verifyConnection} disabled={isVerifying}>
+            {isVerifying ? (
+              <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+            ) : (
+              <Store className="w-4 h-4 mr-1.5" />
+            )}
+            Comprobar conexión
+          </Button>
           <Button
             variant="outline"
             onClick={() => forceSync(appliedTerm)}
