@@ -25,8 +25,12 @@ const ShopifyIntegration = () => {
   const {
     status: connectionStatus,
     isVerifying,
+    isClaiming,
     verify: verifyConnection,
+    claim: claimShop,
+    processWebhooks,
   } = useShopifyConnection();
+
   const {
     products,
     runs,
