@@ -8,6 +8,19 @@ import {
   shopifyGraphql,
   verifyConnection,
 } from '../_shared/shopify-client.ts';
+import {
+  CUSTOMERS_QUERY,
+  LOCATIONS_QUERY,
+  PRODUCTS_QUERY,
+  fetchAllInventoryLevels,
+  fetchAllVariants,
+  resolveClientMatch,
+  totalAvailable,
+  type InventoryLevelRow,
+  type ShopifyProductNode,
+  type ShopifyVariantNode,
+} from '../_shared/shopify-core.ts';
+import { drainWebhookQueue, syncFulfillmentsForOrder } from '../_shared/shopify-webhooks.ts';
 import { ORDERS_QUERY, buildUpsertArgs, type ShopifyAdminOrder } from '../_shared/shopify-admin.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
@@ -20,83 +33,11 @@ const json = (body: unknown, status = 200) =>
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
 
-const PRODUCTS_QUERY = `
-  query Products($first: Int!, $after: String, $query: String) {
-    products(first: $first, after: $after, query: $query, sortKey: UPDATED_AT) {
-      pageInfo { hasNextPage endCursor }
-      edges {
-        node {
-          id
-          title
-          handle
-          description
-          productType
-          vendor
-          status
-          updatedAt
-          featuredImage { url altText }
-          priceRangeV2 { minVariantPrice { amount currencyCode } }
-          variants(first: 100) {
-            edges {
-              node {
-                id
-                title
-                sku
-                barcode
-                price
-                inventoryQuantity
-                availableForSale
-                selectedOptions { name value }
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-`;
-
-const LOCATIONS_QUERY = `
-  query { locations(first: 50) { edges { node { id name isActive } } } }
-`;
-
-const CUSTOMERS_QUERY = `
-  query Customers($first: Int!, $after: String) {
-    customers(first: $first, after: $after, sortKey: UPDATED_AT) {
-      pageInfo { hasNextPage endCursor }
-      edges { node { id firstName lastName email phone note } }
-    }
-  }
-`;
-
-interface ShopifyGqlProduct {
-  id: string;
-  title: string;
-  handle: string;
-  description: string;
-  productType: string | null;
-  vendor: string | null;
-  status: string;
-  featuredImage: { url: string; altText: string | null } | null;
-  priceRangeV2: { minVariantPrice: { amount: string; currencyCode: string } };
-  variants: {
-    edges: Array<{
-      node: {
-        id: string;
-        title: string;
-        sku: string | null;
-        barcode: string | null;
-        price: string;
-        inventoryQuantity: number | null;
-        availableForSale: boolean;
-        selectedOptions: Array<{ name: string; value: string }>;
-      };
-    }>;
-  };
-}
+const run = <T,>(query: string, variables: Record<string, unknown>, scopes: string[]) =>
+  shopifyGraphql<T>(query, variables, { requiredScopes: scopes });
 
 /** Forma que consume el frontend (catálogo navegable). */
-function toClientProduct(node: ShopifyGqlProduct) {
+function toClientProduct(node: ShopifyProductNode, stockByVariant: Map<string, number | null>) {
   return {
     id: node.id,
     title: node.title,
@@ -115,7 +56,7 @@ function toClientProduct(node: ShopifyGqlProduct) {
           sku: v.sku,
           barcode: v.barcode,
           availableForSale: v.availableForSale,
-          quantityAvailable: v.inventoryQuantity,
+          quantityAvailable: stockByVariant.get(v.id) ?? null,
           price: {
             amount: v.price,
             currencyCode: node.priceRangeV2.minVariantPrice.currencyCode,
@@ -130,7 +71,9 @@ function toClientProduct(node: ShopifyGqlProduct) {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
-  const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+  const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
 
   try {
     const authHeader = req.headers.get('Authorization') ?? '';
@@ -147,14 +90,14 @@ Deno.serve(async (req) => {
     const businessId = String(body.business_id ?? '');
     if (!businessId) return json({ error: 'Falta el negocio activo' }, 400);
 
-    // Aislamiento entre organizaciones: el usuario debe pertenecer al negocio.
+    // --- Aislamiento entre organizaciones ---
     const { data: isMember } = await userClient.rpc('is_member_of_business', {
       _business_id: businessId,
     });
     const { data: isSuper } = await userClient.rpc('is_super_admin');
     if (!isMember && !isSuper) return json({ error: 'No tienes acceso a este negocio' }, 403);
 
-    const requiresAdmin = ['verify', 'sync'].includes(action);
+    const requiresAdmin = ['verify', 'sync', 'claim', 'process-webhooks'].includes(action);
     if (requiresAdmin) {
       const { data: isAdmin } = await userClient.rpc('has_min_role', {
         _business_id: businessId,
@@ -167,21 +110,43 @@ Deno.serve(async (req) => {
 
     const shop = getShopDomain();
 
-    const upsertConnection = async (patch: Record<string, unknown>) => {
-      await admin.from('shopify_connections').upsert(
-        {
-          business_id: businessId,
-          shop_domain: shop,
-          api_version: SHOPIFY_API_VERSION,
-          created_by: userData.user.id,
-          ...patch,
-        },
-        { onConflict: 'shop_domain' },
-      );
+    /** La tienda pertenece a un único negocio: sin vínculo no se toca Shopify. */
+    const loadConnection = async () => {
+      const { data: byShop } = await admin
+        .from('shopify_connections')
+        .select('*')
+        .eq('shop_domain', shop)
+        .maybeSingle();
+      return byShop ?? null;
+    };
+
+    const requireConnection = async () => {
+      const connection = await loadConnection();
+      if (!connection) {
+        throw new ShopifyError(
+          'Esta tienda de Shopify todavía no está vinculada a ningún negocio. Vincúlala antes de sincronizar.',
+          409,
+        );
+      }
+      if (connection.business_id !== businessId) {
+        throw new ShopifyError('Esta tienda de Shopify pertenece a otro negocio.', 403);
+      }
+      if (connection.uninstalled_at) {
+        throw new ShopifyError('La aplicación ha sido desinstalada de esta tienda.', 409);
+      }
+      return connection;
+    };
+
+    const patchConnection = async (patch: Record<string, unknown>) => {
+      await admin
+        .from('shopify_connections')
+        .update({ ...patch, api_version: SHOPIFY_API_VERSION })
+        .eq('business_id', businessId)
+        .eq('shop_domain', shop);
     };
 
     const loadStats = async () => {
-      const [products, variants, orders, clients, issues] = await Promise.all([
+      const [products, variants, orders, clients, issues, levels, fulfillments] = await Promise.all([
         admin.from('products').select('id', { count: 'exact', head: true })
           .eq('business_id', businessId).eq('external_source', 'shopify'),
         admin.from('product_variants').select('id', { count: 'exact', head: true })
@@ -189,9 +154,13 @@ Deno.serve(async (req) => {
         admin.from('online_orders').select('id', { count: 'exact', head: true })
           .eq('business_id', businessId).eq('source', 'shopify'),
         admin.from('clients').select('id', { count: 'exact', head: true })
-          .eq('business_id', businessId).eq('is_active', true),
+          .eq('business_id', businessId).eq('external_source', 'shopify'),
         admin.from('integration_sync_issues').select('id', { count: 'exact', head: true })
           .eq('business_id', businessId).eq('resolved', false),
+        admin.from('shopify_inventory_levels').select('id', { count: 'exact', head: true })
+          .eq('business_id', businessId),
+        admin.from('shopify_fulfillments').select('id', { count: 'exact', head: true })
+          .eq('business_id', businessId),
       ]);
       return {
         products: products.count ?? 0,
@@ -199,28 +168,51 @@ Deno.serve(async (req) => {
         orders: orders.count ?? 0,
         clients: clients.count ?? 0,
         open_issues: issues.count ?? 0,
+        inventory_levels: levels.count ?? 0,
+        fulfillments: fulfillments.count ?? 0,
       };
     };
 
+    // ---------------------------------------------------------------- status
     if (action === 'status') {
-      const { data: connection } = await admin
-        .from('shopify_connections')
-        .select('*')
+      const connection = await loadConnection();
+      const ownedByOther = !!connection && connection.business_id !== businessId;
+
+      const { count: pendingWebhooks } = await admin
+        .from('integration_webhook_events')
+        .select('id', { count: 'exact', head: true })
+        .eq('integration_key', 'shopify')
         .eq('business_id', businessId)
-        .maybeSingle();
+        .in('status', ['pending', 'retrying']);
 
       return json({
         shop_domain: shop,
         api_version: SHOPIFY_API_VERSION,
         required_scopes: READ_SCOPES,
-        connection,
+        claimed: !!connection && !ownedByOther,
+        owned_by_other_business: ownedByOther,
+        connection: ownedByOther ? null : connection,
+        pending_webhooks: pendingWebhooks ?? 0,
         stats: await loadStats(),
       });
     }
 
+    // ----------------------------------------------------------------- claim
+    if (action === 'claim') {
+      const { error } = await userClient.rpc('claim_shopify_shop', {
+        _business_id: businessId,
+        _shop_domain: shop,
+        _api_version: SHOPIFY_API_VERSION,
+      });
+      if (error) return json({ error: error.message }, 403);
+      return json({ ok: true, shop_domain: shop });
+    }
+
+    // ---------------------------------------------------------------- verify
     if (action === 'verify') {
+      await requireConnection();
       const result = await verifyConnection();
-      await upsertConnection({
+      await patchConnection({
         last_verified_at: new Date().toISOString(),
         granted_scopes: result.scopes,
         uninstalled_at: null,
@@ -234,11 +226,20 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ------------------------------------------------------- process-webhooks
+    if (action === 'process-webhooks') {
+      await requireConnection();
+      const handled = await drainWebhookQueue(admin, Number(body.limit ?? 20));
+      return json({ ok: true, handled });
+    }
+
+    // --------------------------------------------------------- list-products
     if (action === 'list-products') {
-      const data = await shopifyGraphql<{
+      await requireConnection();
+      const data = await run<{
         products: {
           pageInfo: { hasNextPage: boolean; endCursor: string | null };
-          edges: Array<{ node: ShopifyGqlProduct }>;
+          edges: Array<{ node: ShopifyProductNode }>;
         };
       }>(
         PRODUCTS_QUERY,
@@ -247,21 +248,39 @@ Deno.serve(async (req) => {
           after: body.after ?? null,
           query: body.query ? String(body.query) : null,
         },
-        { requiredScopes: ['read_products'] },
+        ['read_products'],
       );
 
+      const stockByVariant = new Map<string, number | null>();
+      for (const { node } of data.products.edges) {
+        for (const { node: v } of node.variants.edges) {
+          const rows = v.inventoryItem
+            ? v.inventoryItem.inventoryLevels.edges.map((e) => ({
+                variant_external_id: v.id,
+                inventory_item_gid: v.inventoryItem!.id,
+                location_gid: e.node.location.id,
+                location_name: e.node.location.name,
+                available: e.node.quantities.find((q) => q.name === 'available')?.quantity ?? 0,
+              }))
+            : [];
+          stockByVariant.set(v.id, rows.length ? totalAvailable(rows) : null);
+        }
+      }
+
       return json({
-        products: data.products.edges.map((e) => toClientProduct(e.node)),
+        products: data.products.edges.map((e) => toClientProduct(e.node, stockByVariant)),
         hasNextPage: data.products.pageInfo.hasNextPage,
         endCursor: data.products.pageInfo.endCursor,
       });
     }
 
+    // ------------------------------------------------------------------ sync
     if (action === 'sync') {
+      await requireConnection();
       const scopeOption = String(body.scope ?? 'all');
       const days = Number(body.days ?? 60);
 
-      const { data: run } = await admin
+      const { data: syncRun } = await admin
         .from('integration_sync_runs')
         .insert({
           business_id: businessId,
@@ -278,12 +297,17 @@ Deno.serve(async (req) => {
       let failed = 0;
       const messages: string[] = [];
 
-      const logIssue = async (entityType: string, entityName: string, externalId: string | null, message: string) => {
+      const logIssue = async (
+        entityType: string,
+        entityName: string,
+        externalId: string | null,
+        message: string,
+      ) => {
         failed += 1;
-        if (!run) return;
+        if (!syncRun) return;
         await admin.from('integration_sync_issues').insert({
           business_id: businessId,
-          run_id: run.id,
+          run_id: syncRun.id,
           entity_type: entityType,
           entity_name: entityName,
           external_id: externalId,
@@ -293,37 +317,59 @@ Deno.serve(async (req) => {
       };
 
       try {
-        // --- Ubicaciones (informativo, no destructivo) ---
-        let locationCount = 0;
+        // --- Ubicaciones ---
+        const locations = new Map<string, string>();
         try {
-          const locations = await shopifyGraphql<{
+          const data = await run<{
             locations: { edges: Array<{ node: { id: string; name: string; isActive: boolean } }> };
-          }>(LOCATIONS_QUERY, {}, { requiredScopes: ['read_locations'] });
-          locationCount = locations.locations.edges.length;
+          }>(LOCATIONS_QUERY, {}, ['read_locations']);
+          for (const { node } of data.locations.edges) locations.set(node.id, node.name);
         } catch (err) {
           messages.push(err instanceof Error ? err.message : 'Error al leer ubicaciones');
         }
 
-        // --- Productos, variantes, SKU, precios, inventario ---
+        // --- Catálogo: productos, variantes (paginadas) e inventario por ubicación ---
         if (scopeOption === 'all' || scopeOption === 'catalog') {
           let cursor: string | null = null;
           for (let page = 0; page < 50; page++) {
             const data: {
               products: {
                 pageInfo: { hasNextPage: boolean; endCursor: string | null };
-                edges: Array<{ node: ShopifyGqlProduct }>;
+                edges: Array<{ node: ShopifyProductNode }>;
               };
-            } = await shopifyGraphql(
-              PRODUCTS_QUERY,
-              { first: 50, after: cursor, query: null },
-              { requiredScopes: ['read_products'] },
-            );
+            } = await run(PRODUCTS_QUERY, { first: 50, after: cursor, query: null }, [
+              'read_products',
+            ]);
 
             for (const { node } of data.products.edges) {
               try {
-                const variants = node.variants.edges.map((e) => e.node);
+                const { variants, complete } = await fetchAllVariants(
+                  (q, v, o) => shopifyGraphql(q, v, o),
+                  node,
+                );
+                if (!complete) {
+                  await logIssue(
+                    'product',
+                    node.title,
+                    node.id,
+                    'No se pudieron leer todas las variantes (paginación incompleta).',
+                  );
+                }
+
+                // Inventario por ubicación de cada variante.
+                const inventoryRows: InventoryLevelRow[] = [];
+                const perVariantStock = new Map<string, number>();
+                for (const variant of variants) {
+                  const { rows } = await fetchAllInventoryLevels(
+                    (q, v, o) => shopifyGraphql(q, v, o),
+                    variant as ShopifyVariantNode,
+                  );
+                  inventoryRows.push(...rows);
+                  perVariantStock.set(variant.id, totalAvailable(rows));
+                }
+
                 const first = variants[0];
-                const totalStock = variants.reduce((sum, v) => sum + (v.inventoryQuantity ?? 0), 0);
+                const productStock = [...perVariantStock.values()].reduce((a, b) => a + b, 0);
 
                 const { data: existing } = await admin
                   .from('products')
@@ -341,7 +387,7 @@ Deno.serve(async (req) => {
                   category: node.productType || null,
                   sku: first?.sku ?? null,
                   barcode: first?.barcode ?? null,
-                  stock_quantity: totalStock,
+                  stock_quantity: productStock,
                   track_inventory: true,
                   is_active: node.status === 'ACTIVE',
                   external_id: node.id,
@@ -365,6 +411,7 @@ Deno.serve(async (req) => {
                   created += 1;
                 }
 
+                const localVariantIds = new Map<string, string>();
                 if (variants.length > 1) {
                   for (const v of variants) {
                     const variantPayload = {
@@ -377,7 +424,7 @@ Deno.serve(async (req) => {
                       sku: v.sku,
                       barcode: v.barcode,
                       price: Number(v.price) || null,
-                      stock_quantity: v.inventoryQuantity ?? 0,
+                      stock_quantity: perVariantStock.get(v.id) ?? 0,
                       is_active: true,
                       external_id: v.id,
                       external_source: 'shopify',
@@ -393,13 +440,38 @@ Deno.serve(async (req) => {
                       .maybeSingle();
 
                     if (existingVariant) {
-                      await admin.from('product_variants').update(variantPayload).eq('id', existingVariant.id);
-                    } else {
                       await admin
                         .from('product_variants')
-                        .insert({ ...variantPayload, created_by: userData.user.id });
+                        .update(variantPayload)
+                        .eq('id', existingVariant.id);
+                      localVariantIds.set(v.id, existingVariant.id);
+                    } else {
+                      const { data: insertedVariant } = await admin
+                        .from('product_variants')
+                        .insert({ ...variantPayload, created_by: userData.user.id })
+                        .select('id')
+                        .maybeSingle();
+                      if (insertedVariant) localVariantIds.set(v.id, insertedVariant.id);
                     }
                   }
+                }
+
+                if (inventoryRows.length > 0) {
+                  await admin.from('shopify_inventory_levels').upsert(
+                    inventoryRows.map((row) => ({
+                      business_id: businessId,
+                      variant_external_id: row.variant_external_id,
+                      local_variant_id: localVariantIds.get(row.variant_external_id) ?? null,
+                      local_product_id: productId,
+                      inventory_item_gid: row.inventory_item_gid,
+                      location_gid: row.location_gid,
+                      location_name: row.location_name ?? locations.get(row.location_gid) ?? null,
+                      available: row.available,
+                      synced_at: new Date().toISOString(),
+                      updated_at: new Date().toISOString(),
+                    })),
+                    { onConflict: 'business_id,inventory_item_gid,location_gid' },
+                  );
                 }
               } catch (err) {
                 await logIssue(
@@ -416,7 +488,7 @@ Deno.serve(async (req) => {
           }
         }
 
-        // --- Pedidos y líneas de pedido ---
+        // --- Pedidos, líneas y envíos ---
         if (scopeOption === 'all' || scopeOption === 'orders') {
           const since = new Date(Date.now() - days * 86400000).toISOString();
           let cursor: string | null = null;
@@ -426,10 +498,10 @@ Deno.serve(async (req) => {
                 pageInfo: { hasNextPage: boolean; endCursor: string | null };
                 edges: Array<{ node: ShopifyAdminOrder }>;
               };
-            } = await shopifyGraphql(
+            } = await run(
               ORDERS_QUERY,
               { first: 50, after: cursor, query: `updated_at:>='${since}'` },
-              { requiredScopes: ['read_orders'] },
+              ['read_orders'],
             );
 
             for (const { node } of data.orders.edges) {
@@ -443,7 +515,11 @@ Deno.serve(async (req) => {
                 if (row?.was_created) created += 1;
                 else updated += 1;
                 if (row?.order_id) {
-                  await admin.from('online_orders').update({ stock_applied: true }).eq('id', row.order_id);
+                  await admin
+                    .from('online_orders')
+                    .update({ stock_applied: true })
+                    .eq('id', row.order_id);
+                  await syncFulfillmentsForOrder(admin, businessId, row.order_id, node);
                 }
               } catch (err) {
                 await logIssue('order', node.name, node.id, err instanceof Error ? err.message : 'Error');
@@ -455,7 +531,7 @@ Deno.serve(async (req) => {
           }
         }
 
-        // --- Clientes ---
+        // --- Clientes (identificados por GID, nunca fusionados por email) ---
         if (scopeOption === 'all' || scopeOption === 'customers') {
           let cursor: string | null = null;
           for (let page = 0; page < 20; page++) {
@@ -473,11 +549,7 @@ Deno.serve(async (req) => {
                   };
                 }>;
               };
-            } = await shopifyGraphql(
-              CUSTOMERS_QUERY,
-              { first: 50, after: cursor },
-              { requiredScopes: ['read_customers'] },
-            );
+            } = await run(CUSTOMERS_QUERY, { first: 50, after: cursor }, ['read_customers']);
 
             for (const { node } of data.customers.edges) {
               const name =
@@ -485,29 +557,36 @@ Deno.serve(async (req) => {
                 node.email ||
                 'Cliente Shopify';
               try {
-                if (!node.email) continue;
-                const { data: existing } = await admin
+                const filters = [`external_id.eq.${node.id}`];
+                if (node.email) filters.push(`email.ilike.${node.email.replace(/[,;()]/g, '')}`);
+                const { data: candidates } = await admin
                   .from('clients')
-                  .select('id')
+                  .select('id, external_id, email')
                   .eq('business_id', businessId)
-                  .ilike('email', node.email)
-                  .maybeSingle();
+                  .or(filters.join(','))
+                  .limit(20);
 
-                if (existing) {
-                  await admin
-                    .from('clients')
-                    .update({ name, phone: node.phone, updated_at: new Date().toISOString() })
-                    .eq('id', existing.id);
+                const match = resolveClientMatch(node.id, node.email, candidates ?? []);
+                const payload = {
+                  name,
+                  email: node.email,
+                  phone: node.phone,
+                  external_id: node.id,
+                  external_source: 'shopify',
+                  updated_at: new Date().toISOString(),
+                };
+
+                if (match.action === 'update') {
+                  await admin.from('clients').update(payload).eq('id', match.id);
                   updated += 1;
                 } else {
-                  await admin.from('clients').insert({
+                  const { error } = await admin.from('clients').insert({
                     business_id: businessId,
-                    name,
-                    email: node.email,
-                    phone: node.phone,
                     notes: node.note,
                     created_by: userData.user.id,
+                    ...payload,
                   });
+                  if (error) throw error;
                   created += 1;
                 }
               } catch (err) {
@@ -524,13 +603,13 @@ Deno.serve(async (req) => {
         const summaryMessage = [
           `${created} nuevos · ${updated} actualizados`,
           failed > 0 ? `${failed} con error` : null,
-          locationCount ? `${locationCount} ubicaciones` : null,
+          locations.size ? `${locations.size} ubicaciones` : null,
           ...messages,
         ]
           .filter(Boolean)
           .join(' · ');
 
-        if (run) {
+        if (syncRun) {
           await admin
             .from('integration_sync_runs')
             .update({
@@ -541,27 +620,31 @@ Deno.serve(async (req) => {
               finished_at: new Date().toISOString(),
               message: summaryMessage,
             })
-            .eq('id', run.id);
+            .eq('id', syncRun.id);
         }
 
         const now = new Date().toISOString();
-        await upsertConnection({
+        await patchConnection({
           last_sync_status: status,
           last_sync_error: null,
-          last_catalog_sync_at:
-            scopeOption === 'all' || scopeOption === 'catalog' ? now : undefined,
-          last_orders_sync_at: scopeOption === 'all' || scopeOption === 'orders' ? now : undefined,
+          ...(scopeOption === 'all' || scopeOption === 'catalog'
+            ? { last_catalog_sync_at: now }
+            : {}),
+          ...(scopeOption === 'all' || scopeOption === 'orders' ? { last_orders_sync_at: now } : {}),
           last_verified_at: now,
         });
 
-        return json({ ok: true, created, updated, failed, message: summaryMessage, stats: await loadStats() });
+        return json({
+          ok: true,
+          created,
+          updated,
+          failed,
+          message: summaryMessage,
+          stats: await loadStats(),
+        });
       } catch (err) {
-        const message = err instanceof ShopifyError
-          ? err.message
-          : err instanceof Error
-            ? err.message
-            : 'Error desconocido';
-        if (run) {
+        const message = err instanceof Error ? err.message : 'Error desconocido';
+        if (syncRun) {
           await admin
             .from('integration_sync_runs')
             .update({
@@ -572,9 +655,9 @@ Deno.serve(async (req) => {
               finished_at: new Date().toISOString(),
               message,
             })
-            .eq('id', run.id);
+            .eq('id', syncRun.id);
         }
-        await upsertConnection({ last_sync_status: 'error', last_sync_error: message });
+        await patchConnection({ last_sync_status: 'error', last_sync_error: message });
         return json({ error: message }, err instanceof ShopifyError ? err.status : 500);
       }
     }

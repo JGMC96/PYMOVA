@@ -59,14 +59,31 @@ Deno.serve(async (req) => {
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
     const shop = getShopDomain();
 
+    // Aislamiento estricto: la tienda pertenece a un único negocio.
+    const { data: connection } = await admin
+      .from('shopify_connections')
+      .select('*')
+      .eq('shop_domain', shop)
+      .maybeSingle();
+
     if (action === 'status') {
-      const { data: connection } = await admin
-        .from('shopify_connections')
-        .select('*')
-        .eq('business_id', businessId)
-        .maybeSingle();
-      return json({ shop_domain: shop, connection });
+      return json({
+        shop_domain: shop,
+        claimed: !!connection && connection.business_id === businessId,
+        connection: connection?.business_id === businessId ? connection : null,
+      });
     }
+
+    if (!connection) {
+      return json(
+        { error: 'Esta tienda de Shopify todavía no está vinculada a ningún negocio.' },
+        409,
+      );
+    }
+    if (connection.business_id !== businessId) {
+      return json({ error: 'Esta tienda de Shopify pertenece a otro negocio.' }, 403);
+    }
+
 
     if (action === 'diagnose') {
       try {
@@ -124,15 +141,10 @@ Deno.serve(async (req) => {
 
       await admin
         .from('shopify_connections')
-        .upsert(
-          {
-            business_id: businessId,
-            shop_domain: shop,
-            webhooks_registered_at: new Date().toISOString(),
-            created_by: userData.user.id,
-          },
-          { onConflict: 'shop_domain' },
-        );
+        .update({ webhooks_registered_at: new Date().toISOString() })
+        .eq('business_id', businessId)
+        .eq('shop_domain', shop);
+
 
       return json({ ok: true, topics: created, callback_url: callbackUrl.split('?')[0] });
     }
@@ -199,15 +211,10 @@ Deno.serve(async (req) => {
 
         await admin
           .from('shopify_connections')
-          .upsert(
-            {
-              business_id: businessId,
-              shop_domain: shop,
-              last_orders_sync_at: new Date().toISOString(),
-              created_by: userData.user.id,
-            },
-            { onConflict: 'shop_domain' },
-          );
+          .update({ last_orders_sync_at: new Date().toISOString() })
+          .eq('business_id', businessId)
+          .eq('shop_domain', shop);
+
 
         if (run) {
           await admin
