@@ -989,6 +989,81 @@ export type Database = {
           },
         ]
       }
+      integration_variant_mismatches: {
+        Row: {
+          barcode: string | null
+          business_id: string
+          created_at: string
+          details: string | null
+          external_id: string | null
+          external_stock: number | null
+          id: string
+          integration_key: string
+          issue_code: string
+          local_stock: number | null
+          local_variant_id: string | null
+          product_name: string
+          resolved: boolean
+          run_id: string | null
+          sku: string | null
+          updated_at: string
+          variant_name: string | null
+        }
+        Insert: {
+          barcode?: string | null
+          business_id: string
+          created_at?: string
+          details?: string | null
+          external_id?: string | null
+          external_stock?: number | null
+          id?: string
+          integration_key?: string
+          issue_code: string
+          local_stock?: number | null
+          local_variant_id?: string | null
+          product_name: string
+          resolved?: boolean
+          run_id?: string | null
+          sku?: string | null
+          updated_at?: string
+          variant_name?: string | null
+        }
+        Update: {
+          barcode?: string | null
+          business_id?: string
+          created_at?: string
+          details?: string | null
+          external_id?: string | null
+          external_stock?: number | null
+          id?: string
+          integration_key?: string
+          issue_code?: string
+          local_stock?: number | null
+          local_variant_id?: string | null
+          product_name?: string
+          resolved?: boolean
+          run_id?: string | null
+          sku?: string | null
+          updated_at?: string
+          variant_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_variant_mismatches_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integration_variant_mismatches_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "integration_sync_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       integration_webhook_events: {
         Row: {
           business_id: string | null
@@ -1620,6 +1695,8 @@ export type Database = {
           business_id: string
           created_at: string
           created_by: string | null
+          external_id: string | null
+          external_source: string | null
           id: string
           is_active: boolean
           name: string
@@ -1635,6 +1712,8 @@ export type Database = {
           business_id: string
           created_at?: string
           created_by?: string | null
+          external_id?: string | null
+          external_source?: string | null
           id?: string
           is_active?: boolean
           name: string
@@ -1650,6 +1729,8 @@ export type Database = {
           business_id?: string
           created_at?: string
           created_by?: string | null
+          external_id?: string | null
+          external_source?: string | null
           id?: string
           is_active?: boolean
           name?: string
@@ -1684,6 +1765,8 @@ export type Database = {
           created_at: string
           created_by: string | null
           description: string | null
+          external_id: string | null
+          external_source: string | null
           id: string
           is_active: boolean
           name: string
@@ -1701,6 +1784,8 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
+          external_id?: string | null
+          external_source?: string | null
           id?: string
           is_active?: boolean
           name: string
@@ -1718,6 +1803,8 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
+          external_id?: string | null
+          external_source?: string | null
           id?: string
           is_active?: boolean
           name?: string
