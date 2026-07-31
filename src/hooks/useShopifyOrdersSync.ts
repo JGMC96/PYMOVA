@@ -92,6 +92,27 @@ export function useShopifyOrdersSync() {
     [activeBusinessId, refresh],
   );
 
+  const diagnose = useCallback(async () => {
+    if (!activeBusinessId) return null;
+    try {
+      const result = await invoke<{ scopes: string[]; missing: string[] }>({
+        action: 'diagnose',
+        business_id: activeBusinessId,
+      });
+      if (result.missing.length > 0) {
+        toast.error(`Faltan permisos en Shopify: ${result.missing.join(', ')}`, {
+          description: 'Conecta tu cuenta de Shopify o regenera el token con permisos de pedidos.',
+        });
+      } else {
+        toast.success('Permisos de pedidos correctos en Shopify');
+      }
+      return result;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'No se pudo comprobar los permisos');
+      return null;
+    }
+  }, [activeBusinessId]);
+
   const registerWebhooks = useCallback(async () => {
     if (!activeBusinessId) return false;
     setIsRegistering(true);
