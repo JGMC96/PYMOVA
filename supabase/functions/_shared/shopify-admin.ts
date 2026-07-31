@@ -26,13 +26,15 @@ export async function adminGraphql<T = unknown>(
     },
   );
 
-  if (response.status === 401 || response.status === 403) {
-    throw new Error(
-      'Shopify rechazó la petición (permisos insuficientes). Revisa que la app tenga los permisos de lectura y gestión de pedidos.',
-    );
-  }
   if (!response.ok) {
-    throw new Error(`Error HTTP de Shopify Admin API: ${response.status}`);
+    const detail = await response.text().catch(() => '');
+    console.error(`Shopify Admin API ${response.status}: ${detail}`);
+    if (response.status === 401 || response.status === 403) {
+      throw new Error(
+        `Shopify rechazó la petición (${response.status}). El token de administración no es válido o le faltan los permisos read_orders / write_orders (y read_all_orders para pedidos de más de 60 días). Regenera el token en la app privada de Shopify con esos permisos y actualiza SHOPIFY_ACCESS_TOKEN. Detalle: ${detail.slice(0, 300)}`,
+      );
+    }
+    throw new Error(`Error HTTP de Shopify Admin API: ${response.status} ${detail.slice(0, 300)}`);
   }
 
   const json = await response.json();
