@@ -40,7 +40,9 @@ export function useShopifyConnection() {
   const [isLoading, setIsLoading] = useState(true);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isClaiming, setIsClaiming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
 
   const refresh = useCallback(async () => {
     if (!activeBusinessId) return;
