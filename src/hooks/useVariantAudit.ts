@@ -52,7 +52,7 @@ export function useVariantAudit() {
       setIsAuditing(true);
       setProgress(0);
       try {
-        const shopifyProducts = await fetchAllShopifyProducts(query, setProgress);
+        const shopifyProducts = await fetchAllShopifyProducts(activeBusinessId, query, setProgress);
 
         const { data: localProducts } = await supabase
           .from('products')

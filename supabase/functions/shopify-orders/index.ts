@@ -18,6 +18,11 @@ const WEBHOOK_TOPICS = [
   'ORDERS_CANCELLED',
   'ORDERS_FULFILLED',
   'REFUNDS_CREATE',
+  'PRODUCTS_CREATE',
+  'PRODUCTS_UPDATE',
+  'PRODUCTS_DELETE',
+  'INVENTORY_LEVELS_UPDATE',
+  'APP_UNINSTALLED',
 ];
 
 const json = (body: unknown, status = 200) =>
@@ -83,9 +88,8 @@ Deno.serve(async (req) => {
 
 
     if (action === 'register-webhooks') {
-      const callbackUrl = `${SUPABASE_URL}/functions/v1/shopify-orders-webhook?token=${
-        Deno.env.get('SHOPIFY_WEBHOOK_TOKEN') ?? ''
-      }`;
+      // Sin token en la URL: la autenticidad se valida con la firma HMAC.
+      const callbackUrl = `${SUPABASE_URL}/functions/v1/shopify-orders-webhook`;
 
       const existing = await adminGraphql<{
         webhookSubscriptions: { edges: Array<{ node: { id: string; topic: string; endpoint: { callbackUrl?: string } } }> };
