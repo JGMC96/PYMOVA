@@ -5,7 +5,10 @@ export function getShopDomain(): string {
 }
 
 export function getAdminToken(): string {
-  const token = Deno.env.get('SHOPIFY_ACCESS_TOKEN');
+  const onlineTokenEntry = Object.entries(Deno.env.toObject()).find(([name, value]) =>
+    name.startsWith('SHOPIFY_ONLINE_ACCESS_TOKEN:') && Boolean(value)
+  );
+  const token = onlineTokenEntry?.[1] ?? Deno.env.get('SHOPIFY_ACCESS_TOKEN');
   if (!token) throw new Error('Falta el token de administración de Shopify (SHOPIFY_ACCESS_TOKEN).');
   return token;
 }
@@ -31,7 +34,9 @@ export async function adminGraphql<T = unknown>(
     console.error(`Shopify Admin API ${response.status}: ${detail}`);
     if (response.status === 401 || response.status === 403) {
       throw new Error(
-        `Shopify rechazó la petición (${response.status}). El token de administración no es válido o le faltan los permisos read_orders / write_orders (y read_all_orders para pedidos de más de 60 días). Regenera el token en la app privada de Shopify con esos permisos y actualiza SHOPIFY_ACCESS_TOKEN. Detalle: ${detail.slice(0, 300)}`,
+        response.status === 401
+          ? 'La sesión de Shopify ha caducado o no es válida. Vuelve a conectar la cuenta de Shopify.'
+          : 'Shopify no ha concedido los permisos read_orders y write_orders necesarios para gestionar pedidos.',
       );
     }
     throw new Error(`Error HTTP de Shopify Admin API: ${response.status} ${detail.slice(0, 300)}`);

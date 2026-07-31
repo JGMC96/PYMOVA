@@ -56,7 +56,6 @@ const PRODUCTS_QUERY = `
                 sku
                 barcode
                 availableForSale
-                quantityAvailable
                 price { amount currencyCode }
                 selectedOptions { name value }
               }
@@ -93,8 +92,15 @@ export async function storefrontApiRequest(query: string, variables: Record<stri
   const data = await response.json();
 
   if (data.errors) {
+    const messages = Array.from(
+      new Set(
+        data.errors.map((error: { message?: string }) =>
+          error.message?.replace(/\s+/g, ' ').trim() || 'Error desconocido',
+        ),
+      ),
+    );
     throw new Error(
-      `Error de Shopify: ${data.errors.map((e: { message: string }) => e.message).join(', ')}`,
+      `Error de Shopify: ${messages.slice(0, 3).join('. ')}`,
     );
   }
 
@@ -116,7 +122,14 @@ export async function fetchShopifyProducts(
   }
 
   return {
-    products: connection.edges.map((edge: { node: ShopifyProduct }) => edge.node),
+    products: connection.edges.map((edge: { node: ShopifyProduct }) => ({
+      ...edge.node,
+      variants: {
+        edges: edge.node.variants.edges.map((variantEdge) => ({
+          node: { ...variantEdge.node, quantityAvailable: null },
+        })),
+      },
+    })),
     hasNextPage: Boolean(connection.pageInfo?.hasNextPage),
     endCursor: connection.pageInfo?.endCursor ?? null,
   };

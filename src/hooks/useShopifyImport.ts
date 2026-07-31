@@ -156,8 +156,9 @@ export function useShopifyImport() {
         category: product.productType || null,
         sku: firstVariant?.sku || null,
         barcode: firstVariant?.barcode || null,
-        track_inventory: tracksStock,
-        stock_quantity: tracksStock ? productStock : null,
+        ...(tracksStock
+          ? { track_inventory: true, stock_quantity: productStock }
+          : {}),
         is_active: true,
         external_id: product.id,
         external_source: 'shopify',
@@ -227,8 +228,9 @@ export function useShopifyImport() {
             barcode: variant.barcode || null,
             price: Number(variant.price.amount) || null,
             is_active: variant.availableForSale,
-            stock_quantity:
-              typeof variant.quantityAvailable === 'number' ? variant.quantityAvailable : 0,
+            ...(typeof variant.quantityAvailable === 'number'
+              ? { stock_quantity: variant.quantityAvailable }
+              : {}),
             external_id: variant.id,
             external_source: 'shopify',
           };
