@@ -185,7 +185,12 @@ export interface GraphqlRunnerOptions {
 }
 
 export function missingScopes(granted: string[], required: readonly string[]): string[] {
-  return required.filter((scope) => !granted.includes(scope));
+  const set = new Set(granted);
+  // En Shopify, write_X implica read_X: el alcance de escritura concede la lectura.
+  for (const scope of granted) {
+    if (scope.startsWith('write_')) set.add(`read_${scope.slice('write_'.length)}`);
+  }
+  return required.filter((scope) => !set.has(scope));
 }
 
 export type GraphqlRunner = <T = unknown>(
