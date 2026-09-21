@@ -459,7 +459,13 @@ Deno.serve(async (req) => {
                 }
 
                 if (inventoryRows.length > 0) {
-                  await admin.from('shopify_inventory_levels').upsert(
+                  // Dedup dentro del lote: dos variantes pueden compartir inventory_item.
+                  const deduped = [
+                    ...new Map(
+                      inventoryRows.map((r) => [`${r.inventory_item_gid}|${r.location_gid}`, r]),
+                    ).values(),
+                  ];
+                  const { error: invError } = await admin.from('shopify_inventory_levels').upsert(
                     inventoryRows.map((row) => ({
                       business_id: businessId,
                       variant_external_id: row.variant_external_id,
