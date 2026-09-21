@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { toast } from 'sonner';
+import { pushShopifyStock } from '@/lib/shopifyStockPush';
 
 export interface SaleDetailLine {
   sale_item_id: string;
