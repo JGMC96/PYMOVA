@@ -134,6 +134,24 @@ const ShopifyIntegration = () => {
             {connectionStatus?.api_version && (
               <Badge variant="outline">API {connectionStatus.api_version}</Badge>
             )}
+            {connectionStatus?.connection?.granted_scopes && (
+              <Badge
+                className={
+                  connectionStatus.connection.granted_scopes.includes('write_inventory')
+                    ? 'bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/15'
+                    : 'bg-amber-500/15 text-amber-500 hover:bg-amber-500/15'
+                }
+                title={
+                  connectionStatus.connection.granted_scopes.includes('write_inventory')
+                    ? 'Las ventas y devoluciones de la tienda física descuentan y reponen stock también en Shopify.'
+                    : 'Sin este permiso, los ajustes de stock desde la tienda física quedan en espera. Se concede ampliando los alcances de la app de Shopify.'
+                }
+              >
+                {connectionStatus.connection.granted_scopes.includes('write_inventory')
+                  ? 'Stock en Shopify: con escritura'
+                  : 'Stock en Shopify: sin escritura'}
+              </Badge>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-2">
