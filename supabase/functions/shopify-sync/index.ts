@@ -14,6 +14,7 @@ import {
   PRODUCTS_QUERY,
   fetchAllInventoryLevels,
   fetchAllVariants,
+  missingScopes,
   resolveClientMatch,
   totalAvailable,
   type InventoryLevelRow,
@@ -222,7 +223,7 @@ Deno.serve(async (req) => {
         shop_domain: result.shop,
         shop_name: result.name,
         scopes: result.scopes,
-        missing: READ_SCOPES.filter((s) => !result.scopes.includes(s)),
+        missing: missingScopes(result.scopes, READ_SCOPES),
         can_push_stock: result.scopes.includes('write_inventory'),
       });
     }
