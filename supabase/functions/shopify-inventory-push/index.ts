@@ -86,12 +86,15 @@ Deno.serve(async (req) => {
 
     const { data: connection } = await admin
       .from('shopify_connections')
-      .select('shop_domain, default_location_gid')
+      .select('shop_domain, default_location_gid, stock_push_enabled')
       .eq('business_id', businessId)
       .maybeSingle();
 
     if (!connection) {
       return json({ status: 'skipped', reason: 'Sin tienda de Shopify vinculada', pushed: 0 });
+    }
+    if ((connection as { stock_push_enabled?: boolean }).stock_push_enabled === false) {
+      return json({ status: 'skipped', reason: 'Envío de stock desactivado', pushed: 0 });
     }
 
     const { data: pending } = await admin
