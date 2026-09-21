@@ -69,7 +69,11 @@ export function useShopifyConnection() {
     if (!activeBusinessId) return;
     setIsVerifying(true);
     try {
-      const result = await invokeShopifySync<{ shop_name: string; missing: string[] }>({
+      const result = await invokeShopifySync<{
+        shop_name: string;
+        missing: string[];
+        can_push_stock?: boolean;
+      }>({
         action: 'verify',
         business_id: activeBusinessId,
       });
@@ -77,8 +81,17 @@ export function useShopifyConnection() {
         toast.warning('Conexión establecida con permisos incompletos', {
           description: `Faltan alcances: ${result.missing.join(', ')}`,
         });
+      } else if (result.can_push_stock === false) {
+        toast.success(`Conexión correcta con ${result.shop_name}`, {
+          description:
+            'La escritura de inventario en Shopify sigue sin estar concedida: los ajustes de stock desde la tienda física quedarán en espera hasta que amplíes los permisos de la app.',
+        });
       } else {
-        toast.success(`Conexión correcta con ${result.shop_name}`);
+        toast.success(`Conexión correcta con ${result.shop_name}`, {
+          description: result.can_push_stock
+            ? 'Escritura de inventario concedida: las ventas y devoluciones ajustan también el stock de Shopify.'
+            : undefined,
+        });
       }
       await refresh();
     } catch (err) {

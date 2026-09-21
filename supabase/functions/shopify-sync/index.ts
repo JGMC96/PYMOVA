@@ -223,6 +223,7 @@ Deno.serve(async (req) => {
         shop_name: result.name,
         scopes: result.scopes,
         missing: READ_SCOPES.filter((s) => !result.scopes.includes(s)),
+        can_push_stock: result.scopes.includes('write_inventory'),
       });
     }
 
