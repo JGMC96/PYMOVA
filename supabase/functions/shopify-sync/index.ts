@@ -459,8 +459,14 @@ Deno.serve(async (req) => {
                 }
 
                 if (inventoryRows.length > 0) {
-                  await admin.from('shopify_inventory_levels').upsert(
-                    inventoryRows.map((row) => ({
+                  // Dedup dentro del lote: dos variantes pueden compartir inventory_item.
+                  const deduped = [
+                    ...new Map(
+                      inventoryRows.map((r) => [`${r.inventory_item_gid}|${r.location_gid}`, r]),
+                    ).values(),
+                  ];
+                  const { error: invError } = await admin.from('shopify_inventory_levels').upsert(
+                    deduped.map((row) => ({
                       business_id: businessId,
                       variant_external_id: row.variant_external_id,
                       local_variant_id: localVariantIds.get(row.variant_external_id) ?? null,
@@ -474,6 +480,14 @@ Deno.serve(async (req) => {
                     })),
                     { onConflict: 'business_id,inventory_item_gid,location_gid' },
                   );
+                  if (invError) {
+                    await logIssue(
+                      'inventory',
+                      node.title,
+                      node.id,
+                      `No se pudo guardar el inventario por ubicación: ${invError.message}`,
+                    );
+                  }
                 }
               } catch (err) {
                 await logIssue(
