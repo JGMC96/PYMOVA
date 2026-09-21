@@ -480,6 +480,14 @@ Deno.serve(async (req) => {
                     })),
                     { onConflict: 'business_id,inventory_item_gid,location_gid' },
                   );
+                  if (invError) {
+                    await logIssue(
+                      'inventory',
+                      node.title,
+                      node.id,
+                      `No se pudo guardar el inventario por ubicación: ${invError.message}`,
+                    );
+                  }
                 }
               } catch (err) {
                 await logIssue(
