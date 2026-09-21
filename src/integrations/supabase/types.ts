@@ -2171,6 +2171,7 @@ export type Database = {
           business_id: string
           created_at: string
           created_by: string | null
+          default_location_gid: string | null
           granted_scopes: string[]
           id: string
           last_catalog_sync_at: string | null
@@ -2180,6 +2181,7 @@ export type Database = {
           last_verified_at: string | null
           orders_sync_enabled: boolean
           shop_domain: string
+          stock_push_enabled: boolean
           uninstalled_at: string | null
           updated_at: string
           webhooks_registered_at: string | null
@@ -2189,6 +2191,7 @@ export type Database = {
           business_id: string
           created_at?: string
           created_by?: string | null
+          default_location_gid?: string | null
           granted_scopes?: string[]
           id?: string
           last_catalog_sync_at?: string | null
@@ -2198,6 +2201,7 @@ export type Database = {
           last_verified_at?: string | null
           orders_sync_enabled?: boolean
           shop_domain: string
+          stock_push_enabled?: boolean
           uninstalled_at?: string | null
           updated_at?: string
           webhooks_registered_at?: string | null
@@ -2207,6 +2211,7 @@ export type Database = {
           business_id?: string
           created_at?: string
           created_by?: string | null
+          default_location_gid?: string | null
           granted_scopes?: string[]
           id?: string
           last_catalog_sync_at?: string | null
@@ -2216,6 +2221,7 @@ export type Database = {
           last_verified_at?: string | null
           orders_sync_enabled?: boolean
           shop_domain?: string
+          stock_push_enabled?: boolean
           uninstalled_at?: string | null
           updated_at?: string
           webhooks_registered_at?: string | null
@@ -2527,6 +2533,7 @@ export type Database = {
           business_id: string
           created_at: string
           created_by: string | null
+          default_location_gid: string | null
           granted_scopes: string[]
           id: string
           last_catalog_sync_at: string | null
@@ -2536,6 +2543,7 @@ export type Database = {
           last_verified_at: string | null
           orders_sync_enabled: boolean
           shop_domain: string
+          stock_push_enabled: boolean
           uninstalled_at: string | null
           updated_at: string
           webhooks_registered_at: string | null
