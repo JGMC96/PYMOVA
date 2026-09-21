@@ -14,6 +14,7 @@ import {
   PRODUCTS_QUERY,
   fetchAllInventoryLevels,
   fetchAllVariants,
+  missingScopes,
   resolveClientMatch,
   totalAvailable,
   type InventoryLevelRow,
