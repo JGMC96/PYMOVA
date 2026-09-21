@@ -315,7 +315,7 @@ export const VARIANT_FIELDS = `
   inventoryItem {
     id
     tracked
-    inventoryLevels(first: 20) {
+    inventoryLevels(first: 5) {
       pageInfo { hasNextPage endCursor }
       edges {
         node {
@@ -343,7 +343,7 @@ export const PRODUCTS_QUERY = `
           updatedAt
           featuredImage { url altText }
           priceRangeV2 { minVariantPrice { amount currencyCode } }
-          variants(first: 100) {
+          variants(first: 25) {
             pageInfo { hasNextPage endCursor }
             edges { node { ${VARIANT_FIELDS} } }
           }
@@ -358,7 +358,7 @@ export const PRODUCT_VARIANTS_PAGE_QUERY = `
   query ProductVariants($id: ID!, $after: String) {
     product(id: $id) {
       id
-      variants(first: 100, after: $after) {
+      variants(first: 25, after: $after) {
         pageInfo { hasNextPage endCursor }
         edges { node { ${VARIANT_FIELDS} } }
       }
