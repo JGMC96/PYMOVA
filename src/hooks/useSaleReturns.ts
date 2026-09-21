@@ -97,6 +97,7 @@ export function useSaleReturns() {
       }
 
       const row = Array.isArray(data) ? data[0] : (data as any);
+      if (params.restock ?? true) void pushShopifyStock(activeBusiness.id);
       toast.success(`Devolución ${row?.return_number} registrada`);
       return row?.return_number ?? null;
     },
