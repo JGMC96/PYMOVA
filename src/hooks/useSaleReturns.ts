@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { toast } from 'sonner';
+import { pushShopifyStock } from '@/lib/shopifyStockPush';
 
 export interface SaleDetailLine {
   sale_item_id: string;
@@ -97,6 +98,7 @@ export function useSaleReturns() {
       }
 
       const row = Array.isArray(data) ? data[0] : (data as any);
+      if (params.restock ?? true) void pushShopifyStock(activeBusiness.id);
       toast.success(`Devolución ${row?.return_number} registrada`);
       return row?.return_number ?? null;
     },

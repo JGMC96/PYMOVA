@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { toast } from 'sonner';
+import { pushShopifyStock } from '@/lib/shopifyStockPush';
 
 export interface Sale {
   id: string;
@@ -138,6 +139,7 @@ export function useRetailSales() {
 
 
       toast.success(`Venta ${saleNumber} registrada`);
+      void pushShopifyStock(activeBusiness.id);
       fetchSales();
       return { id: sale.id, sale_number: saleNumber };
     } catch (error: any) {

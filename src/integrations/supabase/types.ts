@@ -2171,6 +2171,7 @@ export type Database = {
           business_id: string
           created_at: string
           created_by: string | null
+          default_location_gid: string | null
           granted_scopes: string[]
           id: string
           last_catalog_sync_at: string | null
@@ -2180,6 +2181,7 @@ export type Database = {
           last_verified_at: string | null
           orders_sync_enabled: boolean
           shop_domain: string
+          stock_push_enabled: boolean
           uninstalled_at: string | null
           updated_at: string
           webhooks_registered_at: string | null
@@ -2189,6 +2191,7 @@ export type Database = {
           business_id: string
           created_at?: string
           created_by?: string | null
+          default_location_gid?: string | null
           granted_scopes?: string[]
           id?: string
           last_catalog_sync_at?: string | null
@@ -2198,6 +2201,7 @@ export type Database = {
           last_verified_at?: string | null
           orders_sync_enabled?: boolean
           shop_domain: string
+          stock_push_enabled?: boolean
           uninstalled_at?: string | null
           updated_at?: string
           webhooks_registered_at?: string | null
@@ -2207,6 +2211,7 @@ export type Database = {
           business_id?: string
           created_at?: string
           created_by?: string | null
+          default_location_gid?: string | null
           granted_scopes?: string[]
           id?: string
           last_catalog_sync_at?: string | null
@@ -2216,6 +2221,7 @@ export type Database = {
           last_verified_at?: string | null
           orders_sync_enabled?: boolean
           shop_domain?: string
+          stock_push_enabled?: boolean
           uninstalled_at?: string | null
           updated_at?: string
           webhooks_registered_at?: string | null
@@ -2366,6 +2372,71 @@ export type Database = {
           },
         ]
       }
+      shopify_inventory_pushes: {
+        Row: {
+          attempts: number
+          business_id: string
+          created_at: string
+          delta: number
+          id: string
+          inventory_item_gid: string | null
+          last_error: string | null
+          local_product_id: string | null
+          local_variant_id: string | null
+          location_gid: string | null
+          processed_at: string | null
+          reason: string
+          source_id: string | null
+          source_table: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          business_id: string
+          created_at?: string
+          delta: number
+          id?: string
+          inventory_item_gid?: string | null
+          last_error?: string | null
+          local_product_id?: string | null
+          local_variant_id?: string | null
+          location_gid?: string | null
+          processed_at?: string | null
+          reason: string
+          source_id?: string | null
+          source_table?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          business_id?: string
+          created_at?: string
+          delta?: number
+          id?: string
+          inventory_item_gid?: string | null
+          last_error?: string | null
+          local_product_id?: string | null
+          local_variant_id?: string | null
+          location_gid?: string | null
+          processed_at?: string | null
+          reason?: string
+          source_id?: string | null
+          source_table?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shopify_inventory_pushes_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subscriptions: {
         Row: {
           business_id: string
@@ -2462,6 +2533,7 @@ export type Database = {
           business_id: string
           created_at: string
           created_by: string | null
+          default_location_gid: string | null
           granted_scopes: string[]
           id: string
           last_catalog_sync_at: string | null
@@ -2471,6 +2543,7 @@ export type Database = {
           last_verified_at: string | null
           orders_sync_enabled: boolean
           shop_domain: string
+          stock_push_enabled: boolean
           uninstalled_at: string | null
           updated_at: string
           webhooks_registered_at: string | null
@@ -2599,6 +2672,18 @@ export type Database = {
       enqueue_email: {
         Args: { payload: Json; queue_name: string }
         Returns: number
+      }
+      enqueue_shopify_inventory_push: {
+        Args: {
+          _business_id: string
+          _delta: number
+          _product_id: string
+          _reason: string
+          _source_id: string
+          _source_table: string
+          _variant_id: string
+        }
+        Returns: undefined
       }
       ensure_hr_employee: { Args: { _business_id: string }; Returns: string }
       generate_invoice_number: {

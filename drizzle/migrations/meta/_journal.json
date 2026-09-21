@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1789991670940,
+      "tag": "0000_shopify_inventory_push",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1789991727890,
+      "tag": "0001_shopify_connection_stock_push_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789991786727,
+      "tag": "0002_enqueue_respects_stock_push_flag",
+      "breakpoints": true
+    }
+  ]
+}
