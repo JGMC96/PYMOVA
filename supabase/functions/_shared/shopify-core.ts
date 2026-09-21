@@ -288,6 +288,15 @@ export function createGraphqlRunner(config: GraphqlRunnerOptions): GraphqlRunner
             scope ? [scope] : [],
           );
         }
+        // Consulta demasiado costosa: reintentar pidiendo menos elementos por página.
+        const tooCostly = payload.errors.some((e) =>
+          /max cost limit/i.test(e.message ?? ''),
+        );
+        const currentFirst = Number(variables.first);
+        if (tooCostly && Number.isFinite(currentFirst) && currentFirst > 1) {
+          variables = { ...variables, first: Math.max(1, Math.floor(currentFirst / 2)) };
+          continue;
+        }
         const messages = Array.from(
           new Set(payload.errors.map((e) => e.message.replace(/\s+/g, ' ').trim())),
         ).slice(0, 3);
