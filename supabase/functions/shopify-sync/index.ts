@@ -245,7 +245,7 @@ Deno.serve(async (req) => {
       }>(
         PRODUCTS_QUERY,
         {
-          first: Math.min(Number(body.first ?? 50), 100),
+          first: Math.min(Number(body.first ?? 10), 25),
           after: body.after ?? null,
           query: body.query ? String(body.query) : null,
         },
@@ -338,7 +338,7 @@ Deno.serve(async (req) => {
                 pageInfo: { hasNextPage: boolean; endCursor: string | null };
                 edges: Array<{ node: ShopifyProductNode }>;
               };
-            } = await run(PRODUCTS_QUERY, { first: 50, after: cursor, query: null }, [
+            } = await run(PRODUCTS_QUERY, { first: 10, after: cursor, query: null }, [
               'read_products',
             ]);
 

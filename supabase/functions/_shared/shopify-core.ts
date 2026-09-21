@@ -288,6 +288,15 @@ export function createGraphqlRunner(config: GraphqlRunnerOptions): GraphqlRunner
             scope ? [scope] : [],
           );
         }
+        // Consulta demasiado costosa: reintentar pidiendo menos elementos por página.
+        const tooCostly = payload.errors.some((e) =>
+          /max cost limit/i.test(e.message ?? ''),
+        );
+        const currentFirst = Number(variables.first);
+        if (tooCostly && Number.isFinite(currentFirst) && currentFirst > 1) {
+          variables = { ...variables, first: Math.max(1, Math.floor(currentFirst / 2)) };
+          continue;
+        }
         const messages = Array.from(
           new Set(payload.errors.map((e) => e.message.replace(/\s+/g, ' ').trim())),
         ).slice(0, 3);
@@ -315,7 +324,7 @@ export const VARIANT_FIELDS = `
   inventoryItem {
     id
     tracked
-    inventoryLevels(first: 20) {
+    inventoryLevels(first: 5) {
       pageInfo { hasNextPage endCursor }
       edges {
         node {
@@ -343,7 +352,7 @@ export const PRODUCTS_QUERY = `
           updatedAt
           featuredImage { url altText }
           priceRangeV2 { minVariantPrice { amount currencyCode } }
-          variants(first: 100) {
+          variants(first: 25) {
             pageInfo { hasNextPage endCursor }
             edges { node { ${VARIANT_FIELDS} } }
           }
@@ -358,7 +367,7 @@ export const PRODUCT_VARIANTS_PAGE_QUERY = `
   query ProductVariants($id: ID!, $after: String) {
     product(id: $id) {
       id
-      variants(first: 100, after: $after) {
+      variants(first: 25, after: $after) {
         pageInfo { hasNextPage endCursor }
         edges { node { ${VARIANT_FIELDS} } }
       }
