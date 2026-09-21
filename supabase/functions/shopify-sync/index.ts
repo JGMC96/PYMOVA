@@ -466,7 +466,7 @@ Deno.serve(async (req) => {
                     ).values(),
                   ];
                   const { error: invError } = await admin.from('shopify_inventory_levels').upsert(
-                    inventoryRows.map((row) => ({
+                    deduped.map((row) => ({
                       business_id: businessId,
                       variant_external_id: row.variant_external_id,
                       local_variant_id: localVariantIds.get(row.variant_external_id) ?? null,
