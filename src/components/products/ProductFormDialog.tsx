@@ -30,6 +30,8 @@ const productSchema = z.object({
     .min(2, 'El nombre debe tener al menos 2 caracteres'),
   price: z.coerce.number()
     .min(0, 'El precio debe ser mayor o igual a 0'),
+  cost_price: z.union([z.literal(''), z.coerce.number().min(0, 'El coste debe ser mayor o igual a 0')])
+    .optional(),
   category: z.string().optional(),
   unit: z.string().optional(),
   description: z.string().optional(),
