@@ -446,6 +446,7 @@ export interface ShopifyVariantNode {
   inventoryItem: {
     id: string;
     tracked: boolean;
+    unitCost?: { amount: string | null } | null;
     inventoryLevels: {
       pageInfo: { hasNextPage: boolean; endCursor: string | null };
       edges: Array<{ node: ShopifyInventoryLevelNode }>;
