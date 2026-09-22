@@ -32,6 +32,7 @@ export function VariantsDialog({
   const [name, setName] = useState('');
   const [barcode, setBarcode] = useState('');
   const [price, setPrice] = useState('');
+  const [cost, setCost] = useState('');
   const [stock, setStock] = useState('0');
 
   const handleCreate = async () => {
@@ -40,12 +41,14 @@ export function VariantsDialog({
       name: name.trim(),
       barcode: barcode.trim() || null,
       price: price ? parseFloat(price) : null,
+      cost_price: cost ? parseFloat(cost) : null,
       stock_quantity: parseInt(stock, 10) || 0,
     });
     if (ok) {
       setName('');
       setBarcode('');
       setPrice('');
+      setCost('');
       setStock('0');
       onChanged?.();
     }
