@@ -30,6 +30,8 @@ const productSchema = z.object({
     .min(2, 'El nombre debe tener al menos 2 caracteres'),
   price: z.coerce.number()
     .min(0, 'El precio debe ser mayor o igual a 0'),
+  cost_price: z.union([z.literal(''), z.coerce.number().min(0, 'El coste debe ser mayor o igual a 0')])
+    .optional(),
   category: z.string().optional(),
   unit: z.string().optional(),
   description: z.string().optional(),
@@ -59,6 +61,7 @@ export function ProductFormDialog({
     defaultValues: {
       name: '',
       price: 0,
+      cost_price: '',
       category: '',
       unit: '',
       description: '',
@@ -72,6 +75,7 @@ export function ProductFormDialog({
         form.reset({
           name: product.name,
           price: product.price,
+          cost_price: product.cost_price ?? '',
           category: product.category || '',
           unit: product.unit || '',
           description: product.description || '',
@@ -80,6 +84,7 @@ export function ProductFormDialog({
         form.reset({
           name: '',
           price: 0,
+          cost_price: '',
           category: '',
           unit: '',
           description: '',
@@ -92,6 +97,7 @@ export function ProductFormDialog({
     const success = await onSubmit({
       name: values.name,
       price: values.price,
+      cost_price: values.cost_price === '' || values.cost_price === undefined ? null : Number(values.cost_price),
       category: values.category || undefined,
       unit: values.unit || undefined,
       description: values.description || undefined,
@@ -101,6 +107,12 @@ export function ProductFormDialog({
       onOpenChange(false);
     }
   };
+
+  const watchedPrice = Number(form.watch('price')) || 0;
+  const watchedCost = Number(form.watch('cost_price')) || 0;
+  const marginAmount = watchedPrice - watchedCost;
+  const marginPercent =
+    watchedCost > 0 && watchedPrice > 0 ? (marginAmount / watchedPrice) * 100 : null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -167,6 +179,33 @@ export function ProductFormDialog({
                 )}
               />
             </div>
+
+            <FormField
+              control={form.control}
+              name="cost_price"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Precio de coste</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="Lo que te cuesta a ti"
+                      {...field}
+                      value={field.value ?? ''}
+                    />
+                  </FormControl>
+                  <p className="text-xs text-muted-foreground">
+                    {marginPercent !== null
+                      ? `Margen: ${marginAmount.toFixed(2)} € por unidad (${marginPercent.toFixed(1)} %)`
+                      : 'Necesario para saber el beneficio real de cada venta.'}
+                  </p>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
 
             <FormField
               control={form.control}

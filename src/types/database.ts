@@ -259,6 +259,7 @@ export interface Product {
   name: string;
   description: string | null;
   price: number;
+  cost_price: number | null;
   unit: string | null;
   category: string | null;
   is_active: boolean;
