@@ -8,6 +8,7 @@ export interface ProductFormData {
   name: string;
   description?: string;
   price: number;
+  cost_price?: number | null;
   unit?: string;
   category?: string;
 }
