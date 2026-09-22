@@ -36,6 +36,13 @@
       "when": 1790109332852,
       "tag": "0004_add_unit_cost_to_sale_lines",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790110123286,
+      "tag": "0005_fix_upsert_external_order_ambiguous_order_id",
+      "breakpoints": true
     }
   ]
 }
