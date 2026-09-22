@@ -26,12 +26,17 @@ const Settings = () => {
 
       {/* Tabs */}
       <Tabs defaultValue="profile" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 lg:w-auto lg:inline-grid">
+        <TabsList
+          className={`grid w-full grid-cols-2 lg:w-auto lg:inline-grid ${
+            isAdmin ? 'sm:grid-cols-6' : 'sm:grid-cols-5'
+          }`}
+        >
           <TabsTrigger value="profile">Mi Perfil</TabsTrigger>
           <TabsTrigger value="business">Mi Negocio</TabsTrigger>
           <TabsTrigger value="role">Mi Rol</TabsTrigger>
           <TabsTrigger value="team">Equipo</TabsTrigger>
           <TabsTrigger value="billing">Facturación</TabsTrigger>
+          {isAdmin && <TabsTrigger value="audit">Seguridad</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="profile" className="mt-6">
