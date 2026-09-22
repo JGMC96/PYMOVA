@@ -58,6 +58,12 @@ const Settings = () => {
         <TabsContent value="billing" className="mt-6">
           <BillingSettings />
         </TabsContent>
+
+        {isAdmin && (
+          <TabsContent value="audit" className="mt-6">
+            <SecurityAuditSettings />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );
