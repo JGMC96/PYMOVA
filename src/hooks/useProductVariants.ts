@@ -12,6 +12,7 @@ export interface ProductVariant {
   sku: string | null;
   barcode: string | null;
   price: number | null;
+  cost_price: number | null;
   stock_quantity: number;
   is_active: boolean;
 }
@@ -22,6 +23,7 @@ export interface VariantFormData {
   sku?: string | null;
   barcode?: string | null;
   price?: number | null;
+  cost_price?: number | null;
   stock_quantity?: number;
 }
 
@@ -76,6 +78,7 @@ export function useProductVariants(productId?: string) {
       sku: data.sku || null,
       barcode: data.barcode || null,
       price: data.price ?? null,
+      cost_price: data.cost_price ?? null,
       stock_quantity: data.stock_quantity ?? 0,
       created_by: userData.user?.id ?? null,
     });
