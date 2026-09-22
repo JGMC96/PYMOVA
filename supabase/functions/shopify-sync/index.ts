@@ -300,24 +300,31 @@ Deno.serve(async (req) => {
       let failed = 0;
       const messages: string[] = [];
 
+      const firstErrors: string[] = [];
       const logIssue = async (
         entityType: string,
-        entityName: string,
+        entityName: string | null,
         externalId: string | null,
         message: string,
       ) => {
         failed += 1;
+        if (firstErrors.length < 3) firstErrors.push(`${entityType}: ${message.slice(0, 160)}`);
         if (!syncRun) return;
-        await admin.from('integration_sync_issues').insert({
+        const { error: issueError } = await admin.from('integration_sync_issues').insert({
           business_id: businessId,
           run_id: syncRun.id,
           entity_type: entityType,
-          entity_name: entityName,
+          entity_name: entityName || externalId || 'Sin nombre',
           external_id: externalId,
           attempts: 1,
-          error_message: message.slice(0, 500),
+          error_message: (message || 'Error desconocido').slice(0, 500),
         });
+        // Si ni siquiera se puede registrar la incidencia, que quede en el resumen del run.
+        if (issueError && firstErrors.length < 4) {
+          firstErrors.push(`registro de incidencias: ${issueError.message.slice(0, 160)}`);
+        }
       };
+
 
       try {
         // --- Ubicaciones ---
