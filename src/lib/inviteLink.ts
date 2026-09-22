@@ -9,6 +9,10 @@ const isPublicOrigin = () => {
   return !host.includes("lovableproject.com") && !host.includes("localhost") && host !== "127.0.0.1";
 };
 
+/** Origen público donde debe abrirse la invitación. */
+export const inviteOrigin = () =>
+  isPublicOrigin() ? window.location.origin : PUBLIC_APP_URL;
+
 /** Absolute, shareable invitation link for a given token. */
 export const buildInviteLink = (token: string) => {
   const base = isPublicOrigin() ? window.location.origin : PUBLIC_APP_URL;
