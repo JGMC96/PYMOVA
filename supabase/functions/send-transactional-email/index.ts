@@ -71,38 +71,105 @@ Deno.serve(async (req) => {
   }
 
   // Parse request body
-  let templateName: string
-  let recipientEmail: string
-  let idempotencyKey: string
-  let messageId: string
-  let templateData: Record<string, any> = {}
+  let body: Record<string, any>
   try {
-    const body = await req.json()
+    body = await req.json()
+  } catch {
+    return jsonError('Invalid JSON in request body', 400)
+  }
+
+  const messageId = crypto.randomUUID()
+
+  // Create Supabase client with service role (bypasses RLS)
+  const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+  // --- Authorization -------------------------------------------------------
+  // Trusted server-to-server callers present the service role key and may send
+  // any registered template. Everyone else must be a signed-in user, and the
+  // recipient plus template data are derived from the database, never from the
+  // request, so nobody can turn this endpoint into an open mailer.
+  const bearer = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '')
+  if (!bearer) return jsonError('Unauthorized', 401)
+
+  const isServiceRole = bearer === supabaseServiceKey
+
+  let templateName: string
+  let recipientEmail: string | undefined
+  let templateData: Record<string, any> = {}
+  let idempotencyKey: string
+
+  if (isServiceRole) {
     templateName = body.templateName || body.template_name
     recipientEmail = body.recipientEmail || body.recipient_email
-    messageId = crypto.randomUUID()
     idempotencyKey = body.idempotencyKey || body.idempotency_key || messageId
     if (body.templateData && typeof body.templateData === 'object') {
       templateData = body.templateData
     }
-  } catch {
-    return new Response(
-      JSON.stringify({ error: 'Invalid JSON in request body' }),
-      {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    )
+  } else {
+    const { data: userData, error: userError } = await supabase.auth.getUser(bearer)
+    const caller = userData?.user
+    if (userError || !caller) return jsonError('Unauthorized', 401)
+
+    const requested = body.templateName || body.template_name
+    if (requested !== 'team-invitation') {
+      return jsonError('Not allowed', 403)
+    }
+
+    const invitationId = body.invitationId || body.invitation_id
+    if (typeof invitationId !== 'string' || !invitationId) {
+      return jsonError('invitationId is required', 400)
+    }
+
+    const { data: invitation } = await supabase
+      .from('business_invitations')
+      .select('id, business_id, email, role, token, status, expires_at')
+      .eq('id', invitationId)
+      .maybeSingle()
+
+    if (!invitation || invitation.status !== 'pending') {
+      return jsonError('Invitation not found', 404)
+    }
+    if (new Date(invitation.expires_at).getTime() < Date.now()) {
+      return jsonError('Invitation expired', 410)
+    }
+
+    // The caller must be an active owner/admin of the inviting business.
+    const { data: membership } = await supabase
+      .from('business_members')
+      .select('role, is_active')
+      .eq('business_id', invitation.business_id)
+      .eq('user_id', caller.id)
+      .maybeSingle()
+
+    if (!membership || !membership.is_active || !['owner', 'admin'].includes(membership.role)) {
+      return jsonError('Not allowed', 403)
+    }
+
+    const { data: business } = await supabase
+      .from('businesses')
+      .select('name')
+      .eq('id', invitation.business_id)
+      .maybeSingle()
+
+    const requestedOrigin = typeof body.inviteOrigin === 'string' ? body.inviteOrigin : ''
+    const origin = ALLOWED_INVITE_ORIGINS.includes(requestedOrigin)
+      ? requestedOrigin
+      : DEFAULT_INVITE_ORIGIN
+
+    templateName = 'team-invitation'
+    recipientEmail = invitation.email
+    idempotencyKey = `team-invitation-${invitation.id}-${messageId}`
+    templateData = {
+      businessName: business?.name ?? 'tu equipo',
+      inviteUrl: `${origin}/invite/${invitation.token}`,
+      roleLabel: ROLE_LABEL[invitation.role] ?? 'Personal',
+      inviterName:
+        (caller.user_metadata?.full_name as string | undefined) ?? undefined,
+    }
   }
 
   if (!templateName) {
-    return new Response(
-      JSON.stringify({ error: 'templateName is required' }),
-      {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    )
+    return jsonError('templateName is required', 400)
   }
 
   // 1. Look up template from registry (early — needed to resolve recipient)
@@ -110,36 +177,17 @@ Deno.serve(async (req) => {
 
   if (!template) {
     console.error('Template not found in registry', { templateName })
-    return new Response(
-      JSON.stringify({
-        error: `Template '${templateName}' not found. Available: ${Object.keys(TEMPLATES).join(', ')}`,
-      }),
-      {
-        status: 404,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    )
+    return jsonError(`Template '${templateName}' not found`, 404)
   }
 
   // Resolve effective recipient: template-level `to` takes precedence over
-  // the caller-provided recipientEmail. This allows notification templates
-  // to always send to a fixed address (e.g., site owner from env var).
+  // the resolved recipient. This allows notification templates to always send
+  // to a fixed address (e.g., site owner from env var).
   const effectiveRecipient = template.to || recipientEmail
 
   if (!effectiveRecipient) {
-    return new Response(
-      JSON.stringify({
-        error: 'recipientEmail is required (unless the template defines a fixed recipient)',
-      }),
-      {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    )
+    return jsonError('No recipient could be resolved for this template', 400)
   }
-
-  // Create Supabase client with service role (bypasses RLS)
-  const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
   // 2. Check suppression list (fail-closed: if we can't verify, don't send)
   const { data: suppressed, error: suppressionError } = await supabase
