@@ -159,6 +159,7 @@ export function useProducts(): UseProductsReturn {
           name: normalizedData.name,
           description: normalizedData.description || null,
           price: normalizedData.price,
+          cost_price: normalizedData.cost_price ?? null,
           unit: normalizedData.unit || null,
           category: normalizedData.category || null,
         });
@@ -205,6 +206,7 @@ export function useProducts(): UseProductsReturn {
           name: normalizedData.name,
           description: normalizedData.description || null,
           price: normalizedData.price,
+          cost_price: normalizedData.cost_price ?? null,
           unit: normalizedData.unit || null,
           category: normalizedData.category || null,
         })
