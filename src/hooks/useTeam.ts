@@ -27,7 +27,7 @@ export interface TeamInvitation {
 }
 
 export function useTeam() {
-  const { activeBusinessId, activeBusiness, user } = useBusiness();
+  const { activeBusinessId, user } = useBusiness();
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [invitations, setInvitations] = useState<TeamInvitation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -56,7 +56,7 @@ export function useTeam() {
       }
       return { ok: true, reason: null };
     },
-    [activeBusiness?.name, user],
+    [],
   );
 
 
