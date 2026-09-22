@@ -454,6 +454,14 @@ export interface ShopifyVariantNode {
   } | null;
 }
 
+/** Coste unitario informado en Shopify (inventoryItem.unitCost), o null si no está. */
+export function variantUnitCost(variant: ShopifyVariantNode): number | null {
+  const raw = variant.inventoryItem?.unitCost?.amount;
+  if (raw === null || raw === undefined || raw === '') return null;
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : null;
+}
+
 export interface ShopifyProductNode {
   id: string;
   title: string;
