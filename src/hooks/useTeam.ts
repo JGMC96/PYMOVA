@@ -42,17 +42,13 @@ export function useTeam() {
   /** Envía (o reenvía) el correo de invitación al destinatario. */
   const sendInvitationEmail = useCallback(
     async (invitation: TeamInvitation) => {
+      // El servidor resuelve destinatario y contenido a partir de la invitación:
+      // aquí solo se identifica cuál se envía.
       const { data, error } = await supabase.functions.invoke('send-transactional-email', {
         body: {
           templateName: 'team-invitation',
-          recipientEmail: invitation.email,
-          idempotencyKey: `team-invitation-${invitation.id}-${Date.now()}`,
-          templateData: {
-            businessName: activeBusiness?.name ?? 'tu equipo',
-            inviteUrl: buildInviteLink(invitation.token),
-            roleLabel: ROLE_LABEL[invitation.role],
-            inviterName: user?.user_metadata?.full_name ?? undefined,
-          },
+          invitationId: invitation.id,
+          inviteOrigin: inviteOrigin(),
         },
       });
 
