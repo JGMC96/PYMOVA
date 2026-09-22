@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { toast } from '@/hooks/use-toast';
-import { buildInviteLink } from '@/lib/inviteLink';
+import { inviteOrigin } from '@/lib/inviteLink';
 import type { AppRole } from '@/types/database';
 
 const ROLE_LABEL: Record<AppRole, string> = {
