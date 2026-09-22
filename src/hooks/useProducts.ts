@@ -33,6 +33,10 @@ function normalizeProductData(data: ProductFormData): ProductFormData {
     name: data.name.trim(),
     description: data.description?.trim() || undefined,
     price: Number(data.price),
+    cost_price:
+      data.cost_price === undefined || data.cost_price === null || Number.isNaN(Number(data.cost_price))
+        ? null
+        : Number(data.cost_price),
     unit: data.unit?.trim() || undefined,
     category: data.category?.trim() || undefined,
   };
