@@ -2796,6 +2796,20 @@ export type Database = {
           variant_id: string
         }[]
       }
+      get_security_audit_log: {
+        Args: { _business_id: string; _limit?: number; _offset?: number }
+        Returns: {
+          action: string
+          actor_name: string
+          actor_user_id: string
+          created_at: string
+          id: string
+          new_data: Json
+          old_data: Json
+          record_id: string
+          table_name: string
+        }[]
+      }
       get_user_role_in_business: {
         Args: { _business_id: string }
         Returns: Database["public"]["Enums"]["app_role"]

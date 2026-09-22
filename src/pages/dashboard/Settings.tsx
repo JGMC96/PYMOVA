@@ -5,8 +5,12 @@ import { BusinessSettings } from '@/components/settings/BusinessSettings';
 import { RoleSettings } from '@/components/settings/RoleSettings';
 import { TeamSettings } from '@/components/settings/TeamSettings';
 import { BillingSettings } from '@/components/settings/BillingSettings';
+import { SecurityAuditSettings } from '@/components/settings/SecurityAuditSettings';
+import { useRoleAccess } from '@/hooks/useRoleAccess';
 
 const Settings = () => {
+  const { isAdmin } = useRoleAccess('admin');
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -22,12 +26,17 @@ const Settings = () => {
 
       {/* Tabs */}
       <Tabs defaultValue="profile" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 lg:w-auto lg:inline-grid">
+        <TabsList
+          className={`grid w-full grid-cols-2 lg:w-auto lg:inline-grid ${
+            isAdmin ? 'sm:grid-cols-6' : 'sm:grid-cols-5'
+          }`}
+        >
           <TabsTrigger value="profile">Mi Perfil</TabsTrigger>
           <TabsTrigger value="business">Mi Negocio</TabsTrigger>
           <TabsTrigger value="role">Mi Rol</TabsTrigger>
           <TabsTrigger value="team">Equipo</TabsTrigger>
           <TabsTrigger value="billing">Facturación</TabsTrigger>
+          {isAdmin && <TabsTrigger value="audit">Seguridad</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="profile" className="mt-6">
@@ -49,6 +58,12 @@ const Settings = () => {
         <TabsContent value="billing" className="mt-6">
           <BillingSettings />
         </TabsContent>
+
+        {isAdmin && (
+          <TabsContent value="audit" className="mt-6">
+            <SecurityAuditSettings />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );
