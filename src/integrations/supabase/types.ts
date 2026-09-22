@@ -2839,6 +2839,7 @@ export type Database = {
         Args: { _business_id: string; _opening_amount?: number }
         Returns: string
       }
+      owned_business_count: { Args: { _user_id: string }; Returns: number }
       read_email_batch: {
         Args: { batch_size: number; queue_name: string; vt: number }
         Returns: {
