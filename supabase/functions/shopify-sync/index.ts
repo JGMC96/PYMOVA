@@ -635,9 +635,11 @@ Deno.serve(async (req) => {
           failed > 0 ? `${failed} con error` : null,
           locations.size ? `${locations.size} ubicaciones` : null,
           ...messages,
+          ...firstErrors,
         ]
           .filter(Boolean)
           .join(' · ');
+
 
         if (syncRun) {
           await admin
