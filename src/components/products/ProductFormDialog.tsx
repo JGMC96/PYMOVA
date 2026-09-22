@@ -176,6 +176,33 @@ export function ProductFormDialog({
 
             <FormField
               control={form.control}
+              name="cost_price"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Precio de coste</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="Lo que te cuesta a ti"
+                      {...field}
+                      value={field.value ?? ''}
+                    />
+                  </FormControl>
+                  <p className="text-xs text-muted-foreground">
+                    {marginPercent !== null
+                      ? `Margen: ${marginAmount.toFixed(2)} € por unidad (${marginPercent.toFixed(1)} %)`
+                      : 'Necesario para saber el beneficio real de cada venta.'}
+                  </p>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+
+            <FormField
+              control={form.control}
               name="category"
               render={({ field }) => (
                 <FormItem>
