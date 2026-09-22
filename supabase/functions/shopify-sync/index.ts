@@ -38,6 +38,23 @@ const json = (body: unknown, status = 200) =>
 const run = <T,>(query: string, variables: Record<string, unknown>, scopes: string[]) =>
   shopifyGraphql<T>(query, variables, { requiredScopes: scopes });
 
+/** Texto legible de cualquier error (Error, PostgrestError o desconocido). */
+function errorText(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (err && typeof err === 'object') {
+    const e = err as { message?: string; details?: string; hint?: string; code?: string };
+    const parts = [e.message, e.details, e.hint, e.code ? `(${e.code})` : null].filter(Boolean);
+    if (parts.length) return parts.join(' — ');
+    try {
+      return JSON.stringify(err).slice(0, 300);
+    } catch {
+      return 'Error desconocido';
+    }
+  }
+  return String(err ?? 'Error desconocido');
+}
+
+
 /** Forma que consume el frontend (catálogo navegable). */
 function toClientProduct(node: ShopifyProductNode, stockByVariant: Map<string, number | null>) {
   return {
@@ -300,24 +317,31 @@ Deno.serve(async (req) => {
       let failed = 0;
       const messages: string[] = [];
 
+      const firstErrors: string[] = [];
       const logIssue = async (
         entityType: string,
-        entityName: string,
+        entityName: string | null,
         externalId: string | null,
         message: string,
       ) => {
         failed += 1;
+        if (firstErrors.length < 3) firstErrors.push(`${entityType}: ${message.slice(0, 160)}`);
         if (!syncRun) return;
-        await admin.from('integration_sync_issues').insert({
+        const { error: issueError } = await admin.from('integration_sync_issues').insert({
           business_id: businessId,
           run_id: syncRun.id,
           entity_type: entityType,
-          entity_name: entityName,
+          entity_name: entityName || externalId || 'Sin nombre',
           external_id: externalId,
           attempts: 1,
-          error_message: message.slice(0, 500),
+          error_message: (message || 'Error desconocido').slice(0, 500),
         });
+        // Si ni siquiera se puede registrar la incidencia, que quede en el resumen del run.
+        if (issueError && firstErrors.length < 4) {
+          firstErrors.push(`registro de incidencias: ${issueError.message.slice(0, 160)}`);
+        }
       };
+
 
       try {
         // --- Ubicaciones ---
@@ -545,7 +569,7 @@ Deno.serve(async (req) => {
                   await syncFulfillmentsForOrder(admin, businessId, row.order_id, node);
                 }
               } catch (err) {
-                await logIssue('order', node.name, node.id, err instanceof Error ? err.message : 'Error');
+                await logIssue('order', node.name, node.id, errorText(err));
               }
             }
 
@@ -613,7 +637,7 @@ Deno.serve(async (req) => {
                   created += 1;
                 }
               } catch (err) {
-                await logIssue('customer', name, node.id, err instanceof Error ? err.message : 'Error');
+                await logIssue('customer', name, node.id, errorText(err));
               }
             }
 
@@ -628,9 +652,11 @@ Deno.serve(async (req) => {
           failed > 0 ? `${failed} con error` : null,
           locations.size ? `${locations.size} ubicaciones` : null,
           ...messages,
+          ...firstErrors,
         ]
           .filter(Boolean)
           .join(' · ');
+
 
         if (syncRun) {
           await admin
