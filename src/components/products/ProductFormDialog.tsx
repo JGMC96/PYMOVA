@@ -108,6 +108,12 @@ export function ProductFormDialog({
     }
   };
 
+  const watchedPrice = Number(form.watch('price')) || 0;
+  const watchedCost = Number(form.watch('cost_price')) || 0;
+  const marginAmount = watchedPrice - watchedCost;
+  const marginPercent =
+    watchedCost > 0 && watchedPrice > 0 ? (marginAmount / watchedPrice) * 100 : null;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
