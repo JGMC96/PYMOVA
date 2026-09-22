@@ -17,6 +17,7 @@ import {
   missingScopes,
   resolveClientMatch,
   totalAvailable,
+  variantUnitCost,
   type InventoryLevelRow,
   type ShopifyProductNode,
   type ShopifyVariantNode,
@@ -371,6 +372,7 @@ Deno.serve(async (req) => {
                 }
 
                 const first = variants[0];
+                const firstCost = first ? variantUnitCost(first as ShopifyVariantNode) : null;
                 const productStock = [...perVariantStock.values()].reduce((a, b) => a + b, 0);
 
                 const { data: existing } = await admin
@@ -389,6 +391,8 @@ Deno.serve(async (req) => {
                   category: node.productType || null,
                   sku: first?.sku ?? null,
                   barcode: first?.barcode ?? null,
+                  // Solo sobrescribe el coste si Shopify lo informa (no borra el coste manual).
+                  ...(firstCost !== null ? { cost_price: firstCost } : {}),
                   stock_quantity: productStock,
                   track_inventory: true,
                   is_active: node.status === 'ACTIVE',
@@ -426,6 +430,9 @@ Deno.serve(async (req) => {
                       sku: v.sku,
                       barcode: v.barcode,
                       price: Number(v.price) || null,
+                      ...(variantUnitCost(v as ShopifyVariantNode) !== null
+                        ? { cost_price: variantUnitCost(v as ShopifyVariantNode) }
+                        : {}),
                       stock_quantity: perVariantStock.get(v.id) ?? 0,
                       is_active: true,
                       external_id: v.id,
