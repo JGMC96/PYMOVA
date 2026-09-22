@@ -61,6 +61,7 @@ export function ProductFormDialog({
     defaultValues: {
       name: '',
       price: 0,
+      cost_price: '',
       category: '',
       unit: '',
       description: '',
@@ -74,6 +75,7 @@ export function ProductFormDialog({
         form.reset({
           name: product.name,
           price: product.price,
+          cost_price: product.cost_price ?? '',
           category: product.category || '',
           unit: product.unit || '',
           description: product.description || '',
@@ -82,6 +84,7 @@ export function ProductFormDialog({
         form.reset({
           name: '',
           price: 0,
+          cost_price: '',
           category: '',
           unit: '',
           description: '',
@@ -94,6 +97,7 @@ export function ProductFormDialog({
     const success = await onSubmit({
       name: values.name,
       price: values.price,
+      cost_price: values.cost_price === '' || values.cost_price === undefined ? null : Number(values.cost_price),
       category: values.category || undefined,
       unit: values.unit || undefined,
       description: values.description || undefined,
