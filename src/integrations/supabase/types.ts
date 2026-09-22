@@ -1726,6 +1726,7 @@ export type Database = {
           attributes: Json
           barcode: string | null
           business_id: string
+          cost_price: number | null
           created_at: string
           created_by: string | null
           external_id: string | null
@@ -1743,6 +1744,7 @@ export type Database = {
           attributes?: Json
           barcode?: string | null
           business_id: string
+          cost_price?: number | null
           created_at?: string
           created_by?: string | null
           external_id?: string | null
@@ -1760,6 +1762,7 @@ export type Database = {
           attributes?: Json
           barcode?: string | null
           business_id?: string
+          cost_price?: number | null
           created_at?: string
           created_by?: string | null
           external_id?: string | null
@@ -1795,6 +1798,7 @@ export type Database = {
           barcode: string | null
           business_id: string
           category: string | null
+          cost_price: number | null
           created_at: string
           created_by: string | null
           description: string | null
@@ -1814,6 +1818,7 @@ export type Database = {
           barcode?: string | null
           business_id: string
           category?: string | null
+          cost_price?: number | null
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -1833,6 +1838,7 @@ export type Database = {
           barcode?: string | null
           business_id?: string
           category?: string | null
+          cost_price?: number | null
           created_at?: string
           created_by?: string | null
           description?: string | null
