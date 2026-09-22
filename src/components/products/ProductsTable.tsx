@@ -53,6 +53,8 @@ export function ProductsTable({
               <TableHead>Nombre</TableHead>
               <TableHead>Categoría</TableHead>
               <TableHead>Precio</TableHead>
+              <TableHead>Coste</TableHead>
+              <TableHead>Margen</TableHead>
               <TableHead>Unidad</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead className="w-[50px]"></TableHead>
