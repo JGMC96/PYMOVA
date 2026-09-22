@@ -324,6 +324,7 @@ export const VARIANT_FIELDS = `
   inventoryItem {
     id
     tracked
+    unitCost { amount }
     inventoryLevels(first: 5) {
       pageInfo { hasNextPage endCursor }
       edges {
