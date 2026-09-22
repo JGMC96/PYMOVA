@@ -38,6 +38,23 @@ const json = (body: unknown, status = 200) =>
 const run = <T,>(query: string, variables: Record<string, unknown>, scopes: string[]) =>
   shopifyGraphql<T>(query, variables, { requiredScopes: scopes });
 
+/** Texto legible de cualquier error (Error, PostgrestError o desconocido). */
+function errorText(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (err && typeof err === 'object') {
+    const e = err as { message?: string; details?: string; hint?: string; code?: string };
+    const parts = [e.message, e.details, e.hint, e.code ? `(${e.code})` : null].filter(Boolean);
+    if (parts.length) return parts.join(' — ');
+    try {
+      return JSON.stringify(err).slice(0, 300);
+    } catch {
+      return 'Error desconocido';
+    }
+  }
+  return String(err ?? 'Error desconocido');
+}
+
+
 /** Forma que consume el frontend (catálogo navegable). */
 function toClientProduct(node: ShopifyProductNode, stockByVariant: Map<string, number | null>) {
   return {
@@ -552,7 +569,7 @@ Deno.serve(async (req) => {
                   await syncFulfillmentsForOrder(admin, businessId, row.order_id, node);
                 }
               } catch (err) {
-                await logIssue('order', node.name, node.id, err instanceof Error ? err.message : 'Error');
+                await logIssue('order', node.name, node.id, errorText(err));
               }
             }
 
@@ -620,7 +637,7 @@ Deno.serve(async (req) => {
                   created += 1;
                 }
               } catch (err) {
-                await logIssue('customer', name, node.id, err instanceof Error ? err.message : 'Error');
+                await logIssue('customer', name, node.id, errorText(err));
               }
             }
 
