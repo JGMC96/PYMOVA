@@ -90,7 +90,7 @@ export function VariantsDialog({
           </div>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 items-end">
+        <div className="grid grid-cols-1 sm:grid-cols-6 gap-2 items-end">
           <div className="sm:col-span-2">
             <Label className="text-xs">Nombre</Label>
             <Input
@@ -111,6 +111,16 @@ export function VariantsDialog({
               placeholder={basePrice.toFixed(2)}
               value={price}
               onChange={(e) => setPrice(e.target.value)}
+            />
+          </div>
+          <div>
+            <Label className="text-xs">Coste</Label>
+            <Input
+              type="number"
+              step="0.01"
+              placeholder="0.00"
+              value={cost}
+              onChange={(e) => setCost(e.target.value)}
             />
           </div>
           <div className="flex gap-2">
@@ -146,6 +156,7 @@ export function VariantsDialog({
                 <TableHead>Variante</TableHead>
                 <TableHead>Código</TableHead>
                 <TableHead className="text-right">Precio</TableHead>
+                <TableHead className="text-right">Coste</TableHead>
                 <TableHead className="text-center">Stock</TableHead>
                 <TableHead />
               </TableRow>
@@ -157,6 +168,9 @@ export function VariantsDialog({
                   <TableCell className="text-muted-foreground text-xs">{v.barcode ?? '—'}</TableCell>
                   <TableCell className="text-right">
                     {(v.price ?? basePrice).toFixed(2)} €
+                  </TableCell>
+                  <TableCell className="text-right text-muted-foreground">
+                    {v.cost_price != null ? `${v.cost_price.toFixed(2)} €` : '—'}
                   </TableCell>
                   <TableCell className="text-center">
                     <Badge variant={v.stock_quantity > 0 ? 'secondary' : 'destructive'}>
