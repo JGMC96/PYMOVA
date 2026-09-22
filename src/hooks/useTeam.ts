@@ -5,11 +5,6 @@ import { toast } from '@/hooks/use-toast';
 import { inviteOrigin } from '@/lib/inviteLink';
 import type { AppRole } from '@/types/database';
 
-const ROLE_LABEL: Record<AppRole, string> = {
-  owner: 'Propietario',
-  admin: 'Administrador',
-  staff: 'Personal',
-};
 
 
 export interface TeamMember {
