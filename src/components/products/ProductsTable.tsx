@@ -144,6 +144,18 @@ export function ProductsTable({
               <TableCell className="font-mono">
                 {formatPrice(product.price)}
               </TableCell>
+              <TableCell className="font-mono text-muted-foreground">
+                {product.cost_price != null ? formatPrice(product.cost_price) : '—'}
+              </TableCell>
+              <TableCell>
+                {product.cost_price != null && product.price > 0 ? (
+                  <Badge variant={product.price > product.cost_price ? 'secondary' : 'destructive'}>
+                    {(((product.price - product.cost_price) / product.price) * 100).toFixed(0)}%
+                  </Badge>
+                ) : (
+                  <span className="text-xs text-muted-foreground">Sin coste</span>
+                )}
+              </TableCell>
               <TableCell>{product.unit || '-'}</TableCell>
               <TableCell>
                 <Badge variant={product.is_active ? 'default' : 'secondary'}>
