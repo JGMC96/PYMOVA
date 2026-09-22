@@ -5,8 +5,12 @@ import { BusinessSettings } from '@/components/settings/BusinessSettings';
 import { RoleSettings } from '@/components/settings/RoleSettings';
 import { TeamSettings } from '@/components/settings/TeamSettings';
 import { BillingSettings } from '@/components/settings/BillingSettings';
+import { SecurityAuditSettings } from '@/components/settings/SecurityAuditSettings';
+import { useRoleAccess } from '@/hooks/useRoleAccess';
 
 const Settings = () => {
+  const { isAdmin } = useRoleAccess('admin');
+
   return (
     <div className="space-y-6">
       {/* Header */}
