@@ -29,6 +29,13 @@
       "when": 1790106980514,
       "tag": "0003_add_cost_price_to_catalog",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790109332852,
+      "tag": "0004_add_unit_cost_to_sale_lines",
+      "breakpoints": true
     }
   ]
 }

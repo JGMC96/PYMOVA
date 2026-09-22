@@ -324,6 +324,7 @@ export const VARIANT_FIELDS = `
   inventoryItem {
     id
     tracked
+    unitCost { amount }
     inventoryLevels(first: 5) {
       pageInfo { hasNextPage endCursor }
       edges {
@@ -445,11 +446,20 @@ export interface ShopifyVariantNode {
   inventoryItem: {
     id: string;
     tracked: boolean;
+    unitCost?: { amount: string | null } | null;
     inventoryLevels: {
       pageInfo: { hasNextPage: boolean; endCursor: string | null };
       edges: Array<{ node: ShopifyInventoryLevelNode }>;
     };
   } | null;
+}
+
+/** Coste unitario informado en Shopify (inventoryItem.unitCost), o null si no está. */
+export function variantUnitCost(variant: ShopifyVariantNode): number | null {
+  const raw = variant.inventoryItem?.unitCost?.amount;
+  if (raw === null || raw === undefined || raw === '') return null;
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : null;
 }
 
 export interface ShopifyProductNode {

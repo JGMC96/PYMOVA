@@ -1908,6 +1908,7 @@ export type Database = {
           quantity: number
           sale_id: string
           total: number
+          unit_cost: number | null
           unit_price: number
           variant_id: string | null
         }
@@ -1919,6 +1920,7 @@ export type Database = {
           quantity?: number
           sale_id: string
           total?: number
+          unit_cost?: number | null
           unit_price?: number
           variant_id?: string | null
         }
@@ -1930,6 +1932,7 @@ export type Database = {
           quantity?: number
           sale_id?: string
           total?: number
+          unit_cost?: number | null
           unit_price?: number
           variant_id?: string | null
         }
@@ -1966,6 +1969,7 @@ export type Database = {
           return_id: string
           sale_item_id: string | null
           total: number
+          unit_cost: number | null
           unit_price: number
           variant_id: string | null
         }
@@ -1977,6 +1981,7 @@ export type Database = {
           return_id: string
           sale_item_id?: string | null
           total?: number
+          unit_cost?: number | null
           unit_price?: number
           variant_id?: string | null
         }
@@ -1988,6 +1993,7 @@ export type Database = {
           return_id?: string
           sale_item_id?: string | null
           total?: number
+          unit_cost?: number | null
           unit_price?: number
           variant_id?: string | null
         }
