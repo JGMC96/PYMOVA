@@ -25,9 +25,30 @@ function generateToken(): string {
     .join('')
 }
 
-// Auth note: this function uses verify_jwt = true in config.toml, so Supabase's
-// gateway validates the caller's JWT (anon or service_role) before the request
-// reaches this code. No in-function auth check is needed.
+// Auth note: verify_jwt = true validates the JWT signature, but it does NOT
+// bind the recipient or the template data to the caller. Everything a normal
+// signed-in user can send is derived server-side below from trusted state.
+
+const ROLE_LABEL: Record<string, string> = {
+  owner: 'Propietario',
+  admin: 'Administrador',
+  staff: 'Personal',
+}
+
+// Only these origins may appear in an invitation link.
+const ALLOWED_INVITE_ORIGINS = [
+  'https://pymova.com',
+  'https://www.pymova.com',
+  'https://cogent-business-os.lovable.app',
+]
+const DEFAULT_INVITE_ORIGIN = ALLOWED_INVITE_ORIGINS[0]
+
+function jsonError(message: string, status: number): Response {
+  return new Response(JSON.stringify({ error: message }), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  })
+}
 
 Deno.serve(async (req) => {
   // Handle CORS preflight
