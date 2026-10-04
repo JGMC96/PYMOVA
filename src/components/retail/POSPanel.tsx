@@ -224,6 +224,7 @@ export function POSPanel() {
     const result = await createSale({
       payment_method: method,
       items: snapshot,
+      notes: notes.trim() || undefined,
       subtotal,
       tax,
       total,
