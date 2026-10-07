@@ -2082,6 +2082,11 @@ export type Database = {
           payment_method: string | null
           register_session_id: string | null
           sale_number: string
+          shopify_order_attempts: number
+          shopify_order_error: string | null
+          shopify_order_gid: string | null
+          shopify_order_name: string | null
+          shopify_order_status: string | null
           subtotal: number
           tax: number
           tip: number
@@ -2100,6 +2105,11 @@ export type Database = {
           payment_method?: string | null
           register_session_id?: string | null
           sale_number: string
+          shopify_order_attempts?: number
+          shopify_order_error?: string | null
+          shopify_order_gid?: string | null
+          shopify_order_name?: string | null
+          shopify_order_status?: string | null
           subtotal?: number
           tax?: number
           tip?: number
@@ -2118,6 +2128,11 @@ export type Database = {
           payment_method?: string | null
           register_session_id?: string | null
           sale_number?: string
+          shopify_order_attempts?: number
+          shopify_order_error?: string | null
+          shopify_order_gid?: string | null
+          shopify_order_name?: string | null
+          shopify_order_status?: string | null
           subtotal?: number
           tax?: number
           tip?: number
@@ -2192,6 +2207,8 @@ export type Database = {
           last_sync_status: string | null
           last_verified_at: string | null
           orders_sync_enabled: boolean
+          pos_orders_enabled: boolean
+          pos_orders_since: string
           shop_domain: string
           stock_push_enabled: boolean
           uninstalled_at: string | null
@@ -2212,6 +2229,8 @@ export type Database = {
           last_sync_status?: string | null
           last_verified_at?: string | null
           orders_sync_enabled?: boolean
+          pos_orders_enabled?: boolean
+          pos_orders_since?: string
           shop_domain: string
           stock_push_enabled?: boolean
           uninstalled_at?: string | null
@@ -2232,6 +2251,8 @@ export type Database = {
           last_sync_status?: string | null
           last_verified_at?: string | null
           orders_sync_enabled?: boolean
+          pos_orders_enabled?: boolean
+          pos_orders_since?: string
           shop_domain?: string
           stock_push_enabled?: boolean
           uninstalled_at?: string | null
@@ -2554,6 +2575,8 @@ export type Database = {
           last_sync_status: string | null
           last_verified_at: string | null
           orders_sync_enabled: boolean
+          pos_orders_enabled: boolean
+          pos_orders_since: string
           shop_domain: string
           stock_push_enabled: boolean
           uninstalled_at: string | null
