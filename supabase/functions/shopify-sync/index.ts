@@ -547,7 +547,7 @@ Deno.serve(async (req) => {
               };
             } = await run(
               ORDERS_QUERY,
-              { first: 50, after: cursor, query: `updated_at:>='${since}'` },
+              { first: 50, after: cursor, query: `updated_at:>='${since}' AND -tag:pymova-tpv` },
               ['read_orders'],
             );
 

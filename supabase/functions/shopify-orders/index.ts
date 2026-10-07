@@ -190,7 +190,7 @@ Deno.serve(async (req) => {
           } = await adminGraphql(ORDERS_QUERY, {
             first: 50,
             after: cursor,
-            query: `updated_at:>='${since}'`,
+            query: `updated_at:>='${since}' AND -tag:pymova-tpv`,
           });
 
           for (const { node } of data.orders.edges) {

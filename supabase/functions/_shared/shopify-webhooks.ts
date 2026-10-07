@@ -59,6 +59,9 @@ export async function processEvent(
       return { status: 'ignored', message: 'La sincronización de pedidos está desactivada' };
     }
 
+    if (String((payload as { tags?: unknown })?.tags ?? '').split(',').map((t) => t.trim()).includes('pymova-tpv')) {
+      return { status: 'ignored', message: 'Venta de tienda creada por Pymova' };
+    }
     const orderGid = orderGidFromPayload(payload);
     if (!orderGid) return { status: 'ignored', message: 'Sin identificador de pedido' };
 

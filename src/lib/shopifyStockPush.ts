@@ -15,3 +15,16 @@ export async function pushShopifyStock(businessId: string | undefined | null): P
     console.warn('No se pudo actualizar el stock en Shopify ahora mismo', error);
   }
 }
+
+/**
+ * Crea en Shopify el pedido de las ventas de tienda pendientes (con etiqueta "pymova-tpv").
+ * No bloquea: si falla, la venta queda pendiente y se reintenta en la siguiente venta.
+ */
+export async function pushShopifyPosOrders(businessId: string | undefined | null): Promise<void> {
+  if (!businessId) return;
+  try {
+    await supabase.functions.invoke('shopify-pos-order', { body: { business_id: businessId } });
+  } catch (error) {
+    console.warn('No se pudo crear el pedido en Shopify ahora mismo', error);
+  }
+}
