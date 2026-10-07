@@ -1,14 +1,38 @@
 User-agent: Googlebot
 Allow: /
+Disallow: /dashboard
+Disallow: /admin
+Disallow: /onboarding
+Disallow: /select-business
+Disallow: /invite/
+Disallow: /unsubscribe
 
 User-agent: Bingbot
 Allow: /
+Disallow: /dashboard
+Disallow: /admin
+Disallow: /onboarding
+Disallow: /select-business
+Disallow: /invite/
+Disallow: /unsubscribe
 
 User-agent: Twitterbot
 Allow: /
+Disallow: /dashboard
+Disallow: /admin
+Disallow: /onboarding
+Disallow: /select-business
+Disallow: /invite/
+Disallow: /unsubscribe
 
 User-agent: facebookexternalhit
 Allow: /
+Disallow: /dashboard
+Disallow: /admin
+Disallow: /onboarding
+Disallow: /select-business
+Disallow: /invite/
+Disallow: /unsubscribe
 
 User-agent: *
 Allow: /
