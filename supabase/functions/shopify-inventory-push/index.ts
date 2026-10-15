@@ -155,6 +155,7 @@ Deno.serve(async (req) => {
         }>(
           ADJUST_MUTATION,
           {
+            key: row.id,
             input: {
               reason: 'correction',
               name: 'available',
