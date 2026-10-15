@@ -22,8 +22,8 @@ const ORDER_QUERY = `
 `;
 
 const REFUND_CREATE = `
-  mutation PosRefund($input: RefundInput!) {
-    refundCreate(input: $input) {
+  mutation PosRefund($input: RefundInput!, $key: String!) {
+    refundCreate(input: $input) @idempotent(key: $key) {
       refund { id }
       userErrors { field message }
     }
@@ -118,7 +118,7 @@ Deno.serve(async (req) => {
 
         const result = await shopifyGraphql<{
           refundCreate: { refund: { id: string } | null; userErrors: { message: string }[] };
-        }>(REFUND_CREATE, { input }, { requiredScopes: ['write_orders'] });
+        }>(REFUND_CREATE, { input, key: ret.id }, { requiredScopes: ['write_orders'] });
         const errors = result.refundCreate.userErrors ?? [];
         if (errors.length || !result.refundCreate.refund) throw new Error(errors.map((e) => e.message).join('; ') || 'Shopify no devolvió el reembolso');
 
