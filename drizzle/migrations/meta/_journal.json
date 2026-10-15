@@ -64,6 +64,13 @@
       "when": 1791375675520,
       "tag": "0008_shopify_pos_orders",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792052573565,
+      "tag": "0009_fix_create_sale_return_ambiguous_column",
+      "breakpoints": true
     }
   ]
 }

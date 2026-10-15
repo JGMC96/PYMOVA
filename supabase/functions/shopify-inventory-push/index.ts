@@ -17,8 +17,8 @@ const json = (body: unknown, status = 200) =>
   });
 
 const ADJUST_MUTATION = `
-  mutation AdjustInventory($input: InventoryAdjustQuantitiesInput!) {
-    inventoryAdjustQuantities(input: $input) {
+  mutation AdjustInventory($input: InventoryAdjustQuantitiesInput!, $key: String!) {
+    inventoryAdjustQuantities(input: $input) @idempotent(key: $key) {
       inventoryAdjustmentGroup { createdAt reason }
       userErrors { field message }
     }
@@ -138,11 +138,24 @@ Deno.serve(async (req) => {
       }
 
       try {
+        // Shopify (2026-07+) exige changeFromQuantity: leemos la cantidad real actual.
+        const current = await shopifyGraphql<{
+          inventoryItem: { inventoryLevel: { quantities: { name: string; quantity: number }[] } | null } | null;
+        }>(
+          `query Q($id: ID!, $loc: ID!) { inventoryItem(id: $id) { inventoryLevel(locationId: $loc) { quantities(names: ["available"]) { name quantity } } } }`,
+          { id: level.inventory_item_gid, loc: level.location_gid },
+          { requiredScopes: ['write_inventory'] },
+        );
+        const liveQty =
+          current.inventoryItem?.inventoryLevel?.quantities?.find((q) => q.name === 'available')?.quantity ??
+          level.available;
+
         const result = await shopifyGraphql<{
           inventoryAdjustQuantities: { userErrors: { message: string }[] } | null;
         }>(
           ADJUST_MUTATION,
           {
+            key: row.id,
             input: {
               reason: 'correction',
               name: 'available',
@@ -150,6 +163,7 @@ Deno.serve(async (req) => {
               changes: [
                 {
                   delta: row.delta,
+                  changeFromQuantity: liveQty,
                   inventoryItemId: level.inventory_item_gid,
                   locationId: level.location_gid,
                 },
@@ -162,7 +176,7 @@ Deno.serve(async (req) => {
         const errors = result.inventoryAdjustQuantities?.userErrors ?? [];
         if (errors.length > 0) throw new ShopifyError(errors.map((e) => e.message).join('; '), 422);
 
-        const nextAvailable = level.available + row.delta;
+        const nextAvailable = liveQty + row.delta;
         level.available = nextAvailable;
 
         await admin
