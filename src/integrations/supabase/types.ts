@@ -2025,6 +2025,10 @@ export type Database = {
           restock: boolean
           return_number: string
           sale_id: string
+          shopify_refund_attempts: number
+          shopify_refund_error: string | null
+          shopify_refund_gid: string | null
+          shopify_refund_status: string
           total: number
         }
         Insert: {
@@ -2037,6 +2041,10 @@ export type Database = {
           restock?: boolean
           return_number: string
           sale_id: string
+          shopify_refund_attempts?: number
+          shopify_refund_error?: string | null
+          shopify_refund_gid?: string | null
+          shopify_refund_status?: string
           total?: number
         }
         Update: {
@@ -2049,6 +2057,10 @@ export type Database = {
           restock?: boolean
           return_number?: string
           sale_id?: string
+          shopify_refund_attempts?: number
+          shopify_refund_error?: string | null
+          shopify_refund_gid?: string | null
+          shopify_refund_status?: string
           total?: number
         }
         Relationships: [
