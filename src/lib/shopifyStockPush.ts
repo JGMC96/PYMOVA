@@ -28,3 +28,13 @@ export async function pushShopifyPosOrders(businessId: string | undefined | null
     console.warn('No se pudo crear el pedido en Shopify ahora mismo', error);
   }
 }
+
+/** Registra en Shopify el reembolso de las devoluciones de tienda pendientes. No bloquea. */
+export async function pushShopifyPosRefunds(businessId: string | undefined | null): Promise<void> {
+  if (!businessId) return;
+  try {
+    await supabase.functions.invoke('shopify-pos-refund', { body: { business_id: businessId } });
+  } catch (error) {
+    console.warn('No se pudo registrar la devolución en Shopify ahora mismo', error);
+  }
+}

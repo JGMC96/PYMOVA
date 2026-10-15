@@ -71,6 +71,13 @@
       "when": 1792052573565,
       "tag": "0009_fix_create_sale_return_ambiguous_column",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792053463169,
+      "tag": "0010_shopify_pos_refunds",
+      "breakpoints": true
     }
   ]
 }
