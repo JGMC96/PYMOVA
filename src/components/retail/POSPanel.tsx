@@ -245,6 +245,11 @@ export function POSPanel() {
         total: dueTotal,
         paymentMethod: method,
         createdAt: new Date(),
+        originalTotals: Object.fromEntries(cart.map((i) => [i.variant_id ?? i.product_id, i.total])),
+        tip,
+        cashReceived: usesCash && !isNaN(cashReceived) ? cashReceived : null,
+        change: change !== null && change >= 0 ? change : null,
+        notes: notes.trim() || null,
       });
       setTicketOpen(true);
       if (change !== null && change > 0) {
