@@ -1,4 +1,5 @@
-import { ShoppingCart, Receipt, Package, Wallet, Globe } from 'lucide-react';
+import { ShoppingCart, Receipt, Package, Wallet, Globe, Printer } from 'lucide-react';
+import { TicketSettingsPanel } from '@/components/retail/TicketSettingsPanel';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -68,6 +69,10 @@ const Retail = () => {
               <Package className="w-4 h-4" />
               Inventario
             </TabsTrigger>
+            <TabsTrigger value="tickets" className="flex items-center gap-2">
+              <Printer className="w-4 h-4" />
+              Tickets
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="pos" className="mt-6">
@@ -88,6 +93,10 @@ const Retail = () => {
 
           <TabsContent value="inventory" className="mt-6">
             <InventoryView />
+          </TabsContent>
+
+          <TabsContent value="tickets" className="mt-6">
+            <TicketSettingsPanel />
           </TabsContent>
         </Tabs>
       </div>

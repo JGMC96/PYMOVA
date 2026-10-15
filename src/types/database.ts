@@ -235,6 +235,13 @@ export interface BusinessSettings {
   next_invoice_number: number;
   invoice_prefix: string;
   tax_rate: number;
+  ticket_address?: string | null;
+  ticket_phone?: string | null;
+  ticket_website?: string | null;
+  ticket_header?: string | null;
+  ticket_footer?: string | null;
+  ticket_return_policy?: string | null;
+  ticket_show_logo?: boolean;
   created_at: string;
   updated_at: string;
 }

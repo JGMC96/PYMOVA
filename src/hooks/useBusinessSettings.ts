@@ -4,9 +4,16 @@ import { useBusiness } from '@/contexts/BusinessContext';
 import { toast } from 'sonner';
 import type { BusinessSettings } from '@/types/database';
 
-interface UpdateSettingsData {
+export interface UpdateSettingsData {
   invoice_prefix?: string;
   tax_rate?: number;
+  ticket_address?: string | null;
+  ticket_phone?: string | null;
+  ticket_website?: string | null;
+  ticket_header?: string | null;
+  ticket_footer?: string | null;
+  ticket_return_policy?: string | null;
+  ticket_show_logo?: boolean;
 }
 
 interface UseBusinessSettingsReturn {
@@ -85,6 +92,7 @@ export function useBusinessSettings(): UseBusinessSettingsReturn {
         const result = await supabase
           .from('business_settings')
           .insert({
+            ...data,
             business_id: activeBusinessId,
             invoice_prefix: data.invoice_prefix ?? 'FAC-',
             tax_rate: data.tax_rate ?? 16,

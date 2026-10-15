@@ -202,6 +202,13 @@ export type Database = {
           invoice_prefix: string | null
           next_invoice_number: number
           tax_rate: number | null
+          ticket_address: string | null
+          ticket_footer: string | null
+          ticket_header: string | null
+          ticket_phone: string | null
+          ticket_return_policy: string | null
+          ticket_show_logo: boolean
+          ticket_website: string | null
           updated_at: string
         }
         Insert: {
@@ -211,6 +218,13 @@ export type Database = {
           invoice_prefix?: string | null
           next_invoice_number?: number
           tax_rate?: number | null
+          ticket_address?: string | null
+          ticket_footer?: string | null
+          ticket_header?: string | null
+          ticket_phone?: string | null
+          ticket_return_policy?: string | null
+          ticket_show_logo?: boolean
+          ticket_website?: string | null
           updated_at?: string
         }
         Update: {
@@ -220,6 +234,13 @@ export type Database = {
           invoice_prefix?: string | null
           next_invoice_number?: number
           tax_rate?: number | null
+          ticket_address?: string | null
+          ticket_footer?: string | null
+          ticket_header?: string | null
+          ticket_phone?: string | null
+          ticket_return_policy?: string | null
+          ticket_show_logo?: boolean
+          ticket_website?: string | null
           updated_at?: string
         }
         Relationships: [

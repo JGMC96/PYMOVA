@@ -78,6 +78,13 @@
       "when": 1792053463169,
       "tag": "0010_shopify_pos_refunds",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1792054105076,
+      "tag": "0011_ticket_settings",
+      "breakpoints": true
     }
   ]
 }
