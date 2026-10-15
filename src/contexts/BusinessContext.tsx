@@ -14,6 +14,7 @@ interface BusinessContextType {
   // Auth state
   user: User | null;
   isAuthLoading: boolean;
+  isBusinessesLoading: boolean;
   
   // Business state
   activeBusinessId: string | null;
@@ -38,6 +39,7 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
   // Auth state
   const [user, setUser] = useState<User | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [isBusinessesLoading, setIsBusinessesLoading] = useState(true);
   
   // Business state
   const [activeBusinessId, setActiveBusinessId] = useState<string | null>(null);
@@ -233,9 +235,13 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
 
   // Fetch businesses when user changes
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      if (!isAuthLoading) setIsBusinessesLoading(false);
+      return;
+    }
 
     const loadBusinesses = async () => {
+      setIsBusinessesLoading(true);
       const businesses = await fetchUserBusinesses(user.id);
       setUserBusinesses(businesses);
 
@@ -270,14 +276,16 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
         const modules = await fetchBusinessModules(activeId);
         setEnabledModules(modules);
       }
+      setIsBusinessesLoading(false);
     };
 
     loadBusinesses();
-  }, [user, fetchUserBusinesses, fetchBusinessModules, fetchActiveBusinessFromProfile]);
+  }, [user, isAuthLoading, fetchUserBusinesses, fetchBusinessModules, fetchActiveBusinessFromProfile]);
 
   const value: BusinessContextType = {
     user,
     isAuthLoading,
+    isBusinessesLoading,
     activeBusinessId,
     activeBusiness,
     userBusinesses,
