@@ -1,0 +1,189 @@
+// Renderizado de tickets térmicos (factura simplificada) para el TPV.
+
+export type PaperWidth = '80' | '58';
+
+export interface TerminalTicketPrefs {
+  paperWidth: PaperWidth;
+  autoPrint: boolean;
+  feedLines: number;
+  copies: number;
+}
+
+const PREFS_KEY = 'pymova_ticket_terminal_prefs';
+export const DEFAULT_PREFS: TerminalTicketPrefs = { paperWidth: '80', autoPrint: false, feedLines: 3, copies: 1 };
+
+export function loadTerminalPrefs(): TerminalTicketPrefs {
+  try {
+    const raw = localStorage.getItem(PREFS_KEY);
+    return raw ? { ...DEFAULT_PREFS, ...JSON.parse(raw) } : DEFAULT_PREFS;
+  } catch {
+    return DEFAULT_PREFS;
+  }
+}
+
+export function saveTerminalPrefs(p: TerminalTicketPrefs) {
+  localStorage.setItem(PREFS_KEY, JSON.stringify(p));
+}
+
+export interface TicketBusiness {
+  name: string;
+  legalName?: string | null;
+  taxId?: string | null;
+  logoUrl?: string | null;
+  showLogo?: boolean;
+  address?: string | null;
+  phone?: string | null;
+  website?: string | null;
+  header?: string | null;
+  footer?: string | null;
+  returnPolicy?: string | null;
+}
+
+export interface TicketLine {
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  /** Total de la línea ya con descuento */
+  total: number;
+  /** Importe descontado en la línea */
+  discount?: number;
+}
+
+export interface TicketDoc {
+  kind: 'sale' | 'refund' | 'test';
+  number: string;
+  createdAt: Date;
+  lines: TicketLine[];
+  taxRate: number;
+  /** Total con IVA (sin propina) */
+  total: number;
+  tip?: number;
+  paymentMethod?: string;
+  cashReceived?: number | null;
+  change?: number | null;
+  notes?: string | null;
+  cashier?: string | null;
+}
+
+export const paymentLabels: Record<string, string> = {
+  cash: 'Efectivo',
+  card: 'Tarjeta',
+  transfer: 'Transferencia',
+  bizum: 'Bizum',
+};
+
+const esc = (s: string) =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const eur = (n: number) =>
+  `${n.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+/** Base imponible y cuota a partir de un total con IVA incluido. */
+export function taxBreakdown(total: number, rate: number) {
+  const base = round2(total / (1 + rate / 100));
+  return { base, tax: round2(total - base) };
+}
+
+const multiline = (s?: string | null) =>
+  s ? s.split('\n').map((l) => `<div>${esc(l)}</div>`).join('') : '';
+
+/** HTML interno del ticket (sin <html>), usado en vista previa e impresión. */
+export function renderTicketBody(biz: TicketBusiness, doc: TicketDoc): string {
+  const sign = doc.kind === 'refund' ? -1 : 1;
+  const { base, tax } = taxBreakdown(doc.total, doc.taxRate);
+  const title =
+    doc.kind === 'refund' ? 'TICKET DE ABONO' : doc.kind === 'test' ? 'TICKET DE PRUEBA' : 'FACTURA SIMPLIFICADA';
+  const date = doc.createdAt.toLocaleString('es-ES', {
+    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  });
+
+  const lines = doc.lines
+    .map((l) => {
+      const disc = l.discount && l.discount > 0
+        ? `<div class="row muted"><span>&nbsp;&nbsp;Descuento</span><span>-${eur(l.discount)}</span></div>`
+        : '';
+      return `<div class="item"><div class="bold">${esc(l.name)}</div>
+        <div class="row"><span>${l.quantity} x ${eur(l.unitPrice)}</span><span>${eur(sign * l.total)}</span></div>${disc}</div>`;
+    })
+    .join('');
+
+  const tip = doc.tip && doc.tip > 0 ? doc.tip : 0;
+  const grand = round2(doc.total + tip);
+
+  return `
+  <div class="center">
+    ${biz.showLogo && biz.logoUrl ? `<img class="logo" src="${esc(biz.logoUrl)}" alt="" />` : ''}
+    <div class="xl bold">${esc(biz.name)}</div>
+    ${biz.legalName ? `<div>${esc(biz.legalName)}</div>` : ''}
+    ${biz.taxId ? `<div>NIF: ${esc(biz.taxId)}</div>` : ''}
+    ${multiline(biz.address)}
+    ${biz.phone ? `<div>Tel. ${esc(biz.phone)}</div>` : ''}
+    ${biz.website ? `<div>${esc(biz.website)}</div>` : ''}
+    ${biz.header ? `<div class="sp">${multiline(biz.header)}</div>` : ''}
+  </div>
+  <hr/>
+  <div class="center bold">${title}</div>
+  <div class="row"><span>Nº</span><span class="bold">${esc(doc.number)}</span></div>
+  <div class="row"><span>Fecha</span><span>${date}</span></div>
+  ${doc.cashier ? `<div class="row"><span>Atendido por</span><span>${esc(doc.cashier)}</span></div>` : ''}
+  <hr/>
+  ${lines}
+  <hr/>
+  <div class="row"><span>Base imponible</span><span>${eur(sign * base)}</span></div>
+  <div class="row"><span>IVA ${doc.taxRate}%</span><span>${eur(sign * tax)}</span></div>
+  ${tip ? `<div class="row"><span>Propina</span><span>${eur(tip)}</span></div>` : ''}
+  <div class="row xl bold total"><span>TOTAL</span><span>${eur(sign * grand)}</span></div>
+  ${doc.paymentMethod ? `<div class="row"><span>${doc.kind === 'refund' ? 'Reembolso' : 'Pago'}</span><span>${esc(paymentLabels[doc.paymentMethod] ?? doc.paymentMethod)}</span></div>` : ''}
+  ${doc.cashReceived != null ? `<div class="row"><span>Entregado</span><span>${eur(doc.cashReceived)}</span></div>` : ''}
+  ${doc.change != null && doc.change > 0 ? `<div class="row"><span>Cambio</span><span>${eur(doc.change)}</span></div>` : ''}
+  <div class="muted small">IVA incluido</div>
+  ${doc.notes ? `<hr/><div class="small">${multiline(doc.notes)}</div>` : ''}
+  <hr/>
+  <div class="center ref">*${esc(doc.number)}*</div>
+  ${biz.returnPolicy ? `<div class="center small sp">${multiline(biz.returnPolicy)}</div>` : ''}
+  <div class="center sp">${multiline(biz.footer || '¡Gracias por su compra!')}</div>`;
+}
+
+export function ticketStyles(width: PaperWidth, feedLines: number) {
+  const mm = width === '58' ? 48 : 72; // área imprimible real
+  return `
+  *{box-sizing:border-box;margin:0;padding:0}
+  @page{size:${width}mm auto;margin:0}
+  html,body{background:#fff;color:#000}
+  body{font-family:'Courier New',ui-monospace,monospace;font-size:${width === '58' ? 10 : 12}px;line-height:1.35}
+  .ticket{width:${mm}mm;margin:0 auto;padding:3mm 0 ${feedLines * 5}mm}
+  .center{text-align:center}.bold{font-weight:700}.xl{font-size:1.3em}.small{font-size:.85em}
+  .muted{opacity:.75}.sp{margin-top:4px}
+  .row{display:flex;justify-content:space-between;gap:6px}
+  .item{margin-bottom:3px}
+  .total{margin:4px 0;padding:2px 0;border-top:1px solid #000;border-bottom:1px solid #000}
+  .ref{font-size:1.2em;letter-spacing:2px;font-weight:700}
+  .logo{max-width:60%;max-height:20mm;margin:0 auto 4px;display:block;filter:grayscale(1)}
+  hr{border:none;border-top:1px dashed #000;margin:5px 0}`;
+}
+
+/** Imprime el ticket en un iframe oculto (sin ventanas emergentes). */
+export function printTicket(biz: TicketBusiness, doc: TicketDoc, prefs: TerminalTicketPrefs) {
+  const body = renderTicketBody(biz, doc);
+  const copies = Math.max(1, Math.min(prefs.copies, 3));
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(doc.number)}</title>
+    <style>${ticketStyles(prefs.paperWidth, prefs.feedLines)} .ticket+.ticket{page-break-before:always}</style></head>
+    <body>${Array.from({ length: copies }, () => `<div class="ticket">${body}</div>`).join('')}</body></html>`;
+
+  const iframe = document.createElement('iframe');
+  iframe.setAttribute('aria-hidden', 'true');
+  Object.assign(iframe.style, { position: 'fixed', right: '0', bottom: '0', width: '0', height: '0', border: '0' });
+  document.body.appendChild(iframe);
+  const d = iframe.contentDocument!;
+  d.open();
+  d.write(html);
+  d.close();
+  const go = () => {
+    iframe.contentWindow?.focus();
+    iframe.contentWindow?.print();
+    setTimeout(() => iframe.remove(), 1000);
+  };
+  const imgs = Array.from(d.images);
+  if (imgs.length === 0) setTimeout(go, 50);
+  else Promise.all(imgs.map((i) => (i.complete ? null : new Promise((r) => { i.onload = i.onerror = r; })))).then(go);
+}
