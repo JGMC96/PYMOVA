@@ -17,8 +17,8 @@ const json = (body: unknown, status = 200) =>
   });
 
 const ADJUST_MUTATION = `
-  mutation AdjustInventory($input: InventoryAdjustQuantitiesInput!) {
-    inventoryAdjustQuantities(input: $input) {
+  mutation AdjustInventory($input: InventoryAdjustQuantitiesInput!, $key: String!) {
+    inventoryAdjustQuantities(input: $input) @idempotent(key: $key) {
       inventoryAdjustmentGroup { createdAt reason }
       userErrors { field message }
     }
