@@ -37,7 +37,15 @@ export interface TicketBusiness {
   header?: string | null;
   footer?: string | null;
   returnPolicy?: string | null;
+  fontSize?: TicketFontSize;
+  lineSpacing?: TicketLineSpacing;
+  boldItems?: boolean;
 }
+
+export type TicketFontSize = 'small' | 'normal' | 'large' | 'xlarge';
+export type TicketLineSpacing = 'compact' | 'normal' | 'relaxed';
+export const FONT_SCALE: Record<TicketFontSize, number> = { small: 0.9, normal: 1, large: 1.2, xlarge: 1.4 };
+export const LINE_HEIGHT: Record<TicketLineSpacing, number> = { compact: 1.15, normal: 1.35, relaxed: 1.6 };
 
 export interface TicketLine {
   name: string;
@@ -102,7 +110,7 @@ export function renderTicketBody(biz: TicketBusiness, doc: TicketDoc): string {
       const disc = l.discount && l.discount > 0
         ? `<div class="row muted"><span>&nbsp;&nbsp;Descuento</span><span>-${eur(l.discount)}</span></div>`
         : '';
-      return `<div class="item"><div class="bold">${esc(l.name)}</div>
+      return `<div class="item"><div class="iname">${esc(l.name)}</div>
         <div class="row"><span>${l.quantity} x ${eur(l.unitPrice)}</span><span>${eur(sign * l.total)}</span></div>${disc}</div>`;
     })
     .join('');
@@ -144,13 +152,16 @@ export function renderTicketBody(biz: TicketBusiness, doc: TicketDoc): string {
   <div class="center sp">${multiline(biz.footer || '¡Gracias por su compra!')}</div>`;
 }
 
-export function ticketStyles(width: PaperWidth, feedLines: number) {
+export function ticketStyles(width: PaperWidth, feedLines: number, style: Pick<TicketBusiness, 'fontSize' | 'lineSpacing' | 'boldItems'> = {}) {
+  const base = (width === '58' ? 10 : 12) * FONT_SCALE[style.fontSize ?? 'normal'];
+  const lh = LINE_HEIGHT[style.lineSpacing ?? 'normal'];
   const mm = width === '58' ? 48 : 72; // área imprimible real
   return `
   *{box-sizing:border-box;margin:0;padding:0}
   @page{size:${width}mm auto;margin:0}
   html,body{background:#fff;color:#000}
-  body{font-family:'Courier New',ui-monospace,monospace;font-size:${width === '58' ? 10 : 12}px;line-height:1.35}
+  body{font-family:'Courier New',ui-monospace,monospace;font-size:${base}px;line-height:${lh}}
+  .iname{font-weight:${style.boldItems === false ? 400 : 700}}
   .ticket{width:${mm}mm;margin:0 auto;padding:3mm 0 ${feedLines * 5}mm}
   .center{text-align:center}.bold{font-weight:700}.xl{font-size:1.3em}.small{font-size:.85em}
   .muted{opacity:.75}.sp{margin-top:4px}
@@ -167,7 +178,7 @@ export function printTicket(biz: TicketBusiness, doc: TicketDoc, prefs: Terminal
   const body = renderTicketBody(biz, doc);
   const copies = Math.max(1, Math.min(prefs.copies, 3));
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(doc.number)}</title>
-    <style>${ticketStyles(prefs.paperWidth, prefs.feedLines)} .ticket+.ticket{page-break-before:always}</style></head>
+    <style>${ticketStyles(prefs.paperWidth, prefs.feedLines, biz)} .ticket+.ticket{page-break-before:always}</style></head>
     <body>${Array.from({ length: copies }, () => `<div class="ticket">${body}</div>`).join('')}</body></html>`;
 
   const iframe = document.createElement('iframe');

@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 export function TicketPreview({
   business, doc, prefs, className,
 }: { business: TicketBusiness; doc: TicketDoc; prefs: TerminalTicketPrefs; className?: string }) {
-  const html = `<style>${ticketStyles(prefs.paperWidth, 1).replace(/@page[^}]*}/, '')}</style><div class="ticket">${renderTicketBody(business, doc)}</div>`;
+  const html = `<style>${ticketStyles(prefs.paperWidth, 1, business).replace(/@page[^}]*}/, '')}</style><div class="ticket">${renderTicketBody(business, doc)}</div>`;
   return (
     <div className={cn('overflow-auto rounded-lg bg-muted p-4', className)}>
       <div

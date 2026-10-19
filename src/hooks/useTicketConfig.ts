@@ -18,9 +18,12 @@ export function useTicketConfig() {
 
   const s = bs.settings;
   const business: TicketBusiness = {
-    name: activeBusiness?.trade_name || activeBusiness?.name || 'Mi negocio',
-    legalName: activeBusiness?.legal_name,
-    taxId: activeBusiness?.tax_id,
+    name: s?.ticket_trade_name || activeBusiness?.trade_name || activeBusiness?.name || 'Mi negocio',
+    legalName: s?.ticket_legal_name || activeBusiness?.legal_name,
+    taxId: s?.ticket_tax_id || activeBusiness?.tax_id,
+    fontSize: s?.ticket_font_size ?? 'normal',
+    lineSpacing: s?.ticket_line_spacing ?? 'normal',
+    boldItems: s?.ticket_bold_items ?? true,
     logoUrl: (activeBusiness as { logo_url?: string | null } | null)?.logo_url ?? null,
     showLogo: s?.ticket_show_logo ?? true,
     address: s?.ticket_address,

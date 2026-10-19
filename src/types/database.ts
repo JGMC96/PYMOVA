@@ -242,6 +242,12 @@ export interface BusinessSettings {
   ticket_footer?: string | null;
   ticket_return_policy?: string | null;
   ticket_show_logo?: boolean;
+  ticket_trade_name?: string | null;
+  ticket_legal_name?: string | null;
+  ticket_tax_id?: string | null;
+  ticket_font_size?: 'small' | 'normal' | 'large' | 'xlarge';
+  ticket_line_spacing?: 'compact' | 'normal' | 'relaxed';
+  ticket_bold_items?: boolean;
   created_at: string;
   updated_at: string;
 }

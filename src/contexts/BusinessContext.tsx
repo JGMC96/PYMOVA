@@ -161,6 +161,8 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
 
     const businesses = await fetchUserBusinesses(user.id);
     setUserBusinesses(businesses);
+    const fresh = activeBusinessId ? businesses.find((b) => b.id === activeBusinessId) : null;
+    if (fresh) setActiveBusinessState(fresh);
 
     // If active business no longer accessible, clear it
     if (activeBusinessId && !businesses.find((b) => b.id === activeBusinessId)) {
