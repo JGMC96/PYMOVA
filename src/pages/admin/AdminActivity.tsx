@@ -15,12 +15,11 @@ const PAGE_SIZE = 50;
 const TODOS = '__todos__';
 
 async function fetchActivity(limit: number, businessId: string | null): Promise<PlatformAuditEntry[]> {
-  // `as never`: la RPC aún no está en los tipos generados (los regenera Lovable).
-  const { data, error } = await supabase.rpc('get_platform_audit_log' as never, {
+  const { data, error } = await supabase.rpc('get_platform_audit_log', {
     _limit: limit,
     _offset: 0,
-    _business_id: businessId,
-  } as never);
+    _business_id: businessId ?? undefined,
+  });
   if (error) throw new Error(error.message);
   return (data ?? []) as PlatformAuditEntry[];
 }

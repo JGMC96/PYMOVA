@@ -103,12 +103,11 @@ export default function AdminSubscriptions() {
     if (!pending || reason.trim().length < 3) return;
     setSaving(true);
     // La RPC valida, pide el motivo y deja la acción en la auditoría.
-    // `as never`: la RPC aún no está en los tipos generados (los regenera Lovable).
-    const { error } = await supabase.rpc('admin_update_subscription' as never, {
+    const { error } = await supabase.rpc('admin_update_subscription', {
       _business_id: pending.row.business_id,
       _reason: reason.trim(),
       ...pending.args,
-    } as never);
+    });
     setSaving(false);
     if (error) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
