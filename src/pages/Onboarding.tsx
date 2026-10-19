@@ -39,15 +39,6 @@ export default function Onboarding() {
   const [businessName, setBusinessName] = useState('');
   const [industry, setIndustry] = useState('');
 
-  const generateSlug = (name: string) => {
-    return name
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(^-|-$)/g, '');
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -65,92 +56,16 @@ export default function Onboarding() {
     setIsLoading(true);
 
     try {
-      // 1. Create the business
-      const slug = generateSlug(businessName);
-      const { data: business, error: businessError } = await supabase
-        .from('businesses')
-        .insert({
-          name: businessName.trim(),
-          slug: slug,
-          industry: industry || null,
-        })
-        .select()
-        .single();
+      // El alta completa (negocio, owner, suscripción de prueba, módulos, ajustes y
+      // negocio activo) se hace en una sola transacción en el servidor.
+      const { error: createError } = await supabase.rpc('create_business', {
+        _name: businessName.trim(),
+        _industry: industry || undefined,
+      });
 
-      if (businessError) throw businessError;
+      if (createError) throw new Error(createError.message);
 
-      // 2. Add user as owner
-      const { error: memberError } = await supabase
-        .from('business_members')
-        .insert({
-          business_id: business.id,
-          user_id: user.id,
-          role: 'owner',
-          is_active: true,
-          joined_at: new Date().toISOString(),
-        });
-
-      if (memberError) throw memberError;
-
-      // 3. Get trial plan from plans table
-      const { data: trialPlan, error: planError } = await supabase
-        .from('plans')
-        .select('id')
-        .eq('key', 'trial')
-        .single();
-
-      if (planError) throw planError;
-
-      // 4. Create trial subscription with plan_id FK
-      const { error: subError } = await supabase
-        .from('subscriptions')
-        .insert({
-          business_id: business.id,
-          plan_id: trialPlan.id,
-          status: 'trialing',
-        });
-
-      if (subError) throw subError;
-
-      // 5. Get modules included in trial plan from plan_modules
-      const { data: planModules, error: planModulesError } = await supabase
-        .from('plan_modules')
-        .select('module_id')
-        .eq('plan_id', trialPlan.id);
-
-      if (planModulesError) throw planModulesError;
-
-      // 6. Enable modules for the business using module_id FK
-      if (planModules && planModules.length > 0) {
-        const moduleInserts = planModules.map((pm) => ({
-          business_id: business.id,
-          module_id: pm.module_id,
-          is_enabled: true,
-        }));
-
-        const { error: modulesError } = await supabase
-          .from('business_modules')
-          .insert(moduleInserts);
-
-        if (modulesError) throw modulesError;
-      }
-
-      // 7. Create business settings
-      const { error: settingsError } = await supabase
-        .from('business_settings')
-        .insert({
-          business_id: business.id,
-          next_invoice_number: 1,
-          invoice_prefix: 'FAC-',
-          tax_rate: 16.00,
-        });
-
-      if (settingsError) throw settingsError;
-
-      // 8. Set this as the active business in profile
-      await supabase.rpc('set_active_business', { _business_id: business.id });
-
-      // 9. Refresh context and navigate
+      // Refresh context and navigate
       await refreshBusinesses();
       toast.success('¡Negocio creado exitosamente!');
       navigate('/dashboard');
