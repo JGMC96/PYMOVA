@@ -106,6 +106,13 @@
       "when": 1792415275601,
       "tag": "0014_fix_rls_alta_negocio",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1792417097076,
+      "tag": "0015_fix_auditoria_borrado_negocio",
+      "breakpoints": true
     }
   ]
 }
