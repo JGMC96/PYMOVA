@@ -203,11 +203,17 @@ export type Database = {
           next_invoice_number: number
           tax_rate: number | null
           ticket_address: string | null
+          ticket_bold_items: boolean
+          ticket_font_size: string
           ticket_footer: string | null
           ticket_header: string | null
+          ticket_legal_name: string | null
+          ticket_line_spacing: string
           ticket_phone: string | null
           ticket_return_policy: string | null
           ticket_show_logo: boolean
+          ticket_tax_id: string | null
+          ticket_trade_name: string | null
           ticket_website: string | null
           updated_at: string
         }
@@ -219,11 +225,17 @@ export type Database = {
           next_invoice_number?: number
           tax_rate?: number | null
           ticket_address?: string | null
+          ticket_bold_items?: boolean
+          ticket_font_size?: string
           ticket_footer?: string | null
           ticket_header?: string | null
+          ticket_legal_name?: string | null
+          ticket_line_spacing?: string
           ticket_phone?: string | null
           ticket_return_policy?: string | null
           ticket_show_logo?: boolean
+          ticket_tax_id?: string | null
+          ticket_trade_name?: string | null
           ticket_website?: string | null
           updated_at?: string
         }
@@ -235,11 +247,17 @@ export type Database = {
           next_invoice_number?: number
           tax_rate?: number | null
           ticket_address?: string | null
+          ticket_bold_items?: boolean
+          ticket_font_size?: string
           ticket_footer?: string | null
           ticket_header?: string | null
+          ticket_legal_name?: string | null
+          ticket_line_spacing?: string
           ticket_phone?: string | null
           ticket_return_policy?: string | null
           ticket_show_logo?: boolean
+          ticket_tax_id?: string | null
+          ticket_trade_name?: string | null
           ticket_website?: string | null
           updated_at?: string
         }
