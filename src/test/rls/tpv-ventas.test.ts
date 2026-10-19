@@ -77,18 +77,18 @@ describe.skipIf(!RLS_DB_URL)('RLS · TPV: ventas y devoluciones solo por RPC', (
         _register_session_id => ${venta.register_session_id ?? null}
       )`);
 
-  /** Venta de 1 unidad de la variante a 99 €, con el descuento (%) indicado. */
+  /** Venta de 1 unidad de la variante a 99 € (IVA incluido), con el descuento (%) indicado. */
   const ventaSimple = (n: Negocio, descuentoPct = 0, unitPrice = 99): Venta => {
     const bruto = r2(unitPrice);
     const disc = r2((bruto * descuentoPct) / 100);
     const neto = r2(bruto - disc);
-    const tax = r2((neto * IVA) / 100);
+    const base = r2(neto / (1 + IVA / 100));
     return {
       items: [{ product_id: n.producto, variant_id: n.variante, product_name: 'Zueco · T38', quantity: 1, unit_price: unitPrice, total: neto }],
-      subtotal: neto,
+      subtotal: base,
       discount: disc,
-      tax,
-      total: r2(neto + tax),
+      tax: r2(neto - base),
+      total: neto,
       client_id: n.cliente,
       register_session_id: n.caja,
     };
@@ -119,10 +119,24 @@ describe.skipIf(!RLS_DB_URL)('RLS · TPV: ventas y devoluciones solo por RPC', (
     expect(res.sale_number).toMatch(/^VTA-/);
 
     const [s] = await sql`SELECT subtotal::float, discount::float, tax::float, total::float FROM sales WHERE id = ${res.sale_id}`;
-    expect(s).toEqual({ subtotal: 89.1, discount: 9.9, tax: 18.71, total: 107.81 });
+    // IVA incluido: el cliente paga 89,10 (99 − 10 %); base 73,64 e IVA 15,46
+    expect(s).toEqual({ subtotal: 73.64, discount: 9.9, tax: 15.46, total: 89.1 });
     const [li] = await sql`SELECT unit_price::float, discount::float, total::float, unit_cost FROM sale_items WHERE sale_id = ${res.sale_id}`;
     expect(li).toMatchObject({ unit_price: 99, discount: 9.9, total: 89.1 });
     expect(await stock(A.variante)).toBe(antes - 1);
+  });
+
+  it('A11: un artículo de 6 € se cobra a 6 € (IVA incluido), no a 7,26', async () => {
+    const [p] = await sql<{ id: string }[]>`
+      INSERT INTO products (business_id, name, price, stock_quantity, track_inventory) VALUES (${A.id}, 'Calcetines', 6, 50, true) RETURNING id`;
+    const [res] = await vender(staffA, A.id, {
+      items: [{ product_id: p.id, variant_id: null, product_name: 'Calcetines', quantity: 1, unit_price: 6, total: 6 }],
+      subtotal: 4.96,
+      tax: 1.04,
+      total: 6,
+    });
+    const [s] = await sql`SELECT subtotal::float, tax::float, total::float FROM sales WHERE id = ${res.sale_id}`;
+    expect(s).toEqual({ subtotal: 4.96, tax: 1.04, total: 6 });
   });
 
   it('M1: el precio lo pone el catálogo y los totales que no cuadran se rechazan', async () => {

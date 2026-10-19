@@ -3,6 +3,7 @@ import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Plus, CalendarIcon } from 'lucide-react';
+import { round2, taxBreakdown } from '@/lib/tax';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
@@ -113,17 +114,17 @@ export function InvoiceForm({
     name: 'items',
   });
 
-  // Calculate totals
+  // Totales: los precios incluyen el IVA; la base y la cuota se deducen del total
+  // (mismo cálculo que create_invoice_with_items en el servidor).
   const calculations = useMemo(() => {
-    const subtotal = (watchedItems || []).reduce((sum, item) => {
-      const qty = Number(item?.quantity) || 0;
-      const price = Number(item?.unit_price) || 0;
-      return sum + qty * price;
-    }, 0);
-
-    const tax = subtotal * (taxRate / 100);
-    const total = subtotal + tax;
-
+    const total = round2(
+      (watchedItems || []).reduce((sum, item) => {
+        const qty = Number(item?.quantity) || 0;
+        const price = Number(item?.unit_price) || 0;
+        return sum + round2(qty * price);
+      }, 0),
+    );
+    const { base: subtotal, tax } = taxBreakdown(total, taxRate);
     return { subtotal, tax, total };
   }, [watchedItems, taxRate]);
 
@@ -291,11 +292,11 @@ export function InvoiceForm({
           <CardContent className="pt-6">
             <div className="flex flex-col items-end space-y-2">
               <div className="flex justify-between w-64">
-                <span className="text-muted-foreground">Subtotal:</span>
+                <span className="text-muted-foreground">Base imponible:</span>
                 <span className="font-medium">{formatPrice(calculations.subtotal)}</span>
               </div>
               <div className="flex justify-between w-64">
-                <span className="text-muted-foreground">IVA ({taxRate}%):</span>
+                <span className="text-muted-foreground">IVA ({taxRate}%) incluido:</span>
                 <span className="font-medium">{formatPrice(calculations.tax)}</span>
               </div>
               <Separator className="w-64" />

@@ -1,4 +1,5 @@
 // Renderizado de tickets térmicos (factura simplificada) para el TPV.
+import { round2, taxBreakdown } from './tax';
 
 export type PaperWidth = '80' | '58';
 
@@ -84,13 +85,8 @@ const esc = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const eur = (n: number) =>
   `${n.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
-const round2 = (n: number) => Math.round(n * 100) / 100;
-
-/** Base imponible y cuota a partir de un total con IVA incluido. */
-export function taxBreakdown(total: number, rate: number) {
-  const base = round2(total / (1 + rate / 100));
-  return { base, tax: round2(total - base) };
-}
+// El desglose vive en lib/tax.ts; se reexporta para no romper importaciones.
+export { taxBreakdown };
 
 const multiline = (s?: string | null) =>
   s ? s.split('\n').map((l) => `<div>${esc(l)}</div>`).join('') : '';

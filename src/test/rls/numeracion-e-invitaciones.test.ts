@@ -21,13 +21,14 @@ async function crearNegocio(sql: Sql, ownerEmail: string, nombre: string): Promi
   return { id: b.id, owner, producto: p.id, variante: v.id };
 }
 
-/** Venta de 1 unidad a 10 € (IVA 21 %): subtotal 10, IVA 2,10, total 12,10. */
+/** Venta de 1 unidad a 10 € con IVA incluido (21 %): total 10, base 8,26, IVA 1,74. */
 function vender(sql: Sql, n: Negocio, userId = n.owner) {
   const items = [{ product_id: n.producto, variant_id: n.variante, product_name: 'Zueco · T38', quantity: 1, unit_price: 10, total: 10 }];
+  const base = r2(10 / (1 + IVA / 100));
   return asUser(sql, userId, (tx) => tx<{ sale_id: string; sale_number: string }[]>`
     SELECT * FROM public.create_sale_with_items(
       _business_id => ${n.id}, _items => ${sql.json(items as never)}::jsonb, _payment_method => 'cash',
-      _subtotal => 10, _tax => ${r2(10 * IVA / 100)}, _total => ${r2(10 + 10 * IVA / 100)}, _discount => 0)`);
+      _subtotal => ${base}, _tax => ${r2(10 - base)}, _total => 10, _discount => 0)`);
 }
 
 describe.skipIf(!RLS_DB_URL)('RLS · invitaciones como owner y numeración correlativa', () => {
