@@ -44,7 +44,7 @@ Cada hallazgo indica dónde está, qué impacto tiene y cómo corregirlo. Las ru
 
 - **Qué pasa:** hay dos fallos.
   - El `insert().select()` en `businesses` choca con la RLS de SELECT, que exige ser miembro, y el usuario todavía no lo es. Es así desde `sm/20260609091726`.
-  - El insert de `business_members` duplica los módulos que ya crea el trigger `sync_modules_on_subscription_change` (`sm/20260729163758`).
+  - El insert de `business_modules` duplica los módulos que ya crea el trigger `sync_modules_on_subscription_change` (`sm/20260729163758`).
 - **Impacto:** en producción el último negocio se creó el 27/04, lo que cuadra con que los clientes nuevos no pueden darse de alta.
 - **Corrección:** la misma RPC `create_business`, en [JGMC96/PYMOVA#2](https://github.com/JGMC96/PYMOVA/pull/2).
 
