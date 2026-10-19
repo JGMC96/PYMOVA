@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Printer, Save, Monitor, FileText } from 'lucide-react';
+import { Printer, Save, Monitor, FileText, Type, RotateCcw } from 'lucide-react';
+import { useBusiness } from '@/contexts/BusinessContext';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,15 +19,27 @@ import { TicketLogoUpload } from './TicketLogoUpload';
 type Form = {
   ticket_address: string; ticket_phone: string; ticket_website: string;
   ticket_header: string; ticket_footer: string; ticket_return_policy: string; ticket_show_logo: boolean;
+  ticket_trade_name: string; ticket_legal_name: string; ticket_tax_id: string;
+  ticket_font_size: 'small' | 'normal' | 'large' | 'xlarge';
+  ticket_line_spacing: 'compact' | 'normal' | 'relaxed';
+  ticket_bold_items: boolean;
 };
 
 export function TicketSettingsPanel() {
   const { business, prefs, setPrefs, taxRate, settingsApi } = useTicketConfig();
   const { isAdmin } = useRoleAccess('admin');
+  const { activeBusiness } = useBusiness();
   const s = settingsApi.settings;
+  const fromSettings = {
+    ticket_trade_name: activeBusiness?.trade_name || activeBusiness?.name || '',
+    ticket_legal_name: activeBusiness?.legal_name || '',
+    ticket_tax_id: activeBusiness?.tax_id || '',
+  };
   const [form, setForm] = useState<Form>({
     ticket_address: '', ticket_phone: '', ticket_website: '',
     ticket_header: '', ticket_footer: '', ticket_return_policy: '', ticket_show_logo: true,
+    ticket_trade_name: '', ticket_legal_name: '', ticket_tax_id: '',
+    ticket_font_size: 'normal', ticket_line_spacing: 'normal', ticket_bold_items: true,
   });
 
   useEffect(() => {
@@ -35,15 +49,28 @@ export function TicketSettingsPanel() {
       ticket_website: s.ticket_website ?? '', ticket_header: s.ticket_header ?? '',
       ticket_footer: s.ticket_footer ?? '', ticket_return_policy: s.ticket_return_policy ?? '',
       ticket_show_logo: s.ticket_show_logo ?? true,
+      // De serie: datos de Configuración → Mi Negocio si el ticket no tiene propios
+      ticket_trade_name: s.ticket_trade_name || fromSettings.ticket_trade_name,
+      ticket_legal_name: s.ticket_legal_name || fromSettings.ticket_legal_name,
+      ticket_tax_id: s.ticket_tax_id || fromSettings.ticket_tax_id,
+      ticket_font_size: s.ticket_font_size ?? 'normal',
+      ticket_line_spacing: s.ticket_line_spacing ?? 'normal',
+      ticket_bold_items: s.ticket_bold_items ?? true,
     });
-  }, [s]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [s, activeBusiness?.id]);
 
   const liveBusiness = {
     ...business,
     address: form.ticket_address, phone: form.ticket_phone, website: form.ticket_website,
     header: form.ticket_header, footer: form.ticket_footer, returnPolicy: form.ticket_return_policy,
     showLogo: form.ticket_show_logo,
+    name: form.ticket_trade_name || business.name,
+    legalName: form.ticket_legal_name || null,
+    taxId: form.ticket_tax_id || null,
+    fontSize: form.ticket_font_size, lineSpacing: form.ticket_line_spacing, boldItems: form.ticket_bold_items,
   };
+  const copyFromSettings = () => setForm((f) => ({ ...f, ...fromSettings }));
 
   const sample: TicketDoc = useMemo(() => ({
     kind: 'test', number: 'PRUEBA-0001', createdAt: new Date(), taxRate,
@@ -57,9 +84,16 @@ export function TicketSettingsPanel() {
   const set = (k: keyof Form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
 
-  const save = () => settingsApi.updateSettings(
-    Object.fromEntries(Object.entries(form).map(([k, v]) => [k, typeof v === 'string' ? v.trim() || null : v])),
-  );
+  const save = () => {
+    const out: Record<string, unknown> = Object.fromEntries(
+      Object.entries(form).map(([k, v]) => [k, typeof v === 'string' ? v.trim() || null : v]),
+    );
+    // Si coinciden con Ajustes no se guardan: así siguen los cambios futuros de Ajustes
+    (['ticket_trade_name', 'ticket_legal_name', 'ticket_tax_id'] as const).forEach((k) => {
+      if ((form[k] || '').trim() === fromSettings[k]) out[k] = null;
+    });
+    return settingsApi.updateSettings(out);
+  };
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
@@ -120,12 +154,26 @@ export function TicketSettingsPanel() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><FileText className="w-5 h-5 text-primary" />Datos del ticket</CardTitle>
             <CardDescription>
-              Nombre, razón social y NIF se toman de Configuración → Mi Negocio. Aquí completas el resto. {!isAdmin && 'Solo propietarios y administradores pueden cambiarlos.'}
+              De serie se usan los datos de Configuración → Mi Negocio; puedes cambiarlos solo para el ticket. {!isAdmin && 'Solo propietarios y administradores pueden cambiarlos.'}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {settingsApi.isLoading ? <Skeleton className="h-40 w-full" /> : (
               <fieldset disabled={!isAdmin} className="space-y-4">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-medium">Datos de la empresa</p>
+                  <Button type="button" variant="ghost" size="sm" onClick={copyFromSettings}>
+                    <RotateCcw className="w-4 h-4 mr-1" />Copiar de Ajustes
+                  </Button>
+                </div>
+                <div className="space-y-1.5"><Label htmlFor="tn">Nombre comercial</Label>
+                  <Input id="tn" value={form.ticket_trade_name} onChange={set('ticket_trade_name')} /></div>
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5"><Label htmlFor="ln">Razón social</Label>
+                    <Input id="ln" value={form.ticket_legal_name} onChange={set('ticket_legal_name')} /></div>
+                  <div className="space-y-1.5"><Label htmlFor="nif">NIF / CIF</Label>
+                    <Input id="nif" value={form.ticket_tax_id} onChange={set('ticket_tax_id')} /></div>
+                </div>
                 <div className="space-y-1.5"><Label htmlFor="addr">Dirección de la tienda</Label>
                   <Textarea id="addr" rows={2} value={form.ticket_address} onChange={set('ticket_address')} placeholder={'Calle Colón 10\n46004 Valencia'} /></div>
                 <div className="grid sm:grid-cols-2 gap-4">
@@ -148,6 +196,34 @@ export function TicketSettingsPanel() {
                 <div className="flex items-center justify-between">
                   <Label htmlFor="logo">Mostrar logo del negocio</Label>
                   <Switch id="logo" checked={form.ticket_show_logo} onCheckedChange={(v) => setForm((f) => ({ ...f, ticket_show_logo: v }))} />
+                </div>
+                <div className="border-t pt-4 space-y-4">
+                  <p className="text-sm font-medium flex items-center gap-2"><Type className="w-4 h-4 text-primary" />Diseño del ticket</p>
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5"><Label>Tamaño de letra</Label>
+                      <Select value={form.ticket_font_size} onValueChange={(v) => setForm((f) => ({ ...f, ticket_font_size: v as Form['ticket_font_size'] }))}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="small">Pequeña</SelectItem>
+                          <SelectItem value="normal">Normal</SelectItem>
+                          <SelectItem value="large">Grande</SelectItem>
+                          <SelectItem value="xlarge">Muy grande</SelectItem>
+                        </SelectContent>
+                      </Select></div>
+                    <div className="space-y-1.5"><Label>Espaciado entre líneas</Label>
+                      <Select value={form.ticket_line_spacing} onValueChange={(v) => setForm((f) => ({ ...f, ticket_line_spacing: v as Form['ticket_line_spacing'] }))}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="compact">Compacto (ahorra papel)</SelectItem>
+                          <SelectItem value="normal">Normal</SelectItem>
+                          <SelectItem value="relaxed">Amplio</SelectItem>
+                        </SelectContent>
+                      </Select></div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="bold">Nombres de producto en negrita</Label>
+                    <Switch id="bold" checked={form.ticket_bold_items} onCheckedChange={(v) => setForm((f) => ({ ...f, ticket_bold_items: v }))} />
+                  </div>
                 </div>
                 <Button onClick={save} disabled={settingsApi.isUpdating}>
                   <Save className="w-4 h-4 mr-2" />{settingsApi.isUpdating ? 'Guardando…' : 'Guardar datos del ticket'}
