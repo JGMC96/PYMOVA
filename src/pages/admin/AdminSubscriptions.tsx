@@ -27,12 +27,14 @@ interface Row {
   current_period_end: string | null;
 }
 const STATUSES = ['trialing', 'active', 'past_due', 'cancelled'] as const;
+type SubscriptionStatus = (typeof STATUSES)[number];
+const isStatus = (v: string): v is SubscriptionStatus => (STATUSES as readonly string[]).includes(v);
 
 /** Cambio pendiente de confirmar con un motivo. */
 interface PendingChange {
   row: Row;
   summary: string;
-  args: { _plan_key?: string; _status?: string; _trial_ends_at?: string };
+  args: { _plan_key?: string; _status?: SubscriptionStatus; _trial_ends_at?: string };
 }
 
 export default function AdminSubscriptions() {
@@ -85,7 +87,7 @@ export default function AdminSubscriptions() {
   };
 
   const changeStatus = (row: Row, status: string) => {
-    if (status === row.status) return;
+    if (status === row.status || !isStatus(status)) return;
     askReason({ row, summary: `Estado: ${row.status} → ${status}`, args: { _status: status } });
   };
 
