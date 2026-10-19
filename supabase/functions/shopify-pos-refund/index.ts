@@ -3,10 +3,14 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { serviceClient, shopifyGraphql, ShopifyError } from '../_shared/shopify-client.ts';
+import { refundAmountForReturn } from '../_shared/shopify-core.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 const MAX_ATTEMPTS = 5;
+
+/** La devolución no cuadra con sus líneas: no se reintenta. */
+class IntegrityError extends Error {}
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -52,15 +56,24 @@ Deno.serve(async (req) => {
 
     const { data: returnsData } = await admin
       .from('sale_returns')
-      .select('id, return_number, reason, total, shopify_refund_attempts, sales!inner(shopify_order_gid, sale_number), sale_return_items(product_id, variant_id, product_name, quantity)')
+      .select('id, sale_id, return_number, reason, total, shopify_refund_attempts, sales!inner(shopify_order_gid, sale_number, total), sale_return_items(product_id, variant_id, product_name, quantity, unit_price)')
       .eq('business_id', businessId)
       .is('shopify_refund_gid', null)
       .not('sales.shopify_order_gid', 'is', null)
       .lt('shopify_refund_attempts', MAX_ATTEMPTS)
       .order('created_at', { ascending: true })
       .limit(20);
-    // deno-lint-ignore no-explicit-any
-    const returns = (returnsData ?? []) as any[];
+    interface ReturnRow {
+      id: string;
+      sale_id: string;
+      return_number: string;
+      reason: string | null;
+      total: number | string;
+      shopify_refund_attempts: number;
+      sales: { shopify_order_gid: string | null; sale_number: string; total: number | string };
+      sale_return_items: { product_id: string | null; variant_id: string | null; product_name: string; quantity: number; unit_price: number }[];
+    }
+    const returns = (returnsData ?? []) as unknown as ReturnRow[];
     if (returns.length === 0) return json({ status: 'ok', created: 0, failed: 0 });
 
     const { data: levels } = await admin
@@ -102,6 +115,22 @@ Deno.serve(async (req) => {
           refundLineItems.push({ lineItemId: line.id, quantity: qty, restockType: 'NO_RESTOCK' });
         }
 
+        // El importe sale de las líneas y nunca supera lo pendiente de la venta;
+        // una devolución cuyo total no cuadre no se reembolsa.
+        const { data: previas } = await admin
+          .from('sale_returns')
+          .select('total')
+          .eq('sale_id', ret.sale_id)
+          .neq('id', ret.id)
+          .not('shopify_refund_gid', 'is', null);
+        const alreadyRefunded = (previas ?? []).reduce((sum, r) => sum + Number(r.total), 0);
+        const amount = refundAmountForReturn(ret.sale_return_items, Number(ret.sales.total), alreadyRefunded);
+        if (Math.abs(amount - Number(ret.total)) > 0.01) {
+          throw new IntegrityError(
+            `El importe de la devolución (${Number(ret.total).toFixed(2)}) no cuadra con sus líneas (${amount.toFixed(2)})`,
+          );
+        }
+
         const parent = data.order.transactions.find((t) => ['SALE', 'CAPTURE'].includes(t.kind) && t.status === 'SUCCESS');
         const input: Record<string, unknown> = {
           orderId: orderGid,
@@ -109,10 +138,10 @@ Deno.serve(async (req) => {
           notify: false,
           refundLineItems,
         };
-        if (parent && Number(ret.total) > 0) {
+        if (parent && amount > 0) {
           input.transactions = [{
             orderId: orderGid, parentId: parent.id, kind: 'REFUND', gateway: parent.gateway,
-            amount: Number(ret.total).toFixed(2),
+            amount: amount.toFixed(2),
           }];
         }
 
@@ -130,7 +159,7 @@ Deno.serve(async (req) => {
         }).eq('id', ret.id);
         created++;
       } catch (error) {
-        const attempts = ret.shopify_refund_attempts + 1;
+        const attempts = error instanceof IntegrityError ? MAX_ATTEMPTS : ret.shopify_refund_attempts + 1;
         await admin.from('sale_returns').update({
           shopify_refund_status: attempts >= MAX_ATTEMPTS ? 'failed' : 'pending',
           shopify_refund_error: error instanceof Error ? error.message : 'Error desconocido',
