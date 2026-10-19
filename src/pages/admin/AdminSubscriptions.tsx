@@ -6,6 +6,11 @@ import { Button } from '@/components/ui/button';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/hooks/use-toast';
@@ -23,9 +28,19 @@ interface Row {
 }
 const STATUSES = ['trialing', 'active', 'past_due', 'cancelled'] as const;
 
+/** Cambio pendiente de confirmar con un motivo. */
+interface PendingChange {
+  row: Row;
+  summary: string;
+  args: { _plan_key?: string; _status?: string; _trial_ends_at?: string };
+}
+
 export default function AdminSubscriptions() {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
+  const [pending, setPending] = useState<PendingChange | null>(null);
+  const [reason, setReason] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const load = async () => {
     setRows(null);
@@ -58,20 +73,50 @@ export default function AdminSubscriptions() {
 
   useEffect(() => { load(); }, []);
 
-  const updateField = async (id: string, patch: Record<string, string>) => {
-    const { error } = await supabase.from('subscriptions').update(patch as never).eq('id', id);
+  const askReason = (change: PendingChange) => {
+    setReason('');
+    setPending(change);
+  };
+
+  const changePlan = (row: Row, planId: string) => {
+    const plan = plans.find(p => p.id === planId);
+    if (!plan || plan.id === row.plan_id) return;
+    askReason({ row, summary: `Plan: ${row.plan_name} → ${plan.name}`, args: { _plan_key: plan.key } });
+  };
+
+  const changeStatus = (row: Row, status: string) => {
+    if (status === row.status) return;
+    askReason({ row, summary: `Estado: ${row.status} → ${status}`, args: { _status: status } });
+  };
+
+  const extendTrial = (row: Row) => {
+    const base = row.trial_ends_at ? new Date(row.trial_ends_at) : new Date();
+    base.setDate(base.getDate() + 14);
+    askReason({
+      row,
+      summary: `Prueba ampliada 14 días, hasta el ${base.toLocaleDateString('es-ES')}`,
+      args: { _trial_ends_at: base.toISOString(), _status: 'trialing' },
+    });
+  };
+
+  const confirm = async () => {
+    if (!pending || reason.trim().length < 3) return;
+    setSaving(true);
+    // La RPC valida, pide el motivo y deja la acción en la auditoría.
+    // `as never`: la RPC aún no está en los tipos generados (los regenera Lovable).
+    const { error } = await supabase.rpc('admin_update_subscription' as never, {
+      _business_id: pending.row.business_id,
+      _reason: reason.trim(),
+      ...pending.args,
+    } as never);
+    setSaving(false);
     if (error) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
       return;
     }
-    toast({ title: 'Suscripción actualizada' });
+    toast({ title: 'Suscripción actualizada', description: pending.summary });
+    setPending(null);
     load();
-  };
-
-  const extendTrial = async (id: string, current: string | null) => {
-    const base = current ? new Date(current) : new Date();
-    base.setDate(base.getDate() + 14);
-    await updateField(id, { trial_ends_at: base.toISOString(), status: 'trialing' });
   };
 
   const statusColor = (s: string) =>
@@ -83,7 +128,9 @@ export default function AdminSubscriptions() {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-semibold">Suscripciones</h2>
-        <p className="text-muted-foreground">Gestiona planes y estado de cada negocio.</p>
+        <p className="text-muted-foreground">
+          Gestiona planes y estado de cada negocio. Cada cambio pide un motivo y queda en Actividad.
+        </p>
       </div>
 
       <Card>
@@ -115,18 +162,21 @@ export default function AdminSubscriptions() {
             )}
             {(rows ?? []).map(r => (
               <TableRow key={r.id}>
-                <TableCell className="font-medium">{r.business_name}</TableCell>
+                <TableCell className="font-medium">
+                  {r.business_name}
+                  <div className="text-xs text-muted-foreground font-mono">{r.business_id.slice(0, 8)}</div>
+                </TableCell>
                 <TableCell>
-                  <Select value={r.plan_id} onValueChange={v => updateField(r.id, { plan_id: v })}>
-                    <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+                  <Select value={r.plan_id} onValueChange={v => changePlan(r, v)}>
+                    <SelectTrigger className="w-36" aria-label={`Plan de ${r.business_name}`}><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {plans.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </TableCell>
                 <TableCell>
-                  <Select value={r.status} onValueChange={v => updateField(r.id, { status: v })}>
-                    <SelectTrigger className="w-32">
+                  <Select value={r.status} onValueChange={v => changeStatus(r, v)}>
+                    <SelectTrigger className="w-32" aria-label={`Estado de ${r.business_name}`}>
                       <SelectValue>
                         <Badge variant={statusColor(r.status) as never}>{r.status}</Badge>
                       </SelectValue>
@@ -143,7 +193,7 @@ export default function AdminSubscriptions() {
                   {r.current_period_end ? new Date(r.current_period_end).toLocaleDateString() : '—'}
                 </TableCell>
                 <TableCell className="text-right">
-                  <Button variant="outline" size="sm" onClick={() => extendTrial(r.id, r.trial_ends_at)}>
+                  <Button variant="outline" size="sm" onClick={() => extendTrial(r)}>
                     +14 días prueba
                   </Button>
                 </TableCell>
@@ -152,6 +202,34 @@ export default function AdminSubscriptions() {
           </TableBody>
         </Table>
       </Card>
+
+      <Dialog open={!!pending} onOpenChange={open => { if (!open) setPending(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmar cambio de suscripción</DialogTitle>
+            <DialogDescription>
+              {pending?.row.business_name}: {pending?.summary}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="reason">Motivo (obligatorio)</Label>
+            <Textarea
+              id="reason"
+              value={reason}
+              onChange={e => setReason(e.target.value)}
+              placeholder="Por ejemplo: cliente piloto, pago recibido fuera de la plataforma…"
+              rows={3}
+            />
+            <p className="text-xs text-muted-foreground">Quedará registrado en Actividad junto con tu usuario.</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPending(null)} disabled={saving}>Cancelar</Button>
+            <Button onClick={confirm} disabled={saving || reason.trim().length < 3}>
+              {saving ? 'Guardando…' : 'Confirmar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

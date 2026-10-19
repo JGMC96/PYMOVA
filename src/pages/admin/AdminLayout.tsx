@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { Building2, Users, CreditCard, ShieldCheck, ArrowLeft } from 'lucide-react';
+import { Building2, Users, CreditCard, ShieldCheck, ArrowLeft, History } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { RequireSuperAdmin } from '@/components/auth/RequireSuperAdmin';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,7 @@ const NAV = [
   { to: '/admin/businesses', label: 'Negocios', icon: Building2 },
   { to: '/admin/users', label: 'Usuarios', icon: Users },
   { to: '/admin/subscriptions', label: 'Suscripciones', icon: CreditCard },
+  { to: '/admin/activity', label: 'Actividad', icon: History },
 ];
 
 function AdminShell() {
