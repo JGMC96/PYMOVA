@@ -223,6 +223,7 @@ Hallazgos de la revisión del frontend. Las líneas se han comprobado en el cód
 - **Qué pasa:** el TPV suma el IVA encima de la base (`src/components/retail/POSPanel.tsx:199-201`), pero el ticket trata el total como IVA incluido y vuelve a desglosarlo (`src/lib/ticket.ts:89-101`). El tipo por defecto es el 16 % en `src/hooks/useBusinessSettings.ts:104` y en `src/pages/Onboarding.tsx:145`.
 - **Impacto:** la base imponible y la cuota impresas no coinciden con lo cobrado, y un negocio recién creado factura con un IVA que no existe en España.
 - **Corrección:** decidir un modelo (en España, precios con IVA incluido) y aplicarlo en el TPV, en la RPC y en el ticket. IVA por defecto del 21 %. Añadir tests de `taxBreakdown` con la venta completa.
+- **Estado (19/10/2026):** corregido en `dz/0019` y en el frontend. Precio del catálogo con IVA incluido en TPV y facturas (decisión del usuario); `sales.total` e `invoices.total` son lo que paga el cliente y la base y la cuota se deducen (`src/lib/tax.ts`, `taxBreakdown`); tipo por defecto 21 % en la base de datos y en el cliente. Detectado en la prueba real del 19/10: un calcetín de 6 € se cobró a 7,26 € (`VTA-000002`, ya devuelta; queda con el modelo antiguo, no se reescribe el histórico).
 
 **A12 · El stock se ajusta con valores absolutos desde el cliente.**
 

@@ -10,6 +10,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDes
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { DEFAULT_TAX_RATE } from '@/lib/tax';
 
 const billingSchema = z.object({
   invoice_prefix: z.string().max(10, 'Máximo 10 caracteres'),
@@ -26,7 +27,7 @@ export function BillingSettings() {
     resolver: zodResolver(billingSchema),
     defaultValues: {
       invoice_prefix: 'FAC-',
-      tax_rate: 16,
+      tax_rate: DEFAULT_TAX_RATE,
     },
   });
 
@@ -35,7 +36,7 @@ export function BillingSettings() {
     if (settings) {
       form.reset({
         invoice_prefix: settings.invoice_prefix || 'FAC-',
-        tax_rate: settings.tax_rate ?? 16,
+        tax_rate: settings.tax_rate ?? DEFAULT_TAX_RATE,
       });
     }
   }, [settings, form]);
@@ -120,9 +121,9 @@ export function BillingSettings() {
                 <FormItem>
                   <FormLabel>Tasa de IVA (%)</FormLabel>
                   <FormControl>
-                    <Input 
+                    <Input
                       type="number"
-                      placeholder="16" 
+                      placeholder="21"
                       {...field}
                       disabled={!isAdmin}
                       min={0}
@@ -131,7 +132,7 @@ export function BillingSettings() {
                     />
                   </FormControl>
                   <FormDescription>
-                    Porcentaje de IVA aplicado automáticamente a las facturas
+                    Los precios del catálogo ya incluyen el IVA. Este tipo se usa para desglosar la base imponible en tickets y facturas.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>

@@ -25,6 +25,7 @@ import { PAYMENT_LABELS } from '@/lib/storeProfiles';
 import { SaleTicketDialog, TicketData } from './SaleTicketDialog';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { DEFAULT_TAX_RATE, taxBreakdown } from '@/lib/tax';
 
 const PAYMENT_ICONS: Record<string, typeof Banknote> = {
   cash: Banknote,
@@ -55,7 +56,7 @@ export function POSPanel() {
   const [ticketOpen, setTicketOpen] = useState(false);
   const barcodeRef = useRef<HTMLInputElement>(null);
 
-  const taxRate = settings?.tax_rate ?? 16;
+  const taxRate = settings?.tax_rate ?? DEFAULT_TAX_RATE;
 
   const categories = useMemo(() => {
     const fromProducts = products.map((p) => p.category).filter(Boolean) as string[];
@@ -196,10 +197,11 @@ export function POSPanel() {
       0
     )
   );
-  const subtotal = round2(grossSubtotal - discountValue);
-  const tax = round2(subtotal * (taxRate / 100));
+  // Los precios del catálogo incluyen el IVA: el total es lo que paga el cliente y
+  // la base imponible y la cuota se deducen de él (como en el ticket y en la RPC).
+  const total = round2(grossSubtotal - discountValue);
+  const { base: subtotal, tax } = taxBreakdown(total, taxRate);
   const tip = profile.tipEnabled ? Math.max(round2(parseFloat(tipInput) || 0), 0) : 0;
-  const total = round2(subtotal + tax);
   const dueTotal = round2(total + tip);
   const cashReceived = parseFloat(cashInput);
   const change =
@@ -534,9 +536,9 @@ export function POSPanel() {
                 ) : (
                   <ChevronRight className="w-3.5 h-3.5" />
                 )}
-                Subtotal
+                Subtotal (IVA incl.)
               </span>
-              <span>{subtotal.toFixed(2)} €</span>
+              <span>{total.toFixed(2)} €</span>
             </button>
 
             {breakdownOpen && (
@@ -552,7 +554,11 @@ export function POSPanel() {
                   </div>
                 )}
                 <div className="flex justify-between text-muted-foreground">
-                  <span>IVA ({taxRate}%)</span>
+                  <span>Base imponible</span>
+                  <span>{subtotal.toFixed(2)} €</span>
+                </div>
+                <div className="flex justify-between text-muted-foreground">
+                  <span>IVA ({taxRate}%) incluido</span>
                   <span>{tax.toFixed(2)} €</span>
                 </div>
                 {tip > 0 && (

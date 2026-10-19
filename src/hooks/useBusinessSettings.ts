@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { toast } from 'sonner';
 import type { BusinessSettings } from '@/types/database';
+import { DEFAULT_TAX_RATE } from '@/lib/tax';
 
 export interface UpdateSettingsData {
   invoice_prefix?: string;
@@ -101,7 +102,7 @@ export function useBusinessSettings(): UseBusinessSettingsReturn {
             ...data,
             business_id: activeBusinessId,
             invoice_prefix: data.invoice_prefix ?? 'FAC-',
-            tax_rate: data.tax_rate ?? 16,
+            tax_rate: data.tax_rate ?? DEFAULT_TAX_RATE,
           });
         error = result.error;
       }
@@ -126,7 +127,7 @@ export function useBusinessSettings(): UseBusinessSettingsReturn {
   };
 
   // Default tax rate if no settings exist
-  const taxRate = settings?.tax_rate ?? 16;
+  const taxRate = settings?.tax_rate ?? DEFAULT_TAX_RATE;
 
   return { 
     settings, 
