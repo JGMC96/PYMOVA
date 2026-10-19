@@ -10,7 +10,7 @@
 1. **Hay un fallo crítico de aislamiento entre negocios.** Cualquier usuario registrado puede darse de alta como propietario de un negocio ajeno si conoce su UUID (C1).
 2. **Varias tablas sensibles aceptan escrituras directas que se saltan las RPC.** Pasa en líneas de ticket, devoluciones, fichajes, caja y suscripción, así que la lógica de negocio solo se cumple si el cliente coopera (A1-A5).
 3. **El esquema está repartido en dos carpetas de migraciones, y Drizzle no se usa como ORM** (A6).
-4. **Recuento:** 1 crítico, 13 altos (A1-A13), 8 medios de backend y 9 de frontend (F1-F9), y 11 bajos (B1-B6 y F10-F14).
+4. **Recuento:** 1 crítico, 14 altos (A1-A14), 8 medios de backend y 9 de frontend (F1-F9), y 11 bajos (B1-B6 y F10-F14).
 5. **Las comprobaciones de tipos, los tests y el build pasan, pero el lint falla.** Además, la lógica crítica de caja, stock, fichajes, cobros y numeración no tiene ningún test.
 
 ## Resultado de las comprobaciones
@@ -110,6 +110,12 @@ Cada hallazgo indica dónde está, qué impacto tiene y cómo corregirlo. Las ru
 - **Qué pasa:** la función lee las ventas con `shopify_order_gid IS NULL` y crea el pedido sin bloquear ni marcar antes la fila, y `orderCreate` no lleva clave de idempotencia. Dos llamadas a la vez (dos pestañas, o el envío automático tras cada venta mientras sigue el anterior) crean el mismo pedido dos veces. `shopify-pos-refund` sí manda `key: ret.id`.
 - **Impacto:** pedidos y ventas duplicados en Shopify, que descuadran la contabilidad y el stock de Shopify.
 - **Corrección:** reservar cada venta antes de llamar a Shopify (`update … set shopify_order_status = 'sending' where id = … and shopify_order_status is distinct from 'sending' returning id`), o un `pg_advisory_xact_lock` por negocio. Antes de crear, buscar en Shopify por `sourceIdentifier`.
+
+**A14 · No se podía borrar ningún negocio.** `audit_security_changes()` (`dz/0007`) y `audit_log_changes()` (`sm/20260126161816:281`). Se encontró el 19/10/2026 al intentar borrar el TUILUS duplicado.
+
+- **Qué pasa:** al borrar un negocio, los triggers de auditoría insertaban en `audit_logs` filas con el `business_id` del negocio que se estaba borrando, tanto la del propio negocio como las de cada fila borrada en cascada. La FK `audit_logs_business_id_fkey` las rechazaba. Su `ON DELETE SET NULL` solo afecta a las filas que ya existían.
+- **Impacto:** ni el owner, ni el super admin desde `/admin/businesses`, ni el SQL directo podían borrar un negocio. El error que aparecía era `insert or update on table "audit_logs" violates foreign key constraint`.
+- **Corrección:** `dz/0015`. Si el negocio ya no existe, la fila de auditoría se guarda con `business_id` NULL. El id sigue en `old_data` y en `record_id`. Tests en `src/test/rls/borrado-negocio.test.ts`.
 
 ### Medio
 
