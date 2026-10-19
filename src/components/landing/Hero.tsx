@@ -76,7 +76,7 @@ export const Hero = () => {
           transition={{ duration: 0.8, delay: 0.4 }}
           className="mt-16 w-full max-w-3xl"
         >
-          <img src={shareImage.url} alt="Pymova: gestión para pymes y comercios, TPV e inventario, facturación y cobros, RRHH y Shopify" width={1200} height={630} loading="lazy" className="w-full h-auto rounded-lg" />
+          <img src={`https://pymova.com${shareImage.url}`} alt="Pymova: gestión para pymes y comercios, TPV e inventario, facturación y cobros, RRHH y Shopify" width={1200} height={630} loading="lazy" className="w-full h-auto rounded-lg" />
         </motion.div>
       </main>
     </section>
