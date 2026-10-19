@@ -58,11 +58,10 @@ export default function Onboarding() {
     try {
       // El alta completa (negocio, owner, suscripción de prueba, módulos, ajustes y
       // negocio activo) se hace en una sola transacción en el servidor.
-      // `as never`: la RPC aún no está en los tipos generados (los regenera Lovable).
-      const { error: createError } = await supabase.rpc('create_business' as never, {
+      const { error: createError } = await supabase.rpc('create_business', {
         _name: businessName.trim(),
-        _industry: industry || null,
-      } as never);
+        _industry: industry || undefined,
+      });
 
       if (createError) throw new Error(createError.message);
 

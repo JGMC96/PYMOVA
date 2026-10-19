@@ -46,7 +46,7 @@ describe('Onboarding', () => {
 
     await waitFor(() => expect(navigate).toHaveBeenCalledWith('/dashboard'));
     expect(rpc).toHaveBeenCalledTimes(1);
-    expect(rpc).toHaveBeenCalledWith('create_business', { _name: 'Mi Tienda', _industry: null });
+    expect(rpc).toHaveBeenCalledWith('create_business', { _name: 'Mi Tienda', _industry: undefined });
     expect(from).not.toHaveBeenCalled();
     expect(refreshBusinesses).toHaveBeenCalled();
   });
