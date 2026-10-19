@@ -27,7 +27,7 @@ const features = [
   {
     icon: FileText,
     title: "Facturación Simple",
-    description: "Crea facturas profesionales en segundos. Envíalas por email y haz seguimiento automático.",
+    description: "Crea facturas con sus líneas e impuestos y consulta su estado junto a los cobros registrados.",
     color: "bg-success/10 text-success",
   },
   {
@@ -38,14 +38,14 @@ const features = [
   },
   {
     icon: BarChart3,
-    title: "Dashboard Inteligente",
-    description: "Visualiza el estado de tu negocio: ingresos, gastos, facturas pendientes y tendencias.",
+    title: "TPV y Shopify",
+    description: "Registra ventas y devoluciones en tienda, imprime tickets y sincroniza pedidos y existencias con Shopify.",
     color: "bg-primary/10 text-primary",
   },
   {
     icon: MessageSquare,
-    title: "Asesor IA",
-    description: "Un asistente que conoce tu negocio. Responde preguntas, detecta alertas y te ayuda a decidir.",
+    title: "Gestión de Equipos",
+    description: "Consulta fichajes, horarios y ausencias de tu equipo desde el módulo de recursos humanos.",
     color: "bg-accent/10 text-accent",
   },
 ];
@@ -59,7 +59,7 @@ const benefits = [
   {
     icon: Shield,
     title: "Datos seguros y privados",
-    description: "Cada negocio es un espacio aislado. Tus datos nunca se mezclan con otros.",
+    description: "Acceso por negocio con roles de propietario, administrador y personal para organizar los permisos.",
   },
   {
     icon: Globe,
@@ -81,11 +81,11 @@ export const Features = () => {
           className="text-center mb-16"
         >
           <h2 className="text-3xl sm:text-4xl font-display font-bold text-foreground mb-4">
-            Todo lo que tu negocio necesita
+            Herramientas para la operación diaria
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Módulos diseñados para la operación diaria de pequeñas y medianas empresas. 
-            Sin complicaciones, sin funciones decorativas.
+            Clientes y facturación para pequeñas empresas; TPV, tickets y existencias
+            para comercios; fichajes y ausencias para equipos. Activa los módulos disponibles en tu plan.
           </p>
         </motion.div>
 

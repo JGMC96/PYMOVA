@@ -1,6 +1,8 @@
 import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import shareImage from "@/assets/pymova-share.jpg.asset.json";
 
 export const Hero = () => {
   return (
@@ -24,7 +26,7 @@ export const Hero = () => {
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
             <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-400" />
           </span>
-          Potenciado por IA contextual
+          Gestión para pymes y comercios
         </motion.div>
 
         {/* Headline */}
@@ -34,9 +36,9 @@ export const Hero = () => {
           transition={{ duration: 0.6, delay: 0.1 }}
           className="max-w-4xl text-5xl md:text-7xl lg:text-8xl font-display font-extrabold tracking-tight text-white mb-8 leading-[1.05]"
         >
-          El sistema operativo para{" "}
+          Pymova:{" "}
           <span className="bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 via-teal-400 to-emerald-500 inline-block">
-            tu negocio
+            gestión para pymes
           </span>
         </motion.h1>
 
@@ -47,8 +49,9 @@ export const Hero = () => {
           transition={{ duration: 0.6, delay: 0.2 }}
           className="max-w-2xl text-lg md:text-xl text-slate-400 leading-relaxed mb-12"
         >
-          Gestiona clientes, ventas, facturación y pagos en una sola plataforma unificada.
-          Visualiza tu capital en tiempo real con inteligencia de negocio personalizada.
+          Para pequeñas empresas y comercios que necesitan gestionar clientes, facturas,
+          cobros y equipos en un solo lugar. Con TPV, inventario y sincronización con Shopify
+          para conectar la tienda física con las ventas online.
         </motion.p>
 
         {/* CTAs */}
@@ -58,48 +61,22 @@ export const Hero = () => {
           transition={{ duration: 0.6, delay: 0.3 }}
           className="flex flex-col sm:flex-row items-center gap-4"
         >
-          <Link to="/auth?tab=register">
-            <button className="group relative px-8 py-4 bg-cyan-700 rounded-xl text-white font-bold text-base overflow-hidden transition-all hover:bg-cyan-600 hover:shadow-[0_0_40px_rgba(8,145,178,0.4)]">
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
-              <span className="relative flex items-center gap-2">
-                Comenzar gratis
-                <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" strokeWidth={2.5} />
-              </span>
-            </button>
-          </Link>
-
-          <button className="px-8 py-4 bg-slate-900/50 border border-slate-800 rounded-xl text-slate-300 font-bold text-base hover:bg-slate-800 hover:text-white transition-all backdrop-blur-sm">
-            Ver demostración
-          </button>
+          <Button asChild variant="accent" size="lg">
+            <Link to="/auth?tab=register">Crear cuenta <ArrowRight /></Link>
+          </Button>
+          <Button asChild variant="heroOutline" size="lg">
+            <a href="#features">Explorar módulos</a>
+          </Button>
         </motion.div>
 
-        {/* Decorative Dashboard Preview */}
+        {/* Imagen de marca compartida con las vistas previas de enlaces */}
         <motion.div
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.4 }}
-          className="mt-24 w-full max-w-5xl aspect-video rounded-2xl border border-slate-800 bg-slate-900/40 p-4 relative"
+          className="mt-16 w-full max-w-3xl"
         >
-          <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-[#020617] to-transparent pointer-events-none rounded-2xl" />
-          <div className="w-full h-full rounded-lg border border-slate-800/50 bg-[#0a0f1e] overflow-hidden flex flex-col">
-            <div className="h-8 border-b border-slate-800 flex items-center px-4 gap-2">
-              <div className="w-2 h-2 rounded-full bg-slate-700" />
-              <div className="w-2 h-2 rounded-full bg-slate-700" />
-              <div className="w-2 h-2 rounded-full bg-slate-700" />
-            </div>
-            <div className="flex-1 p-6 flex gap-6">
-              <div className="w-1/3 space-y-4">
-                <div className="h-12 bg-slate-800/40 rounded-lg" />
-                <div className="h-32 bg-slate-800/20 rounded-lg" />
-                <div className="h-8 bg-slate-800/30 rounded-lg w-2/3" />
-              </div>
-              <div className="flex-1">
-                <div className="h-full bg-slate-800/30 rounded-lg relative overflow-hidden">
-                  <div className="absolute bottom-0 left-0 right-0 h-1/2 bg-gradient-to-t from-cyan-500/20 to-transparent" />
-                </div>
-              </div>
-            </div>
-          </div>
+          <img src={`https://pymova.com${shareImage.url}`} alt="Pymova: gestión para pymes y comercios, TPV e inventario, facturación y cobros, RRHH y Shopify" width={1200} height={630} loading="lazy" className="w-full h-auto rounded-lg" />
         </motion.div>
       </main>
     </section>
