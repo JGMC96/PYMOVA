@@ -55,18 +55,21 @@ Cada hallazgo indica dónde está, qué impacto tiene y cómo corregirlo. Las ru
 - **Qué pasa:** la RPC solo usa `business_id` en un `LEFT JOIN` para leer el coste (`dz/0004:60`). Las líneas se insertan con el `variant_id` o el `product_id` que mande el cliente. Después, el trigger (`SECURITY DEFINER`, que se salta la RLS) descuenta stock de esa variante sea del negocio que sea. Lo mismo pasa con `_client_id` y `_register_session_id`, que tampoco se validan.
 - **Impacto:** un miembro de un negocio puede alterar el stock de otro negocio si conoce los UUID de sus variantes. También puede asociar ventas a cajas de otro negocio.
 - **Corrección:** en la RPC, rechazar la venta si alguna línea no pertenece a `_business_id`. En el trigger, filtrar con `AND business_id = (select business_id from sales where id = NEW.sale_id)`. Tests de los dos casos.
+- **Estado (19/10/2026):** corregido en `dz/0017`. La RPC valida cliente, caja, productos y variantes del negocio; el trigger comprueba el negocio de la venta. Tests en `src/test/rls/tpv-ventas.test.ts`.
 
 **A2 · Los tickets se pueden editar después de la venta.** `sm/20260609091726:27`, política «Members can manage sale items» (`FOR ALL`).
 
 - **Qué pasa:** cualquier miembro, staff incluido, puede hacer UPDATE y DELETE en `sale_items` de ventas ya cerradas, e INSERT de líneas nuevas que disparan el descuento de stock y la cola de Shopify. `sales` no tiene política de UPDATE, pero sus líneas sí se pueden cambiar.
 - **Impacto:** se puede manipular un ticket a posteriori (importe, cantidades), con descuadres de caja y de stock. Choca con la inalterabilidad de los registros de facturación (Veri*factu).
 - **Corrección:** dejar solo `SELECT` para miembros. Las líneas solo se crean dentro de `create_sale_with_items`. Las correcciones se hacen con devoluciones.
+- **Estado (19/10/2026):** corregido en `dz/0017`. `sales` y `sale_items` sin escritura directa; solo el super admin borra ventas, y queda en Actividad (decisión del usuario).
 
 **A3 · Las devoluciones se pueden crear sin la RPC, con importe libre, y se reembolsan en Shopify.** `sm/20260730103608:154` («Members create returns») y `:169` (líneas), junto con `supabase/functions/shopify-pos-refund/index.ts:110-117`.
 
 - **Qué pasa:** cualquier miembro puede insertar en `sale_returns` un `total` arbitrario sin pasar por `create_sale_return`, que es la que limita las cantidades. `shopify-pos-refund` envía después ese `total` como transacción REFUND al pedido de Shopify.
 - **Impacto:** reembolsos mayores de lo vendido, o sin líneas, que se ejecutan en Shopify. También descuadran el arqueo.
 - **Corrección:** quitar el INSERT directo en `sale_returns` y `sale_return_items`, de modo que solo se pueda devolver con la RPC. En `shopify-pos-refund`, recalcular el importe a partir de las líneas y limitarlo al total de la venta.
+- **Estado (19/10/2026):** corregido en `dz/0017` y en `shopify-pos-refund` (`refundAmountForReturn`): el importe sale de las líneas, se topa a lo pendiente de la venta y una devolución que no cuadra se marca `failed` sin reembolsar.
 
 **A4 · Los fichajes se pueden falsear.** `sm/20260609090816:100` («Users can insert their own time entries») y `clock_action` en `:304-405`.
 
@@ -128,6 +131,7 @@ Cada hallazgo indica dónde está, qué impacto tiene y cómo corregirlo. Las ru
 - **Qué pasa:** `subtotal`, `tax`, `total`, `unit_price` y el `total` de cada línea vienen del navegador, y no se comprueba que la suma de las líneas coincida con el total.
 - **Impacto:** un error del frontend o una llamada manipulada guarda tickets incoherentes, y el arqueo los da por buenos.
 - **Corrección:** recalcular los totales en la RPC (con el precio de catálogo o validando el descuento) y rechazar descuadres de más de 0,01 €.
+- **Estado (19/10/2026):** corregido en `dz/0017`. Precio del catálogo, descuento por línea deducido del neto, IVA al tipo del negocio y tolerancia de 0,02 €. Decisión del usuario: el precio manual no existe; si se quiere, irá con permiso de admin y auditoría.
 
 **M2 · El arqueo de caja ignora las devoluciones en efectivo y permite dos cajas abiertas.** `close_register_session` (`sm/20260729155359:161`) y `open_register_session` (`:134`).
 

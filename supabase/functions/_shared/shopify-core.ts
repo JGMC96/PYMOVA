@@ -673,3 +673,23 @@ export function orderGidFromPayload(payload: Record<string, unknown>): string | 
 export function retryDelaySeconds(attempts: number): number {
   return Math.min(3600, 30 * Math.pow(3, Math.max(0, attempts - 1)));
 }
+
+// ---------------------------------------------------------------------------
+// Reembolsos de devoluciones del TPV
+// ---------------------------------------------------------------------------
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * Importe a reembolsar en Shopify por una devolución: la suma de sus líneas,
+ * nunca por encima de lo que queda por reembolsar de la venta.
+ */
+export function refundAmountForReturn(
+  items: { quantity: number; unit_price: number }[],
+  saleTotal: number,
+  alreadyRefunded: number,
+): number {
+  const lines = round2(items.reduce((sum, i) => sum + Number(i.quantity) * Number(i.unit_price), 0));
+  const pending = Math.max(0, round2(Number(saleTotal) - Number(alreadyRefunded)));
+  return Math.max(0, Math.min(lines, pending));
+}
