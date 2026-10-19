@@ -57,7 +57,7 @@ export function useBusinessSettings(): UseBusinessSettingsReturn {
         console.error('Error fetching business settings:', error);
       }
 
-      setSettings(data);
+      setSettings(data as BusinessSettings | null);
     } catch (err) {
       console.error('Error fetching business settings:', err);
     } finally {
