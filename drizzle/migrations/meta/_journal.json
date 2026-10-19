@@ -99,6 +99,13 @@
       "when": 1792412556560,
       "tag": "0013_ticket_layout_options",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1792415275601,
+      "tag": "0014_fix_rls_alta_negocio",
+      "breakpoints": true
     }
   ]
 }
