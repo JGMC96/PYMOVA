@@ -12,6 +12,7 @@ import { useTicketConfig } from '@/hooks/useTicketConfig';
 import { useRoleAccess } from '@/hooks/useRoleAccess';
 import { printTicket, type TicketDoc } from '@/lib/ticket';
 import { TicketPreview } from './TicketPreview';
+import { TicketLogoUpload } from './TicketLogoUpload';
 
 type Form = {
   ticket_address: string; ticket_phone: string; ticket_website: string;
@@ -139,6 +140,11 @@ export function TicketSettingsPanel() {
                   <Textarea id="ret" rows={2} value={form.ticket_return_policy} onChange={set('ticket_return_policy')} placeholder="Cambios en 30 días con este ticket y el producto sin usar." /></div>
                 <div className="space-y-1.5"><Label htmlFor="ftr">Pie del ticket</Label>
                   <Input id="ftr" value={form.ticket_footer} onChange={set('ticket_footer')} placeholder="¡Gracias por su compra!" /></div>
+                <div className="space-y-2">
+                  <Label>Logo del ticket</Label>
+                  <TicketLogoUpload disabled={!isAdmin} />
+                  <p className="text-xs text-muted-foreground">Mejor un logo negro sobre fondo blanco o transparente.</p>
+                </div>
                 <div className="flex items-center justify-between">
                   <Label htmlFor="logo">Mostrar logo del negocio</Label>
                   <Switch id="logo" checked={form.ticket_show_logo} onCheckedChange={(v) => setForm((f) => ({ ...f, ticket_show_logo: v }))} />
