@@ -2655,6 +2655,10 @@ export type Database = {
         Args: { _counted_amount: number; _notes?: string; _session_id: string }
         Returns: undefined
       }
+      create_business: {
+        Args: { _industry?: string; _name: string }
+        Returns: string
+      }
       create_invoice_with_items: {
         Args: {
           _business_id: string
