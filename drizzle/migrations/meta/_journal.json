@@ -85,6 +85,13 @@
       "when": 1792054105076,
       "tag": "0011_ticket_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1792411534402,
+      "tag": "0012_business_logos_policies",
+      "breakpoints": true
     }
   ]
 }
