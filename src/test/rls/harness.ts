@@ -53,7 +53,10 @@ export async function createTestDb(options: { skip?: (file: string) => boolean }
   await sql.unsafe(readFileSync(join(__dirname, 'shim_supabase.sql'), 'utf8'));
   for (const file of migrationFiles()) {
     if (options.skip?.(file)) continue;
-    const text = readFileSync(file, 'utf8').replace(SUPABASE_ONLY_EXTENSION, '-- (extensión de Supabase omitida en tests)');
+    // Fines de línea LF, como en producción (en Windows git puede dejar CRLF).
+    const text = readFileSync(file, 'utf8')
+      .replace(/\r\n/g, '\n')
+      .replace(SUPABASE_ONLY_EXTENSION, '-- (extensión de Supabase omitida en tests)');
     try {
       await sql.unsafe(text);
     } catch (error) {
