@@ -143,13 +143,15 @@ describe.skipIf(!RLS_DB_URL)('RLS · alta de negocios', () => {
     expect(desactivados.count).toBe(0);
   });
 
-  it('el super admin sí puede cambiar el plan', async () => {
+  it('el super admin sí puede cambiar el plan (con la RPC y un motivo)', async () => {
     const superAdmin = await createUser(sql, 'super@ejemplo.test');
     await sql`INSERT INTO platform_roles (user_id, role) VALUES (${superAdmin}, 'super_admin')`;
-    const actualizadas = await asUser(sql, superAdmin, (tx) => tx`
-      UPDATE subscriptions SET plan_id = (SELECT id FROM plans WHERE key = 'pro')
-      WHERE business_id = ${negocioVictima}`);
-    expect(actualizadas.count).toBe(1);
+    const [sub] = await asUser(sql, superAdmin, (tx) => tx`
+      SELECT * FROM public.admin_update_subscription(${negocioVictima}, 'Prueba de alta', 'pro')`);
+    expect(sub.business_id).toBe(negocioVictima);
+    const [plan] = await sql`
+      SELECT p.key FROM subscriptions s JOIN plans p ON p.id = s.plan_id WHERE s.business_id = ${negocioVictima}`;
+    expect(plan.key).toBe('pro');
     await sql`UPDATE subscriptions SET plan_id = (SELECT id FROM plans WHERE key = 'trial') WHERE business_id = ${negocioVictima}`;
   });
 

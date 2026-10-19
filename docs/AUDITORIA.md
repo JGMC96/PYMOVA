@@ -79,6 +79,10 @@ Cada hallazgo indica dónde está, qué impacto tiene y cómo corregirlo. Las ru
 - **Qué pasa:** el owner puede hacer `update subscriptions set plan_id = <plan superior>`. El trigger `sync_business_modules_from_plan` (`sm/20260729163758`) le activa entonces los módulos de ese plan. También puede activar módulos directamente en `business_modules`.
 - **Impacto:** se salta el cobro del plan.
 - **Corrección:** `subscriptions` y `business_modules` deben ser de solo lectura para los miembros. Los cambios de plan pasan por una RPC o edge function que valide el pago, o solo por el super admin.
+- **Estado (19/10/2026):**
+  - `dz/0014`: los miembros ya no escriben en `subscriptions` ni en `business_modules`.
+  - `dz/0016`: el super admin tampoco edita `subscriptions` directamente. Usa `admin_update_subscription`, que valida y exige un motivo. Las tablas `subscriptions`, `business_modules` y `platform_roles` quedan auditadas, y `audit_logs` guarda `actor_is_super_admin` y `reason`. La pantalla `/admin/activity` muestra la actividad de super admin con `get_platform_audit_log`.
+  - Pendiente: validar el pago antes del cambio de plan (cuando haya pasarela), y una RPC para los roles de plataforma que impida retirar al último super admin.
 
 **A6 · Hay dos fuentes de migraciones y `drizzle/schema.ts` está vacío.** `drizzle/schema.ts:1`, `drizzle.config.ts`, `drizzle/migrations/0000-0013` y `supabase/migrations/`.
 

@@ -24,6 +24,7 @@ import AdminOverview from "./pages/admin/AdminOverview";
 import AdminBusinesses from "./pages/admin/AdminBusinesses";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminSubscriptions from "./pages/admin/AdminSubscriptions";
+import AdminActivity from "./pages/admin/AdminActivity";
 
 const queryClient = new QueryClient();
 
@@ -77,6 +78,7 @@ const App = () => (
               <Route path="businesses" element={<AdminBusinesses />} />
               <Route path="users" element={<AdminUsers />} />
               <Route path="subscriptions" element={<AdminSubscriptions />} />
+              <Route path="activity" element={<AdminActivity />} />
             </Route>
 
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
