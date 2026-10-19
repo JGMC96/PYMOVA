@@ -207,6 +207,9 @@ export type Database = {
           id: string
           invoice_prefix: string | null
           next_invoice_number: number
+          next_online_order_number: number
+          next_return_number: number
+          next_sale_number: number
           tax_rate: number | null
           ticket_address: string | null
           ticket_bold_items: boolean
@@ -229,6 +232,9 @@ export type Database = {
           id?: string
           invoice_prefix?: string | null
           next_invoice_number?: number
+          next_online_order_number?: number
+          next_return_number?: number
+          next_sale_number?: number
           tax_rate?: number | null
           ticket_address?: string | null
           ticket_bold_items?: boolean
@@ -251,6 +257,9 @@ export type Database = {
           id?: string
           invoice_prefix?: string | null
           next_invoice_number?: number
+          next_online_order_number?: number
+          next_return_number?: number
+          next_sale_number?: number
           tax_rate?: number | null
           ticket_address?: string | null
           ticket_bold_items?: boolean
@@ -2975,6 +2984,10 @@ export type Database = {
           payload: Json
           source_queue: string
         }
+        Returns: number
+      }
+      next_document_number: {
+        Args: { _business_id: string; _kind: string }
         Returns: number
       }
       open_register_session: {
