@@ -120,6 +120,13 @@
       "when": 1792417917485,
       "tag": "0016_admin_auditoria_y_planes",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1792419319923,
+      "tag": "0017_tpv_ventas_solo_rpc",
+      "breakpoints": true
     }
   ]
 }
