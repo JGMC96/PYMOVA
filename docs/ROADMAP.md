@@ -8,7 +8,7 @@ Este plan parte de `docs/AUDITORIA.md` (19/10/2026). Cada sprint dura 2 semanas.
 - **Migraciones aditivas e idempotentes**, en la carpeta que se decida en el sprint 1.
 - **Nada se aplica a producción sin el visto bueno del usuario.**
 
-## Sprint 0 · Antes de empezar (1-2 días)
+## Sprint 0 · Antes de empezar (1-2 días) · HECHO el 19/10
 
 - Proyecto de **staging** en Supabase con el esquema de producción: un `db dump` del esquema, sin datos personales.
 - Reproducir en staging el ataque de **C1**, que va primero, y los de A1-A5. Así se confirma que el diagnóstico hecho sobre las migraciones coincide con la base de datos real.
