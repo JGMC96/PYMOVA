@@ -98,12 +98,14 @@ Cada hallazgo indica dónde está, qué impacto tiene y cómo corregirlo. Las ru
 - **Qué pasa:** dos ventas simultáneas leen el mismo `MAX` y reciben el mismo `VTA-…`. No hay índice único en `sales (business_id, sale_number)` ni en `invoices (business_id, invoice_number)`. Las facturas sí usan un contador con `FOR UPDATE` (`sm/20260126161816:203`), pero el admin puede reescribir `business_settings.next_invoice_number` porque tiene permiso de gestión de ajustes (`sm/20260126161816:192`).
 - **Impacto:** tickets con el mismo número y saltos o duplicados en la numeración de facturas. Es un incumplimiento fiscal (Veri*factu exige numeración correlativa sin huecos).
 - **Corrección:** contadores por negocio en una tabla con `FOR UPDATE` (o `INSERT … ON CONFLICT DO UPDATE … RETURNING`), índices únicos y quitar `next_invoice_number` de lo que puede escribir el cliente.
+- **Estado (19/10/2026):** corregido en `dz/0018`. Contadores `next_sale_number`, `next_return_number`, `next_online_order_number` y `next_invoice_number` en `business_settings`, sembrados con la serie existente y consumidos por `next_document_number` con bloqueo de fila; trigger que impide editarlos desde el cliente; números de documento inmutables; índices únicos en ventas, facturas y devoluciones; las facturas solo nacen con `create_invoice_with_items`. Pendiente: huecos justificados por anulación (hoy el borrado del super admin deja hueco).
 
 **A8 · Un admin puede invitar a alguien como owner.** `sm/20260729173452:32` (INSERT en `business_invitations`) y `accept_business_invitation` (`sm/20260729184300:1`).
 
 - **Qué pasa:** la política no limita el `role` de la invitación, y la RPC inserta o actualiza el miembro con `_inv.role`. Un admin puede invitar a otra cuenta suya como `owner`, saltándose la regla de la `dz/0006`, según la cual solo un owner da el rol owner.
 - **Impacto:** escalada de privilegios de admin a owner.
 - **Corrección:** en la política de INSERT y UPDATE, exigir `role <> 'owner' OR has_business_role(business_id, 'owner')`. Repetir la comprobación en la RPC.
+- **Estado (19/10/2026):** corregido en `dz/0018`. Política de INSERT, trigger en UPDATE (un admin puede revocar, pero no subir a owner) y comprobación en `accept_business_invitation` del rol de quien invitó. Tests en `src/test/rls/numeracion-e-invitaciones.test.ts`.
 
 **A9 · La integración con Shopify admite una sola tienda por despliegue: el primero que la reclama se la queda.** `supabase/functions/_shared/shopify-client.ts:34-41` (`SHOPIFY_STORE_DOMAIN`), `shopify-sync/index.ts:130` y `claim_shopify_shop` (`sm/20260731184426:38`).
 
@@ -147,6 +149,7 @@ Cada hallazgo indica dónde está, qué impacto tiene y cómo corregirlo. Las ru
 
 - **Qué pasa:** `generate_online_order_number` (`sm/20260730170011:130`) es `SECURITY DEFINER` sin ninguna comprobación, y tiene `GRANT … TO authenticated` sin `REVOKE … FROM PUBLIC`. Cualquiera puede consumir números de pedido de otro negocio. `create_online_order`, `set_online_order_status` y `create_online_order_return` tampoco revocan el permiso a `PUBLIC`, aunque dentro sí comprueban `auth.uid()`.
 - **Corrección:** comprobar la pertenencia al negocio en `generate_online_order_number`, y hacer `REVOKE … FROM PUBLIC, anon` en todas.
+- **Estado (19/10/2026):** `generate_online_order_number` corregida en `dz/0018` (pertenencia al negocio y REVOKE). Las otras tres siguen pendientes.
 
 **M5 · La importación de pedidos de Shopify está repetida en tres sitios.** `_shared/shopify-webhooks.ts:62-85`, `shopify-orders/index.ts:190-212` y `shopify-sync/index.ts:548-570`.
 
