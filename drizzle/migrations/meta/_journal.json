@@ -127,6 +127,13 @@
       "when": 1792419319923,
       "tag": "0017_tpv_ventas_solo_rpc",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1792420689094,
+      "tag": "0018_invitaciones_owner_y_numeracion",
+      "breakpoints": true
     }
   ]
 }
