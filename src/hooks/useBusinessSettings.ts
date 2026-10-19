@@ -14,6 +14,12 @@ export interface UpdateSettingsData {
   ticket_footer?: string | null;
   ticket_return_policy?: string | null;
   ticket_show_logo?: boolean;
+  ticket_trade_name?: string | null;
+  ticket_legal_name?: string | null;
+  ticket_tax_id?: string | null;
+  ticket_font_size?: 'small' | 'normal' | 'large' | 'xlarge';
+  ticket_line_spacing?: 'compact' | 'normal' | 'relaxed';
+  ticket_bold_items?: boolean;
 }
 
 interface UseBusinessSettingsReturn {
@@ -51,7 +57,7 @@ export function useBusinessSettings(): UseBusinessSettingsReturn {
         console.error('Error fetching business settings:', error);
       }
 
-      setSettings(data);
+      setSettings(data as BusinessSettings | null);
     } catch (err) {
       console.error('Error fetching business settings:', err);
     } finally {
