@@ -177,6 +177,14 @@ Cada hallazgo indica dónde está, qué impacto tiene y cómo corregirlo. Las ru
 - **B5 · `README.md` es la plantilla de Lovable,** con `REPLACE_WITH_PROJECT_ID`.
 - **B6 · CORS `*` en las edge functions.** Es aceptable porque exigen JWT, pero conviene limitarlo al dominio de la app.
 
+## Avisos del escáner de Lovable (19/10/2026)
+
+Tres avisos recibidos del escáner de la plataforma y comprobados en el código:
+
+- **E1 · Inyección de fórmulas en el CSV de permisos (CWE-1236).** `src/components/hr/MonthlyPermissionsSummary.tsx:84`. El nombre del empleado se concatenaba sin neutralizar `=`, `+`, `-`, `@`, tabulador ni retorno de carro. **Corregido:** `csvCell` en `src/lib/csv.ts` (prefijo `'` y comillas escapadas), con tests.
+- **E2 · Correos y un token en los logs de las edge functions.** `handle-email-unsubscribe/index.ts:106` (token de baja en claro) y `send-transactional-email/index.ts` (correo completo en 7 logs). **Corregido:** `redactEmail` y `redactToken` en `_shared/privacy.ts`, con tests.
+- **E3 · Módulos comprobados solo en el cliente.** La RLS de `products` y del resto de tablas de módulos no mira si el negocio tiene el módulo activo; solo lo hace `RequireModule` en la interfaz. **Pendiente:** afecta a todas las tablas de módulos de pago y se decide con el usuario (cambio de RLS en todas ellas, o aceptar que un miembro pueda leer por API datos de un módulo no contratado).
+
 ## Seguridad multi-tenant: lo que está bien
 
 - **Las 47 tablas** de `supabase/migrations/` y `shopify_inventory_pushes` tienen la RLS activa, y todas tienen políticas por `business_id` o rol (inventario completo hecho con las migraciones). `user_roles` se borró (`sm/20260126161816:7`).

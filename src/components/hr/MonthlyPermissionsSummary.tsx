@@ -8,6 +8,13 @@ import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { useHrEmployees } from '@/hooks/useHrEmployees';
+import { csvCell } from '@/lib/csv';
+
+interface PermissionRow {
+  employee_id: string;
+  permission_type: string;
+  hours_count: number | null;
+}
 
 interface Row {
   employee_id: string;
@@ -30,7 +37,7 @@ export function MonthlyPermissionsSummary() {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
-  const [data, setData] = useState<any[]>([]);
+  const [data, setData] = useState<PermissionRow[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -39,15 +46,15 @@ export function MonthlyPermissionsSummary() {
     const endDate = new Date(year, month, 0);
     const end = `${year}-${String(month).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`;
     setIsLoading(true);
-    (supabase
-      .from('hr_permissions' as any)
+    supabase
+      .from('hr_permissions')
       .select('employee_id, permission_type, hours_count')
       .eq('business_id', activeBusinessId)
       .eq('status', 'approved')
       .gte('permission_date', start)
-      .lte('permission_date', end) as any)
-      .then(({ data, error }: any) => {
-        if (!error) setData(data || []);
+      .lte('permission_date', end)
+      .then(({ data, error }) => {
+        if (!error) setData(data ?? []);
         setIsLoading(false);
       });
   }, [activeBusinessId, year, month]);
@@ -70,9 +77,11 @@ export function MonthlyPermissionsSummary() {
 
   const exportCsv = () => {
     const header = 'Empleado,Solicitudes,Llegadas tarde (h),Salidas anticipadas (h),Asuntos personales (h),Otros (h),Total (h)\n';
+    // El nombre lo escribe el propio empleado: csvCell evita que una celda
+    // que empiece por =, + o @ se ejecute como fórmula al abrir el archivo.
     const lines = rows.map((r) =>
       [
-        `"${r.employee_name}"`,
+        csvCell(r.employee_name),
         r.count,
         (r.by_type.late_arrival || 0).toFixed(2),
         (r.by_type.early_departure || 0).toFixed(2),
