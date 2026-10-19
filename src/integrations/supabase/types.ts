@@ -17,6 +17,7 @@ export type Database = {
       audit_logs: {
         Row: {
           action: string
+          actor_is_super_admin: boolean | null
           actor_user_id: string | null
           business_id: string | null
           created_at: string
@@ -24,12 +25,14 @@ export type Database = {
           ip_address: string | null
           new_data: Json | null
           old_data: Json | null
+          reason: string | null
           record_id: string | null
           table_name: string
           user_id: string | null
         }
         Insert: {
           action: string
+          actor_is_super_admin?: boolean | null
           actor_user_id?: string | null
           business_id?: string | null
           created_at?: string
@@ -37,12 +40,14 @@ export type Database = {
           ip_address?: string | null
           new_data?: Json | null
           old_data?: Json | null
+          reason?: string | null
           record_id?: string | null
           table_name: string
           user_id?: string | null
         }
         Update: {
           action?: string
+          actor_is_super_admin?: boolean | null
           actor_user_id?: string | null
           business_id?: string | null
           created_at?: string
@@ -50,6 +55,7 @@ export type Database = {
           ip_address?: string | null
           new_data?: Json | null
           old_data?: Json | null
+          reason?: string | null
           record_id?: string | null
           table_name?: string
           user_id?: string | null
@@ -2602,6 +2608,33 @@ export type Database = {
     }
     Functions: {
       accept_business_invitation: { Args: { _token: string }; Returns: string }
+      admin_update_subscription: {
+        Args: {
+          _business_id: string
+          _current_period_end?: string
+          _plan_key?: string
+          _reason: string
+          _status?: Database["public"]["Enums"]["subscription_status"]
+          _trial_ends_at?: string
+        }
+        Returns: {
+          business_id: string
+          created_at: string
+          current_period_end: string | null
+          current_period_start: string | null
+          id: string
+          plan_id: string
+          status: Database["public"]["Enums"]["subscription_status"]
+          trial_ends_at: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "subscriptions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       apply_online_order_stock: {
         Args: { _direction: number; _order_id: string }
         Returns: undefined
@@ -2840,6 +2873,23 @@ export type Database = {
           vacation_days_pending: number
           vacation_days_total: number
           vacation_days_used: number
+        }[]
+      }
+      get_platform_audit_log: {
+        Args: { _business_id?: string; _limit?: number; _offset?: number }
+        Returns: {
+          action: string
+          actor_email: string
+          actor_user_id: string
+          business_id: string
+          business_name: string
+          created_at: string
+          id: string
+          new_data: Json
+          old_data: Json
+          reason: string
+          record_id: string
+          table_name: string
         }[]
       }
       get_recent_activity: {
