@@ -134,6 +134,13 @@
       "when": 1792420689094,
       "tag": "0018_invitaciones_owner_y_numeracion",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1792429622278,
+      "tag": "0019_iva_incluido",
+      "breakpoints": true
     }
   ]
 }
