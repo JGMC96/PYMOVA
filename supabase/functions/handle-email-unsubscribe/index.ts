@@ -1,13 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
-
-// Never log cleartext addresses: keep only the first character and the domain.
-function redactEmail(email: string | null | undefined): string {
-  if (!email) return 'unknown'
-  const [local, domain] = email.split('@')
-  if (!domain) return '***'
-  return `${local.slice(0, 1)}***@${domain}`
-}
+import { redactEmail, redactToken } from '../_shared/privacy.ts'
 
 function jsonResponse(data: Record<string, unknown>, status = 200): Response {
   return new Response(JSON.stringify(data), {
@@ -103,7 +96,7 @@ Deno.serve(async (req) => {
     .maybeSingle()
 
   if (updateError) {
-    console.error('Failed to mark token as used', { error: updateError, token })
+    console.error('Failed to mark token as used', { error: updateError, token: redactToken(token) })
     return jsonResponse({ error: 'Failed to process unsubscribe' }, 500)
   }
 
