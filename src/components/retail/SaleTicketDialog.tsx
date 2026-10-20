@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useRef } from 'react';
-import { Printer, Check, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Printer, Check, X, Mail } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import type { CartItem } from '@/hooks/useRetailSales';
 import { useTicketConfig } from '@/hooks/useTicketConfig';
 import { printTicket, type TicketDoc } from '@/lib/ticket';
 import { TicketPreview } from './TicketPreview';
+import { SendReceiptDialog } from './SendReceiptDialog';
 
 export interface TicketData {
   saleNumber: string;
@@ -24,6 +25,11 @@ export interface TicketData {
   notes?: string | null;
   /** Dependiente que atendió, para «Atendido por». */
   cashier?: string | null;
+  /** Venta registrada (para enviar el ticket por correo). */
+  saleId?: string;
+  clientName?: string | null;
+  /** El cliente tiene correo y aceptó el ticket por correo. */
+  clientCanEmail?: boolean;
 }
 
 interface SaleTicketDialogProps {
@@ -46,6 +52,7 @@ export function toTicketDoc(t: TicketData): TicketDoc {
     change: t.change,
     notes: t.notes,
     cashier: t.cashier ?? null,
+    clientName: t.clientName ?? null,
     lines: t.items.map((i) => {
       const key = i.variant_id ?? i.product_id;
       const orig = t.originalTotals?.[key] ?? i.total;
@@ -64,6 +71,7 @@ export function SaleTicketDialog({ open, onOpenChange, ticket }: SaleTicketDialo
   const { business, prefs } = useTicketConfig();
   const doc = useMemo(() => (ticket ? toTicketDoc(ticket) : null), [ticket]);
   const printedFor = useRef<string | null>(null);
+  const [sendFor, setSendFor] = useState<{ id: string; number: string } | null>(null);
 
   useEffect(() => {
     if (open && doc && prefs.autoPrint && printedFor.current !== doc.number) {
@@ -73,6 +81,7 @@ export function SaleTicketDialog({ open, onOpenChange, ticket }: SaleTicketDialo
   }, [open, doc, prefs, business]);
 
   if (!doc) return null;
+  const sendSale = ticket?.saleId ? { id: ticket.saleId, number: doc.number } : null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -93,12 +102,23 @@ export function SaleTicketDialog({ open, onOpenChange, ticket }: SaleTicketDialo
             <X className="w-4 h-4 mr-2" />
             Cerrar
           </Button>
-          <Button onClick={() => printTicket(business, doc, prefs)} autoFocus>
+          {sendSale && (
+            <Button variant={ticket?.clientCanEmail ? 'default' : 'outline'} onClick={() => setSendFor(sendSale)}>
+              <Mail className="w-4 h-4 mr-2" />
+              Enviar por correo
+            </Button>
+          )}
+          <Button
+            variant={ticket?.clientCanEmail ? 'outline' : 'default'}
+            onClick={() => printTicket(business, doc, prefs)}
+            autoFocus={!ticket?.clientCanEmail}
+          >
             <Printer className="w-4 h-4 mr-2" />
             Imprimir ticket
           </Button>
         </DialogFooter>
       </DialogContent>
+      <SendReceiptDialog sale={sendFor} onClose={() => setSendFor(null)} />
     </Dialog>
   );
 }

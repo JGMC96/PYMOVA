@@ -4,6 +4,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2'
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
 import { TEMPLATES } from '../_shared/transactional-email-templates/registry.ts'
 import { redactEmail } from '../_shared/privacy.ts'
+import { buildSaleReceipt, SALE_RECEIPT_DAILY_LIMIT } from '../_shared/sale-receipt.ts'
 
 // Configuration baked in at scaffold time — do NOT change these manually.
 // To update, re-run the email domain setup flow.
@@ -49,6 +50,108 @@ function jsonError(message: string, status: number): Response {
     status,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   })
+}
+
+interface ResolvedSend {
+  templateName: string
+  recipientEmail: string
+  idempotencyKey: string
+  templateData: Record<string, any>
+  logMetadata: Record<string, any>
+}
+
+// Ticket de una venta del TPV. Lo pide cualquier miembro activo del negocio, pero el
+// destinatario es el correo del cliente de la venta y solo si aceptó recibirlo; el
+// contenido sale de la base de datos. Como mucho SALE_RECEIPT_DAILY_LIMIT envíos al día.
+async function resolveSaleReceipt(
+  supabase: any,
+  callerId: string,
+  body: Record<string, any>,
+  messageId: string,
+): Promise<ResolvedSend | Response> {
+  const saleId = body.saleId || body.sale_id
+  if (typeof saleId !== 'string' || !saleId) return jsonError('saleId is required', 400)
+
+  const { data: sale } = await supabase
+    .from('sales')
+    .select('id, business_id, client_id, sale_number, created_at, payment_method, subtotal, tax, total, tip, cash_received, change_given, seller_employee_id')
+    .eq('id', saleId)
+    .maybeSingle()
+  if (!sale) return jsonError('Venta no encontrada', 404)
+
+  const { data: membership } = await supabase
+    .from('business_members')
+    .select('is_active')
+    .eq('business_id', sale.business_id)
+    .eq('user_id', callerId)
+    .maybeSingle()
+  if (!membership?.is_active) return jsonError('Not allowed', 403)
+
+  if (!sale.client_id) return jsonError('La venta no tiene cliente', 409)
+  const { data: client } = await supabase
+    .from('clients')
+    .select('name, email, receipt_email_consent, is_active')
+    .eq('id', sale.client_id)
+    .maybeSingle()
+  if (!client?.email) return jsonError('El cliente no tiene correo', 409)
+  if (!client.receipt_email_consent) {
+    return jsonError('El cliente no ha aceptado recibir el ticket por correo', 409)
+  }
+
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  const { count, error: countError } = await supabase
+    .from('email_send_log')
+    .select('id', { count: 'exact', head: true })
+    .eq('template_name', 'sale-receipt')
+    .eq('status', 'pending')
+    .eq('metadata->>sale_id', sale.id)
+    .gte('created_at', since)
+  if (countError) return jsonError('No se pudo comprobar los envíos anteriores', 500)
+  if ((count ?? 0) >= SALE_RECEIPT_DAILY_LIMIT) {
+    return jsonError('Este ticket ya se ha enviado varias veces hoy', 429)
+  }
+
+  const [{ data: items }, { data: business }, { data: settings }] = await Promise.all([
+    supabase
+      .from('sale_items')
+      .select('product_name, quantity, unit_price, total')
+      .eq('sale_id', sale.id)
+      .order('id'),
+    supabase
+      .from('businesses')
+      .select('name, trade_name, legal_name, tax_id, currency, timezone')
+      .eq('id', sale.business_id)
+      .maybeSingle(),
+    supabase
+      .from('business_settings')
+      .select('tax_rate, ticket_trade_name, ticket_legal_name, ticket_tax_id, ticket_address, ticket_phone, ticket_website, ticket_footer, ticket_return_policy')
+      .eq('business_id', sale.business_id)
+      .maybeSingle(),
+  ])
+  if (!business) return jsonError('Negocio no encontrado', 404)
+
+  let cashier: string | null = null
+  if (sale.seller_employee_id) {
+    const { data: name } = await supabase.rpc('employee_display_name', {
+      _employee_id: sale.seller_employee_id,
+    })
+    cashier = typeof name === 'string' && name !== 'Sin nombre' ? name : null
+  }
+
+  return {
+    templateName: 'sale-receipt',
+    recipientEmail: client.email,
+    idempotencyKey: `sale-receipt-${sale.id}-${messageId}`,
+    templateData: buildSaleReceipt({
+      sale,
+      items: items ?? [],
+      business,
+      settings: settings ?? null,
+      clientName: client.name ?? null,
+      cashier,
+    }),
+    logMetadata: { sale_id: sale.id, business_id: sale.business_id },
+  }
 }
 
 Deno.serve(async (req) => {
@@ -98,6 +201,7 @@ Deno.serve(async (req) => {
   let recipientEmail: string | undefined
   let templateData: Record<string, any> = {}
   let idempotencyKey: string
+  let logMetadata: Record<string, any> | null = null
 
   if (isServiceRole) {
     templateName = body.templateName || body.template_name
@@ -112,60 +216,65 @@ Deno.serve(async (req) => {
     if (userError || !caller) return jsonError('Unauthorized', 401)
 
     const requested = body.templateName || body.template_name
-    if (requested !== 'team-invitation') {
+    if (requested === 'sale-receipt') {
+      const resolved = await resolveSaleReceipt(supabase, caller.id, body, messageId)
+      if (resolved instanceof Response) return resolved
+      ;({ templateName, recipientEmail, idempotencyKey, templateData, logMetadata } = resolved)
+    } else if (requested !== 'team-invitation') {
       return jsonError('Not allowed', 403)
-    }
+    } else {
 
-    const invitationId = body.invitationId || body.invitation_id
-    if (typeof invitationId !== 'string' || !invitationId) {
-      return jsonError('invitationId is required', 400)
-    }
+      const invitationId = body.invitationId || body.invitation_id
+      if (typeof invitationId !== 'string' || !invitationId) {
+        return jsonError('invitationId is required', 400)
+      }
 
-    const { data: invitation } = await supabase
-      .from('business_invitations')
-      .select('id, business_id, email, role, token, status, expires_at')
-      .eq('id', invitationId)
-      .maybeSingle()
+      const { data: invitation } = await supabase
+        .from('business_invitations')
+        .select('id, business_id, email, role, token, status, expires_at')
+        .eq('id', invitationId)
+        .maybeSingle()
 
-    if (!invitation || invitation.status !== 'pending') {
-      return jsonError('Invitation not found', 404)
-    }
-    if (new Date(invitation.expires_at).getTime() < Date.now()) {
-      return jsonError('Invitation expired', 410)
-    }
+      if (!invitation || invitation.status !== 'pending') {
+        return jsonError('Invitation not found', 404)
+      }
+      if (new Date(invitation.expires_at).getTime() < Date.now()) {
+        return jsonError('Invitation expired', 410)
+      }
 
-    // The caller must be an active owner/admin of the inviting business.
-    const { data: membership } = await supabase
-      .from('business_members')
-      .select('role, is_active')
-      .eq('business_id', invitation.business_id)
-      .eq('user_id', caller.id)
-      .maybeSingle()
+      // The caller must be an active owner/admin of the inviting business.
+      const { data: membership } = await supabase
+        .from('business_members')
+        .select('role, is_active')
+        .eq('business_id', invitation.business_id)
+        .eq('user_id', caller.id)
+        .maybeSingle()
 
-    if (!membership || !membership.is_active || !['owner', 'admin'].includes(membership.role)) {
-      return jsonError('Not allowed', 403)
-    }
+      if (!membership || !membership.is_active || !['owner', 'admin'].includes(membership.role)) {
+        return jsonError('Not allowed', 403)
+      }
 
-    const { data: business } = await supabase
-      .from('businesses')
-      .select('name')
-      .eq('id', invitation.business_id)
-      .maybeSingle()
+      const { data: business } = await supabase
+        .from('businesses')
+        .select('name')
+        .eq('id', invitation.business_id)
+        .maybeSingle()
 
-    const requestedOrigin = typeof body.inviteOrigin === 'string' ? body.inviteOrigin : ''
-    const origin = ALLOWED_INVITE_ORIGINS.includes(requestedOrigin)
-      ? requestedOrigin
-      : DEFAULT_INVITE_ORIGIN
+      const requestedOrigin = typeof body.inviteOrigin === 'string' ? body.inviteOrigin : ''
+      const origin = ALLOWED_INVITE_ORIGINS.includes(requestedOrigin)
+        ? requestedOrigin
+        : DEFAULT_INVITE_ORIGIN
 
-    templateName = 'team-invitation'
-    recipientEmail = invitation.email
-    idempotencyKey = `team-invitation-${invitation.id}-${messageId}`
-    templateData = {
-      businessName: business?.name ?? 'tu equipo',
-      inviteUrl: `${origin}/invite/${invitation.token}`,
-      roleLabel: ROLE_LABEL[invitation.role] ?? 'Personal',
-      inviterName:
-        (caller.user_metadata?.full_name as string | undefined) ?? undefined,
+      templateName = 'team-invitation'
+      recipientEmail = invitation.email
+      idempotencyKey = `team-invitation-${invitation.id}-${messageId}`
+      templateData = {
+        businessName: business?.name ?? 'tu equipo',
+        inviteUrl: `${origin}/invite/${invitation.token}`,
+        roleLabel: ROLE_LABEL[invitation.role] ?? 'Personal',
+        inviterName:
+          (caller.user_metadata?.full_name as string | undefined) ?? undefined,
+      }
     }
   }
 
@@ -371,6 +480,7 @@ Deno.serve(async (req) => {
     template_name: templateName,
     recipient_email: effectiveRecipient,
     status: 'pending',
+    metadata: logMetadata,
   })
 
   const { error: enqueueError } = await supabase.rpc('enqueue_email', {
