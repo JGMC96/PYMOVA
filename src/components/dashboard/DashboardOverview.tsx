@@ -15,13 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDashboardMetrics } from "@/hooks/useDashboardMetrics";
 import { useRecentActivity, formatRelativeTime, type ActivityEventType } from "@/hooks/useRecentActivity";
-
-const formatPrice = (amount: number): string => {
-  return new Intl.NumberFormat('es-MX', {
-    style: 'currency',
-    currency: 'MXN',
-  }).format(amount);
-};
+import { useMoney } from "@/hooks/useMoney";
 
 const formatChange = (value: number, isPercentage: boolean = true): string => {
   const prefix = value > 0 ? '+' : '';
@@ -45,6 +39,7 @@ const getActivityIcon = (type: ActivityEventType) => {
 };
 
 export const DashboardOverview = () => {
+  const { format: formatPrice } = useMoney();
   const navigate = useNavigate();
   const metrics = useDashboardMetrics();
   const { activities, isLoading: activitiesLoading } = useRecentActivity(10);

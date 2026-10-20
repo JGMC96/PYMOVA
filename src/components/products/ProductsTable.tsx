@@ -17,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import type { Product } from '@/types/database';
+import { useMoney } from '@/hooks/useMoney';
 
 interface ProductsTableProps {
   products: Product[];
@@ -28,13 +29,6 @@ interface ProductsTableProps {
 }
 
 // Format price with currency
-const formatPrice = (price: number) => {
-  return new Intl.NumberFormat('es-MX', {
-    style: 'currency',
-    currency: 'MXN',
-  }).format(price);
-};
-
 export function ProductsTable({
   products,
   isLoading,
@@ -43,6 +37,7 @@ export function ProductsTable({
   onToggleStatus,
   onNewProduct,
 }: ProductsTableProps) {
+  const { format: formatPrice } = useMoney();
   // Loading state
   if (isLoading) {
     return (

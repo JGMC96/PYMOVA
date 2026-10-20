@@ -21,6 +21,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { InvoiceStatus } from '@/types/database';
 import type { InvoiceWithClient } from '@/hooks/useInvoices';
+import { useMoney } from '@/hooks/useMoney';
 
 interface InvoicesTableProps {
   invoices: InvoiceWithClient[];
@@ -36,14 +37,8 @@ const STATUS_CONFIG: Record<InvoiceStatus, { label: string; variant: 'default' |
   cancelled: { label: 'Cancelada', variant: 'outline' },
 };
 
-const formatPrice = (amount: number): string => {
-  return new Intl.NumberFormat('es-MX', {
-    style: 'currency',
-    currency: 'MXN',
-  }).format(amount);
-};
-
 export function InvoicesTable({ invoices, isLoading, onStatusChange }: InvoicesTableProps) {
+  const { format: formatPrice } = useMoney();
   if (isLoading) {
     return (
       <div className="space-y-3">

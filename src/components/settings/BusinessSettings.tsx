@@ -28,9 +28,9 @@ const INDUSTRIES = [
 ];
 
 const CURRENCIES = [
-  { value: 'MXN', label: 'Peso Mexicano (MXN)' },
-  { value: 'USD', label: 'Dólar Estadounidense (USD)' },
   { value: 'EUR', label: 'Euro (EUR)' },
+  { value: 'USD', label: 'Dólar Estadounidense (USD)' },
+  { value: 'MXN', label: 'Peso Mexicano (MXN)' },
 ];
 
 const TIMEZONES = [
@@ -68,8 +68,8 @@ export function BusinessSettings() {
       tax_id: '',
       trade_name: '',
       industry: '',
-      currency: 'MXN',
-      timezone: 'America/Mexico_City',
+      currency: 'EUR',
+      timezone: 'Europe/Madrid',
       logo_url: '',
     },
   });
@@ -83,8 +83,8 @@ export function BusinessSettings() {
         tax_id: activeBusiness.tax_id || '',
         trade_name: activeBusiness.trade_name || '',
         industry: activeBusiness.industry || '',
-        currency: activeBusiness.currency || 'MXN',
-        timezone: activeBusiness.timezone || 'America/Mexico_City',
+        currency: activeBusiness.currency || 'EUR',
+        timezone: activeBusiness.timezone || 'Europe/Madrid',
         logo_url: activeBusiness.logo_url || '',
       });
     }
