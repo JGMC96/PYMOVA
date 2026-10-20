@@ -517,6 +517,19 @@ export function totalAvailable(rows: InventoryLevelRow[]): number {
 }
 
 /**
+ * Disponible en la ubicación de la tienda (la que usa Pymova como stock). Sin ubicación
+ * por defecto, la suma de todas. Null si Shopify no da niveles para la variante.
+ */
+export function availableAtLocation(
+  rows: InventoryLevelRow[],
+  locationGid: string | null | undefined,
+): number | null {
+  if (rows.length === 0) return null;
+  if (!locationGid) return totalAvailable(rows);
+  return rows.filter((row) => row.location_gid === locationGid).reduce((sum, row) => sum + row.available, 0);
+}
+
+/**
  * Recupera TODAS las variantes de un producto siguiendo la paginación.
  * Devuelve `complete: false` si no se pudo agotar la paginación.
  */

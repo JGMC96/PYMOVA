@@ -20,6 +20,9 @@ export interface ShopifyConnectionStatus {
     last_sync_status: string | null;
     last_sync_error: string | null;
     uninstalled_at: string | null;
+    /** Último refresco del stock desde Shopify (botón o tarea nocturna). */
+    last_stock_refresh_at?: string | null;
+    last_stock_refresh_status?: string | null;
   } | null;
   stats: {
     products: number;
@@ -159,6 +162,7 @@ export function useShopifyConnection() {
       toast.success('Stock actualizado desde Shopify', {
         description: `${result.items} artículos revisados (${result.applied} niveles aplicados).`,
       });
+      await refresh();
     } catch (err) {
       toast.error('No se pudo actualizar el stock desde Shopify', {
         description: err instanceof Error ? err.message : undefined,
@@ -166,7 +170,7 @@ export function useShopifyConnection() {
     } finally {
       setIsRefreshingStock(false);
     }
-  }, [activeBusinessId]);
+  }, [activeBusinessId, refresh]);
 
   /** Procesa los webhooks pendientes en cola. */
   const processWebhooks = useCallback(async () => {
