@@ -39,9 +39,11 @@ interface ReturnDialogProps {
   saleId: string | null;
   saleNumber?: string;
   onCompleted?: () => void;
+  /** Devolución registrada: el padre abre su ticket de abono. */
+  onReturned?: (returnId: string) => void;
 }
 
-export function ReturnDialog({ open, onOpenChange, saleId, saleNumber, onCompleted }: ReturnDialogProps) {
+export function ReturnDialog({ open, onOpenChange, saleId, saleNumber, onCompleted, onReturned }: ReturnDialogProps) {
   const { fetchSaleDetail, createReturn, isLoading, isSubmitting } = useSaleReturns();
   const { chooseSeller, dropSession, can, authorize } = useSellerSession();
   const { openSession } = useCashRegister();
@@ -91,6 +93,7 @@ export function ReturnDialog({ open, onOpenChange, saleId, saleNumber, onComplet
     if (result) {
       onOpenChange(false);
       onCompleted?.();
+      onReturned?.(result.id);
     }
   };
 

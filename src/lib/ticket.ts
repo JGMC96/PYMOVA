@@ -73,6 +73,8 @@ export interface TicketDoc {
   change?: number | null;
   notes?: string | null;
   cashier?: string | null;
+  /** Abono: número de la venta que rectifica. */
+  originalNumber?: string | null;
 }
 
 export const paymentLabels: Record<string, string> = {
@@ -80,6 +82,7 @@ export const paymentLabels: Record<string, string> = {
   card: 'Tarjeta',
   transfer: 'Transferencia',
   bizum: 'Bizum',
+  store_credit: 'Vale',
 };
 
 const esc = (s: string) =>
@@ -139,6 +142,7 @@ export function renderTicketBody(biz: TicketBusiness, doc: TicketDoc): string {
   <div class="center bold">${title}</div>
   <div class="row"><span>Nº</span><span class="bold">${esc(doc.number)}</span></div>
   <div class="row"><span>Fecha</span><span>${date}</span></div>
+  ${doc.originalNumber ? `<div class="row"><span>Rectifica</span><span>${esc(doc.originalNumber)}</span></div>` : ''}
   ${doc.cashier ? `<div class="row"><span>Atendido por</span><span>${esc(doc.cashier)}</span></div>` : ''}
   <hr/>
   ${lines}
