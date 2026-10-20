@@ -1,5 +1,6 @@
 // Renderizado de tickets térmicos (factura simplificada) para el TPV.
 import { round2, taxBreakdown } from './tax';
+import { code128Svg } from './barcode';
 
 export type PaperWidth = '80' | '58';
 
@@ -88,6 +89,15 @@ const eur = (n: number) =>
 // El desglose vive en lib/tax.ts; se reexporta para no romper importaciones.
 export { taxBreakdown };
 
+/** Código de barras del número de ticket (vacío si no se puede codificar). */
+const ticketBarcode = (number: string) => {
+  try {
+    return `<div class="barcode">${code128Svg(number)}</div>`;
+  } catch {
+    return '';
+  }
+};
+
 const multiline = (s?: string | null) =>
   s ? s.split('\n').map((l) => `<div>${esc(l)}</div>`).join('') : '';
 
@@ -143,7 +153,8 @@ export function renderTicketBody(biz: TicketBusiness, doc: TicketDoc): string {
   <div class="muted small">IVA incluido</div>
   ${doc.notes ? `<hr/><div class="small">${multiline(doc.notes)}</div>` : ''}
   <hr/>
-  <div class="center ref">*${esc(doc.number)}*</div>
+  ${ticketBarcode(doc.number)}
+  <div class="center ref">${esc(doc.number)}</div>
   ${biz.returnPolicy ? `<div class="center small sp">${multiline(biz.returnPolicy)}</div>` : ''}
   <div class="center sp">${multiline(biz.footer || '¡Gracias por su compra!')}</div>`;
 }
@@ -164,7 +175,8 @@ export function ticketStyles(width: PaperWidth, feedLines: number, style: Pick<T
   .row{display:flex;justify-content:space-between;gap:6px}
   .item{margin-bottom:3px}
   .total{margin:4px 0;padding:2px 0;border-top:1px solid #000;border-bottom:1px solid #000}
-  .ref{font-size:1.2em;letter-spacing:2px;font-weight:700}
+  .ref{font-size:1.1em;letter-spacing:2px;font-weight:700}
+  .barcode svg{display:block;margin:2px auto 1px;width:${Math.min(mm, 60)}mm;height:12mm}
   .logo{max-width:60%;max-height:20mm;margin:0 auto 4px;display:block;filter:grayscale(1)}
   hr{border:none;border-top:1px dashed #000;margin:5px 0}`;
 }
