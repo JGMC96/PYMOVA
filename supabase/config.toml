@@ -18,12 +18,14 @@ verify_jwt = false
 [functions.shopify-orders]
 verify_jwt = true
 
+# Las tareas programadas llaman sin JWT, con un ticket de un solo uso en el cuerpo.
+# Con usuario, la función comprueba el token con auth.getUser().
 [functions.shopify-sync]
-verify_jwt = true
+verify_jwt = false
 
 [functions.shopify-orders-webhook]
 verify_jwt = false
 
-# Las tareas programadas llaman con la clave de servicio: la pasarela debe verificar el JWT.
+# Igual que shopify-sync: tareas programadas con ticket; usuarios con auth.getUser().
 [functions.shopify-inventory-push]
-verify_jwt = true
+verify_jwt = false

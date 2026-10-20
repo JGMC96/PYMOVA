@@ -3,7 +3,7 @@
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { serviceClient, shopifyGraphql, ShopifyError } from '../_shared/shopify-client.ts';
-import { isServiceRoleRequest } from '../_shared/service-auth.ts';
+import { consumeTicket, hasTicket } from '../_shared/scheduled-ticket.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
@@ -216,19 +216,20 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {
-    const authHeader = req.headers.get('Authorization') ?? '';
-    if (!authHeader.startsWith('Bearer ')) return json({ error: 'No autorizado' }, 401);
-
-    const body = await req.json().catch(() => ({}));
+    const body = (await req.json().catch(() => ({}))) ?? {};
     const admin = serviceClient();
 
-    // Tareas programadas (pg_cron): la pasarela ya ha verificado el JWT (verify_jwt = true).
-    if (isServiceRoleRequest(authHeader)) {
-      const ids = body.business_id ? [String(body.business_id)] : await businessesWithPendingPushes(admin);
+    // Tareas programadas (pg_cron): sin JWT, con ticket de un solo uso en el cuerpo.
+    if (hasTicket(body)) {
+      if (!(await consumeTicket(admin, body, 'push-stock'))) return json({ error: 'No autorizado' }, 401);
+      const ids = await businessesWithPendingPushes(admin);
       const results = [];
       for (const id of ids) results.push({ business_id: id, ...(await pushForBusiness(admin, id)) });
       return json({ status: 'ok', results });
     }
+
+    const authHeader = req.headers.get('Authorization') ?? '';
+    if (!authHeader.startsWith('Bearer ')) return json({ error: 'No autorizado' }, 401);
 
     const userClient = createClient(SUPABASE_URL, ANON_KEY, {
       global: { headers: { Authorization: authHeader } },

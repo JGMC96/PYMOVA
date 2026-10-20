@@ -28,7 +28,7 @@ import {
 } from '../_shared/shopify-core.ts';
 import { drainWebhookQueue, syncFulfillmentsForOrder } from '../_shared/shopify-webhooks.ts';
 import { ORDERS_QUERY, buildUpsertArgs, type ShopifyAdminOrder } from '../_shared/shopify-admin.ts';
-import { isServiceRoleRequest } from '../_shared/service-auth.ts';
+import { consumeTicket, hasTicket } from '../_shared/scheduled-ticket.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -170,11 +170,15 @@ async function refreshStock(admin: SupabaseClient, businessId: string) {
 }
 
 /**
- * Tareas programadas (pg_cron con la clave de servicio): solo procesar la cola de
+ * Tareas programadas (pg_cron con un ticket de un solo uso): solo procesar la cola de
  * avisos y refrescar el stock. El negocio sale de la conexión de la tienda.
  */
 async function handleScheduledJob(admin: SupabaseClient, body: Record<string, unknown>): Promise<Response> {
   const action = String(body.action ?? '');
+  if (!['process-webhooks', 'refresh-stock'].includes(action)) {
+    return json({ error: 'Acción no permitida para tareas programadas' }, 403);
+  }
+  if (!(await consumeTicket(admin, body, action))) return json({ error: 'No autorizado' }, 401);
   try {
     if (action === 'process-webhooks') {
       const handled = await drainWebhookQueue(admin, Math.min(Number(body.limit ?? 50), 100));
@@ -205,13 +209,13 @@ Deno.serve(async (req) => {
   });
 
   try {
+    const body = (await req.json().catch(() => ({}))) ?? {};
+
+    // Tareas programadas: sin JWT, con ticket de un solo uso en el cuerpo.
+    if (hasTicket(body)) return await handleScheduledJob(admin, body);
+
     const authHeader = req.headers.get('Authorization') ?? '';
     if (!authHeader.startsWith('Bearer ')) return json({ error: 'No autorizado' }, 401);
-
-    // Tareas programadas: la pasarela ya ha verificado el JWT (verify_jwt = true).
-    if (isServiceRoleRequest(authHeader)) {
-      return await handleScheduledJob(admin, await req.json().catch(() => ({})));
-    }
 
     const userClient = createClient(SUPABASE_URL, ANON_KEY, {
       global: { headers: { Authorization: authHeader } },
@@ -219,7 +223,6 @@ Deno.serve(async (req) => {
     const { data: userData, error: userError } = await userClient.auth.getUser();
     if (userError || !userData.user) return json({ error: 'No autorizado' }, 401);
 
-    const body = await req.json().catch(() => ({}));
     const action = String(body.action ?? 'status');
     const businessId = String(body.business_id ?? '');
     if (!businessId) return json({ error: 'Falta el negocio activo' }, 400);
