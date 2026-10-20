@@ -841,10 +841,14 @@ export type Database = {
           business_id: string
           clock_in_at: string
           clock_out_at: string | null
+          corrected_at: string | null
+          corrected_by: string | null
+          correction_reason: string | null
           created_at: string
           employee_id: string
           id: string
           last_break_start: string | null
+          needs_review: boolean
           session_date: string
           status: Database["public"]["Enums"]["work_session_status"]
           updated_at: string
@@ -855,10 +859,14 @@ export type Database = {
           business_id: string
           clock_in_at: string
           clock_out_at?: string | null
+          corrected_at?: string | null
+          corrected_by?: string | null
+          correction_reason?: string | null
           created_at?: string
           employee_id: string
           id?: string
           last_break_start?: string | null
+          needs_review?: boolean
           session_date: string
           status?: Database["public"]["Enums"]["work_session_status"]
           updated_at?: string
@@ -869,10 +877,14 @@ export type Database = {
           business_id?: string
           clock_in_at?: string
           clock_out_at?: string | null
+          corrected_at?: string | null
+          corrected_by?: string | null
+          correction_reason?: string | null
           created_at?: string
           employee_id?: string
           id?: string
           last_break_start?: string | null
+          needs_review?: boolean
           session_date?: string
           status?: Database["public"]["Enums"]["work_session_status"]
           updated_at?: string
@@ -2648,6 +2660,10 @@ export type Database = {
         Args: { _direction: number; _order_id: string }
         Returns: undefined
       }
+      business_local_date: {
+        Args: { _at?: string; _business_id: string }
+        Returns: string
+      }
       claim_shopify_shop: {
         Args: {
           _api_version?: string
@@ -2695,6 +2711,16 @@ export type Database = {
       }
       close_register_session: {
         Args: { _counted_amount: number; _notes?: string; _session_id: string }
+        Returns: undefined
+      }
+      correct_work_session: {
+        Args: {
+          _break_seconds: number
+          _clock_in_at: string
+          _clock_out_at: string
+          _reason: string
+          _session_id: string
+        }
         Returns: undefined
       }
       create_business: {
@@ -2865,6 +2891,9 @@ export type Database = {
           break_seconds: number
           clock_in_at: string
           clock_out_at: string
+          correction_reason: string
+          id: string
+          needs_review: boolean
           session_date: string
           status: Database["public"]["Enums"]["work_session_status"]
           worked_seconds: number
@@ -2875,6 +2904,7 @@ export type Database = {
         Returns: {
           my_employee_id: string
           my_last_entry_type: Database["public"]["Enums"]["time_entry_type"]
+          my_pending_reviews: number
           my_session_clock_in: string
           my_session_status: string
           pending_absences: number
