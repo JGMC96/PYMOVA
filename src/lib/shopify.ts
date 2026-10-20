@@ -16,9 +16,16 @@ export interface ShopifyVariant {
   selectedOptions: Array<{ name: string; value: string }>;
 }
 
+/** Un producto de Shopify solo se vende en Pymova si está activo allí. */
+export function isShopifyProductActive(status: string | null | undefined): boolean {
+  return (status ?? '').toUpperCase() === 'ACTIVE';
+}
+
 export interface ShopifyProduct {
   id: string;
   title: string;
+  /** ACTIVE, DRAFT o ARCHIVED (lo da list-products). */
+  status?: string;
   handle: string;
   description: string;
   productType: string | null;
