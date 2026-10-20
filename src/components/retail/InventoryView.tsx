@@ -1,8 +1,7 @@
 import { useState } from 'react';
-import { Package, RefreshCw, Edit2, Check, X, Layers, History } from 'lucide-react';
+import { Package, RefreshCw, Edit2, Layers, History } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import {
@@ -16,35 +15,16 @@ import {
 import { useInventory, type ProductWithStock } from '@/hooks/useInventory';
 import { VariantsDialog } from './VariantsDialog';
 import { StockMovementsDialog } from './StockMovementsDialog';
+import { StockAdjustDialog, type StockAdjustTarget } from './StockAdjustDialog';
+import { useRoleAccess } from '@/hooks/useRoleAccess';
 
 export function InventoryView() {
-  const { products, isLoading, isUpdating, updateStock, toggleTracking, refreshProducts } = useInventory();
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState<string>('');
+  const { products, isLoading, isUpdating, toggleTracking, refreshProducts } = useInventory();
+  const { isAdmin } = useRoleAccess('admin');
+  const [adjustTarget, setAdjustTarget] = useState<StockAdjustTarget | null>(null);
   const [variantProduct, setVariantProduct] = useState<ProductWithStock | null>(null);
   const [historyProduct, setHistoryProduct] = useState<ProductWithStock | null>(null);
 
-
-  const startEditing = (productId: string, currentStock: number) => {
-    setEditingId(productId);
-    setEditValue(currentStock.toString());
-  };
-
-  const cancelEditing = () => {
-    setEditingId(null);
-    setEditValue('');
-  };
-
-  const saveStock = async (productId: string) => {
-    const newQuantity = parseInt(editValue, 10);
-    if (isNaN(newQuantity) || newQuantity < 0) {
-      cancelEditing();
-      return;
-    }
-    await updateStock(productId, newQuantity);
-    setEditingId(null);
-    setEditValue('');
-  };
 
   const handleTrackingChange = async (productId: string, checked: boolean) => {
     await toggleTracking(productId, checked);
@@ -105,51 +85,32 @@ export function InventoryView() {
                   <TableCell className="text-right">${product.price.toFixed(2)}</TableCell>
                   <TableCell>
                     {product.track_inventory ? (
-                      editingId === product.id ? (
-                        <div className="flex items-center justify-center gap-1">
-                          <Input
-                            type="number"
-                            value={editValue}
-                            onChange={(e) => setEditValue(e.target.value)}
-                            className="w-20 h-8 text-center"
-                            min={0}
-                            autoFocus
-                          />
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-success"
-                            onClick={() => saveStock(product.id)}
-                            disabled={isUpdating}
-                          >
-                            <Check className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive"
-                            onClick={cancelEditing}
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-center gap-2">
-                          <Badge
-                            variant={product.stock_quantity > 10 ? 'secondary' : product.stock_quantity > 0 ? 'outline' : 'destructive'}
-                          >
-                            {product.stock_quantity}
-                          </Badge>
+                      <div className="flex items-center justify-center gap-2">
+                        <Badge
+                          variant={product.stock_quantity > 10 ? 'secondary' : product.stock_quantity > 0 ? 'outline' : 'destructive'}
+                          title={product.variants.length > 0 ? 'Suma de las variantes: se ajusta en cada variante' : undefined}
+                        >
+                          {product.stock_quantity}
+                        </Badge>
+                        {isAdmin && product.variants.length === 0 && (
                           <Button
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7"
-                            onClick={() => startEditing(product.id, product.stock_quantity)}
+                            title="Ajustar stock"
+                            onClick={() =>
+                              setAdjustTarget({
+                                productId: product.id,
+                                variantId: null,
+                                name: product.name,
+                                current: product.stock_quantity,
+                              })
+                            }
                           >
                             <Edit2 className="w-3 h-3" />
                           </Button>
-                        </div>
-                      )
+                        )}
+                      </div>
                     ) : (
                       <span className="text-muted-foreground text-center block">—</span>
                     )}
@@ -200,6 +161,7 @@ export function InventoryView() {
       )}
 
       <StockMovementsDialog product={historyProduct} onClose={() => setHistoryProduct(null)} />
+      <StockAdjustDialog target={adjustTarget} onClose={() => setAdjustTarget(null)} onDone={refreshProducts} />
     </Card>
   );
 

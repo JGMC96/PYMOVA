@@ -242,13 +242,13 @@ Hallazgos de la revisión del frontend. Las líneas se han comprobado en el cód
 - **Qué pasa:** `updateStock` hace `update products set stock_quantity = N` (`src/hooks/useInventory.ts:72-77`), y la importación de Shopify sobrescribe el stock (`src/hooks/useShopifyImport.ts:165` y `:237`). Las dos cosas compiten con el trigger que descuenta las ventas.
 - **Impacto:** se pierden ventas hechas mientras alguien ajusta el stock, y no queda historial de movimientos.
 - **Corrección:** RPC `adjust_stock(_variant_id, _delta, _reason)` con una tabla `stock_movements`, que además alimenta la cola de Shopify.
-- **Estado (20/10/2026): en curso.** Primera parte en `dz/0024`:
+- **Estado (20/10/2026): corregido.** Primera parte en `dz/0024`:
   - historial `stock_movements` con el origen de cada cambio (venta, devolución, pedido online, Shopify, importación, alta);
   - el stock del producto padre es la suma de sus variantes;
   - para los artículos emparejados, el stock local sale de Shopify en la ubicación de la tienda (Tienda Valencia, decisión del usuario), más los envíos pendientes. Los webhooks `inventory_levels/update`, que antes no hacían nada, ahora lo actualizan al momento;
   - acción `refresh-stock` y botón «Actualizar stock desde Shopify»;
   - la importación ya no pisa el stock con la suma de ubicaciones.
-  - **Pendiente (`dz/0025`):** `adjust_stock` solo para admins, escritura directa bloqueada y ajustes manuales enviados a Shopify.
+  - **Segunda parte en `dz/0025`:** `adjust_stock` solo para admins y con motivo; queda como movimiento `manual` y el delta va a Shopify. El cliente ya no puede cambiar `stock_quantity` escribiendo en las tablas, y el stock inicial al crear un artículo solo lo pone un admin. **A12 corregido.**
 - **Encontrado de paso y corregido en `dz/0024`:**
   - `create_online_order_return` fallaba siempre con «return_number is ambiguous»: en producción no se había podido registrar ninguna devolución online;
   - cancelar o devolver en Pymova un pedido de Shopify sumaba stock local que nunca se había restado;
