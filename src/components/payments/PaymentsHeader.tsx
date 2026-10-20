@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Search, Plus } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { useRoleAccess } from '@/hooks/useRoleAccess';
 
 interface PaymentsHeaderProps {
   searchTerm: string;
@@ -14,6 +15,8 @@ export function PaymentsHeader({
   onSearchChange,
   onNewPayment,
 }: PaymentsHeaderProps) {
+  // 0031: los cobros los registran los administradores.
+  const { isAdmin } = useRoleAccess('admin');
   const [localSearch, setLocalSearch] = useState(searchTerm);
 
   // Debounce search input
@@ -39,10 +42,12 @@ export function PaymentsHeader({
             Registra y gestiona los pagos de tus facturas
           </p>
         </div>
-        <Button onClick={onNewPayment}>
-          <Plus className="mr-2 h-4 w-4" />
-          Nuevo pago
-        </Button>
+        {isAdmin && (
+          <Button onClick={onNewPayment}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nuevo pago
+          </Button>
+        )}
       </div>
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">

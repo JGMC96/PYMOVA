@@ -26,6 +26,10 @@ interface ProductsTableProps {
   onEdit: (product: Product) => void;
   onToggleStatus: (id: string, currentStatus: boolean) => void;
   onNewProduct: () => void;
+  /** Con permiso de catálogo (0031): editar y desactivar. */
+  canEdit?: boolean;
+  /** Con permiso de ver costes (0031): columnas Coste y Margen. */
+  showCosts?: boolean;
 }
 
 // Format price with currency
@@ -36,6 +40,8 @@ export function ProductsTable({
   onEdit,
   onToggleStatus,
   onNewProduct,
+  canEdit = true,
+  showCosts = true,
 }: ProductsTableProps) {
   const { format: formatPrice } = useMoney();
   // Loading state
@@ -48,8 +54,8 @@ export function ProductsTable({
               <TableHead>Nombre</TableHead>
               <TableHead>Categoría</TableHead>
               <TableHead>Precio</TableHead>
-              <TableHead>Coste</TableHead>
-              <TableHead>Margen</TableHead>
+              {showCosts && <TableHead>Coste</TableHead>}
+              {showCosts && <TableHead>Margen</TableHead>}
               <TableHead>Unidad</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead className="w-[50px]"></TableHead>
@@ -86,9 +92,11 @@ export function ProductsTable({
           <p className="text-muted-foreground mb-4 max-w-sm">
             Comienza agregando tu primer producto o servicio al catálogo.
           </p>
-          <Button onClick={onNewProduct}>
-            Agregar primer producto
-          </Button>
+          {canEdit && (
+            <Button onClick={onNewProduct}>
+              Agregar primer producto
+            </Button>
+          )}
         </div>
       </div>
     );
@@ -119,8 +127,8 @@ export function ProductsTable({
             <TableHead>Nombre</TableHead>
             <TableHead>Categoría</TableHead>
             <TableHead>Precio</TableHead>
-            <TableHead>Coste</TableHead>
-            <TableHead>Margen</TableHead>
+            {showCosts && <TableHead>Coste</TableHead>}
+            {showCosts && <TableHead>Margen</TableHead>}
             <TableHead>Unidad</TableHead>
             <TableHead>Estado</TableHead>
             <TableHead className="w-[50px]"></TableHead>
@@ -143,18 +151,22 @@ export function ProductsTable({
               <TableCell className="font-mono">
                 {formatPrice(product.price)}
               </TableCell>
-              <TableCell className="font-mono text-muted-foreground">
-                {product.cost_price != null ? formatPrice(product.cost_price) : '—'}
-              </TableCell>
-              <TableCell>
-                {product.cost_price != null && product.price > 0 ? (
-                  <Badge variant={product.price > product.cost_price ? 'secondary' : 'destructive'}>
-                    {(((product.price - product.cost_price) / product.price) * 100).toFixed(0)}%
-                  </Badge>
-                ) : (
-                  <span className="text-xs text-muted-foreground">Sin coste</span>
-                )}
-              </TableCell>
+              {showCosts && (
+                <TableCell className="font-mono text-muted-foreground">
+                  {product.cost_price != null ? formatPrice(product.cost_price) : '—'}
+                </TableCell>
+              )}
+              {showCosts && (
+                <TableCell>
+                  {product.cost_price != null && product.price > 0 ? (
+                    <Badge variant={product.price > product.cost_price ? 'secondary' : 'destructive'}>
+                      {(((product.price - product.cost_price) / product.price) * 100).toFixed(0)}%
+                    </Badge>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">Sin coste</span>
+                  )}
+                </TableCell>
+              )}
               <TableCell>{product.unit || '-'}</TableCell>
               <TableCell>
                 <Badge variant={product.is_active ? 'default' : 'secondary'}>
@@ -162,6 +174,7 @@ export function ProductsTable({
                 </Badge>
               </TableCell>
               <TableCell>
+                {canEdit && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon">
@@ -191,6 +204,7 @@ export function ProductsTable({
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
+                )}
               </TableCell>
             </TableRow>
           ))}

@@ -7,6 +7,7 @@ import { useInvoices } from '@/hooks/useInvoices';
 import { useBusinessSettings } from '@/hooks/useBusinessSettings';
 import { useClients } from '@/hooks/useClients';
 import { useProducts } from '@/hooks/useProducts';
+import { useRoleAccess } from '@/hooks/useRoleAccess';
 
 export default function NewInvoicePage() {
   const navigate = useNavigate();
@@ -16,6 +17,7 @@ export default function NewInvoicePage() {
   const { products, isLoading: productsLoading } = useProducts();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { isAdmin, isLoading: roleLoading } = useRoleAccess('admin');
 
   const isLoading = settingsLoading || clientsLoading || productsLoading;
 
@@ -39,11 +41,23 @@ export default function NewInvoicePage() {
     }
   };
 
-  if (isLoading) {
+  if (isLoading || roleLoading) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
         <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
         <p className="text-muted-foreground">Cargando datos...</p>
+      </div>
+    );
+  }
+
+  // 0031: las facturas las crean los administradores (el servidor también lo exige).
+  if (!isAdmin) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
+        <p className="text-muted-foreground">Solo un administrador puede crear facturas.</p>
+        <Button variant="outline" onClick={() => navigate('/dashboard/invoices')}>
+          Volver a facturas
+        </Button>
       </div>
     );
   }

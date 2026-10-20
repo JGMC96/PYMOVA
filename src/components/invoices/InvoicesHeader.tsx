@@ -1,5 +1,6 @@
 import { Search, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useRoleAccess } from '@/hooks/useRoleAccess';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -34,6 +35,8 @@ export function InvoicesHeader({
   onStatusFilterChange,
   onNewInvoice,
 }: InvoicesHeaderProps) {
+  // 0031: las facturas las crean los administradores.
+  const { isAdmin } = useRoleAccess('admin');
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -43,10 +46,12 @@ export function InvoicesHeader({
             Gestiona las facturas de tu negocio
           </p>
         </div>
-        <Button onClick={onNewInvoice}>
-          <Plus className="h-4 w-4 mr-2" />
-          Nueva Factura
-        </Button>
+        {isAdmin && (
+          <Button onClick={onNewInvoice}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nueva Factura
+          </Button>
+        )}
       </div>
 
       <div className="flex items-center gap-4">

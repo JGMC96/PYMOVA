@@ -5,6 +5,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { useSellerSession } from '@/contexts/SellerSessionContext';
 
+export interface PermissionFlags {
+  canReturn: boolean;
+  canClose: boolean;
+  canEditCatalog: boolean;
+  canSeeCosts: boolean;
+  canAdjustStock: boolean;
+}
+
 export interface SellerReportRow {
   employee_id: string | null;
   name: string;
@@ -78,15 +86,18 @@ export function useSellers() {
     [activeBusinessId],
   );
 
-  /** Solo el propietario (0030): descuento máximo, devoluciones y cierre de caja. */
-  const savePermissions = (id: string, maxDiscountPct: number, canReturn: boolean, canCloseRegister: boolean) =>
+  /** Solo el propietario (0030 y 0031). */
+  const savePermissions = (id: string, maxDiscountPct: number, flags: PermissionFlags) =>
     run(
       'set_employee_permissions',
       {
         _employee_id: id,
         _max_discount_pct: maxDiscountPct,
-        _can_return: canReturn,
-        _can_close_register: canCloseRegister,
+        _can_return: flags.canReturn,
+        _can_close_register: flags.canClose,
+        _can_edit_catalog: flags.canEditCatalog,
+        _can_see_costs: flags.canSeeCosts,
+        _can_adjust_stock: flags.canAdjustStock,
       },
       'Permisos guardados',
     );

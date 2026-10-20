@@ -116,6 +116,10 @@ export interface PosPermission {
   max_discount_pct: number;
   can_return: boolean;
   can_close_register: boolean;
+  /** 0031: gestión con cuenta propia. */
+  can_edit_catalog: boolean;
+  can_see_costs: boolean;
+  can_adjust_stock: boolean;
 }
 
 /** Descuento de la venta en %, igual que el servidor: descuento / (cobrado + descuento). */

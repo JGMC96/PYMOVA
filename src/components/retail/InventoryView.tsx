@@ -16,11 +16,12 @@ import { useInventory, type ProductWithStock } from '@/hooks/useInventory';
 import { VariantsDialog } from './VariantsDialog';
 import { StockMovementsDialog } from './StockMovementsDialog';
 import { StockAdjustDialog, type StockAdjustTarget } from './StockAdjustDialog';
-import { useRoleAccess } from '@/hooks/useRoleAccess';
+import { useMyPermissions } from '@/hooks/useMyPermissions';
 
 export function InventoryView() {
   const { products, isLoading, isUpdating, toggleTracking, refreshProducts } = useInventory();
-  const { isAdmin } = useRoleAccess('admin');
+  // 0031: ajustar stock y cambiar el control de stock, con su permiso.
+  const { canAdjustStock, canEditCatalog } = useMyPermissions();
   const [adjustTarget, setAdjustTarget] = useState<StockAdjustTarget | null>(null);
   const [variantProduct, setVariantProduct] = useState<ProductWithStock | null>(null);
   const [historyProduct, setHistoryProduct] = useState<ProductWithStock | null>(null);
@@ -92,7 +93,7 @@ export function InventoryView() {
                         >
                           {product.stock_quantity}
                         </Badge>
-                        {isAdmin && product.variants.length === 0 && (
+                        {canAdjustStock && product.variants.length === 0 && (
                           <Button
                             variant="ghost"
                             size="icon"
@@ -119,7 +120,7 @@ export function InventoryView() {
                     <Switch
                       checked={product.track_inventory}
                       onCheckedChange={(checked) => handleTrackingChange(product.id, checked)}
-                      disabled={isUpdating}
+                      disabled={isUpdating || !canEditCatalog}
                     />
                   </TableCell>
                   <TableCell className="text-center">

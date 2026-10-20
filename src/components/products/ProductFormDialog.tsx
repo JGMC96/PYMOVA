@@ -46,6 +46,8 @@ interface ProductFormDialogProps {
   product: Product | null;
   onSubmit: (data: ProductFormData) => Promise<boolean>;
   isSubmitting: boolean;
+  /** Con permiso de ver costes (0031). Oculto, el formulario conserva el coste que ya tenía. */
+  showCosts?: boolean;
 }
 
 export function ProductFormDialog({
@@ -54,6 +56,7 @@ export function ProductFormDialog({
   product,
   onSubmit,
   isSubmitting,
+  showCosts = true,
 }: ProductFormDialogProps) {
   const { format: formatPrice } = useMoney();
   const isEditing = !!product;
@@ -182,6 +185,7 @@ export function ProductFormDialog({
               />
             </div>
 
+            {showCosts && (
             <FormField
               control={form.control}
               name="cost_price"
@@ -207,6 +211,7 @@ export function ProductFormDialog({
                 </FormItem>
               )}
             />
+            )}
 
 
             <FormField

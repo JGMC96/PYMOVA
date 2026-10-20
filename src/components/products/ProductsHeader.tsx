@@ -11,6 +11,8 @@ interface ProductsHeaderProps {
   showInactive: boolean;
   onShowInactiveChange: (show: boolean) => void;
   onNewProduct: () => void;
+  /** Con permiso de catálogo (0031). */
+  canCreate?: boolean;
 }
 
 export function ProductsHeader({
@@ -19,6 +21,7 @@ export function ProductsHeader({
   showInactive,
   onShowInactiveChange,
   onNewProduct,
+  canCreate = true,
 }: ProductsHeaderProps) {
   // Local state for debounced search
   const [localSearch, setLocalSearch] = useState(searchTerm);
@@ -80,10 +83,12 @@ export function ProductsHeader({
           </div>
 
           {/* New product button */}
-          <Button onClick={onNewProduct}>
-            <Plus className="h-4 w-4 mr-2" />
-            Nuevo producto
-          </Button>
+          {canCreate && (
+            <Button onClick={onNewProduct}>
+              <Plus className="h-4 w-4 mr-2" />
+              Nuevo producto
+            </Button>
+          )}
         </div>
       </div>
     </div>

@@ -109,12 +109,15 @@ describe.skipIf(!RLS_DB_URL)('RLS · ajustes manuales de stock', () => {
       asUser(sql, owner, (tx) => tx`UPDATE products SET stock_quantity = 99 WHERE id = ${suelto}`),
     ).rejects.toMatchObject(PERMISO_DENEGADO);
 
-    // Otros campos sí se pueden editar.
-    const ok = await asUser(sql, staff, (tx) => tx`UPDATE products SET description = 'Nuevo' WHERE id = ${suelto}`);
+    // Otros campos los edita quien tiene permiso de catálogo (0031): el admin sí, el staff no.
+    const ok = await asUser(sql, admin, (tx) => tx`UPDATE products SET description = 'Nuevo' WHERE id = ${suelto}`);
     expect(ok.count).toBe(1);
+    await expect(
+      asUser(sql, staff, (tx) => tx`UPDATE products SET description = 'Otro' WHERE id = ${suelto}`),
+    ).rejects.toMatchObject(PERMISO_DENEGADO);
   });
 
-  it('crear un artículo con stock inicial: el admin sí (queda como alta), el staff solo con 0', async () => {
+  it('crear un artículo con stock inicial: el admin sí (queda como alta); el staff, sin permiso de catálogo, no crea', async () => {
     const [nuevo] = await asUser(sql, admin, (tx) => tx<{ id: string }[]>`
       INSERT INTO product_variants (business_id, product_id, name, price, stock_quantity)
       VALUES (${negocio}, ${padre}, 'T40', 50, 4) RETURNING id`);
@@ -125,7 +128,11 @@ describe.skipIf(!RLS_DB_URL)('RLS · ajustes manuales de stock', () => {
       asUser(sql, staff, (tx) => tx`
         INSERT INTO product_variants (business_id, product_id, name, price, stock_quantity) VALUES (${negocio}, ${padre}, 'T41', 50, 7)`),
     ).rejects.toMatchObject(PERMISO_DENEGADO);
-    const sinStock = await asUser(sql, staff, (tx) => tx`
+    await expect(
+      asUser(sql, staff, (tx) => tx`
+        INSERT INTO product_variants (business_id, product_id, name, price, stock_quantity) VALUES (${negocio}, ${padre}, 'T42', 50, 0)`),
+    ).rejects.toMatchObject(PERMISO_DENEGADO);
+    const sinStock = await asUser(sql, admin, (tx) => tx`
       INSERT INTO product_variants (business_id, product_id, name, price, stock_quantity) VALUES (${negocio}, ${padre}, 'T42', 50, 0)`);
     expect(sinStock.count).toBe(1);
   });

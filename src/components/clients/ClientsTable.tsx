@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
+import { useRoleAccess } from '@/hooks/useRoleAccess';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Client } from '@/types/database';
@@ -68,6 +69,7 @@ export function ClientsTable({
   onToggleStatus,
   showInactive,
 }: ClientsTableProps) {
+  const { isAdmin } = useRoleAccess('admin');
   return (
     <div className="rounded-md border">
       <Table>
@@ -105,6 +107,7 @@ export function ClientsTable({
                   </Badge>
                 </TableCell>
                 <TableCell>
+                  {isAdmin && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -134,6 +137,7 @@ export function ClientsTable({
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
+                  )}
                 </TableCell>
               </TableRow>
             ))

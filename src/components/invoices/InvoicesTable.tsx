@@ -17,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
+import { useRoleAccess } from '@/hooks/useRoleAccess';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { InvoiceStatus } from '@/types/database';
@@ -38,6 +39,8 @@ const STATUS_CONFIG: Record<InvoiceStatus, { label: string; variant: 'default' |
 };
 
 export function InvoicesTable({ invoices, isLoading, onStatusChange }: InvoicesTableProps) {
+  // 0031: cambiar el estado de una factura, solo administradores.
+  const { isAdmin } = useRoleAccess('admin');
   const { format: formatPrice } = useMoney();
   if (isLoading) {
     return (
@@ -106,6 +109,7 @@ export function InvoicesTable({ invoices, isLoading, onStatusChange }: InvoicesT
                     : '-'}
                 </TableCell>
                 <TableCell>
+                  {isAdmin && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -139,6 +143,7 @@ export function InvoicesTable({ invoices, isLoading, onStatusChange }: InvoicesT
                       )}
                     </DropdownMenuContent>
                   </DropdownMenu>
+                  )}
                 </TableCell>
               </TableRow>
             );
