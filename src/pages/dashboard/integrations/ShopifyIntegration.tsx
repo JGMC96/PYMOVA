@@ -31,6 +31,8 @@ const ShopifyIntegration = () => {
     processWebhooks,
     refreshStock,
     isRefreshingStock,
+    sync: syncCatalog,
+    isSyncing: isCatalogSyncing,
   } = useShopifyConnection();
 
   const {
@@ -169,7 +171,7 @@ const ShopifyIntegration = () => {
           <Button
             variant="outline"
             onClick={refreshStock}
-            disabled={isRefreshingStock || isSyncing || isImporting}
+            disabled={isRefreshingStock || isSyncing || isCatalogSyncing || isImporting}
             title="Trae el stock de la tienda (ubicación por defecto) desde Shopify"
           >
             {isRefreshingStock ? (
@@ -181,19 +183,24 @@ const ShopifyIntegration = () => {
           </Button>
           <Button
             variant="outline"
-            onClick={() => forceSync(appliedTerm)}
-            disabled={isSyncing || isImporting}
+            // Sin filtro, el catálogo entero lo sincroniza el servidor: respeta el estado de
+            // Shopify, empareja el inventario y no depende de que esta pestaña siga abierta.
+            onClick={() => (appliedTerm ? forceSync(appliedTerm) : syncCatalog('catalog'))}
+            disabled={isSyncing || isCatalogSyncing || isImporting}
+            title={appliedTerm ? 'Sincroniza solo los productos del filtro' : 'Sincroniza todo el catálogo en el servidor'}
           >
-            {isSyncing ? (
+            {isSyncing || isCatalogSyncing ? (
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
             ) : (
               <RefreshCw className="w-4 h-4 mr-2" />
             )}
-            {isSyncing
-              ? queue.phase === 'processing'
-                ? `Sincronizando… (${queue.processed}/${queue.total})`
-                : `Descargando… (${syncProgress})`
-              : 'Forzar sincronización'}
+            {isCatalogSyncing
+              ? 'Sincronizando catálogo…'
+              : isSyncing
+                ? queue.phase === 'processing'
+                  ? `Sincronizando… (${queue.processed}/${queue.total})`
+                  : `Descargando… (${syncProgress})`
+                : 'Forzar sincronización'}
           </Button>
         <Button onClick={handleImport} disabled={isImporting || selected.size === 0}>
           {isImporting ? (

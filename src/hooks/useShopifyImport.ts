@@ -7,6 +7,7 @@ import {
   fetchAllShopifyProducts,
   refreshShopifyStock,
   type ShopifyProduct,
+  isShopifyProductActive,
 } from '@/lib/shopify';
 
 /**
@@ -181,7 +182,8 @@ export function useShopifyImport() {
         // El stock de un producto que ya existe no se pisa: la API da la suma de todas
         // las ubicaciones y en Pymova manda la tienda (refreshShopifyStock).
         ...(tracksStock ? { track_inventory: true } : {}),
-        is_active: true,
+        // Solo los activos en Shopify se venden; borradores y archivados quedan inactivos.
+        is_active: isShopifyProductActive(product.status),
         external_id: product.id,
         external_source: 'shopify',
       };
