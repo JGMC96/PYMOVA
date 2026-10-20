@@ -32,8 +32,9 @@ export function useHrEmployees() {
       if (reqId !== requestIdRef.current) return;
       if (error) throw error;
 
-      const rows = (data || []) as HrEmployee[];
-      const ids = rows.map((r) => r.user_id);
+      const rows = (data || []) as (HrEmployee & { display_name?: string | null })[];
+      // Los dependientes del TPV sin cuenta (0027) no tienen perfil: su nombre va en display_name.
+      const ids = rows.map((r) => r.user_id).filter((id): id is string => !!id);
       let profMap = new Map<string, string | null>();
       if (ids.length) {
         const { data: profs } = await supabase
@@ -42,7 +43,9 @@ export function useHrEmployees() {
           .in('id', ids);
         profMap = new Map((profs || []).map((p: any) => [p.id, p.full_name]));
       }
-      setEmployees(rows.map((r) => ({ ...r, full_name: profMap.get(r.user_id) ?? null })));
+      setEmployees(
+        rows.map((r) => ({ ...r, full_name: (r.user_id ? profMap.get(r.user_id) : null) ?? r.display_name ?? null })),
+      );
     } catch (err) {
       console.error('useHrEmployees', err);
     } finally {

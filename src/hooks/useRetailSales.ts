@@ -16,6 +16,8 @@ export interface Sale {
   payment_method: string | null;
   notes: string | null;
   created_by: string | null;
+  /** Dependiente que atendió (hr_employees), o null. */
+  seller_employee_id?: string | null;
   created_at: string;
 }
 
@@ -56,6 +58,8 @@ export interface CreateSaleData {
   cash_received?: number | null;
   change_given?: number | null;
   register_session_id?: string | null;
+  /** Sesión de vendedor abierta con el PIN; el servidor resuelve el vendedor. */
+  seller_session_id?: string | null;
 }
 
 
@@ -97,7 +101,10 @@ export function useRetailSales() {
     fetchSales();
   }, [fetchSales]);
 
-  const createSale = async (data: CreateSaleData): Promise<{ id: string; sale_number: string } | null> => {
+  const createSale = async (
+    data: CreateSaleData,
+    opts: { onError?: (message: string) => void } = {},
+  ): Promise<{ id: string; sale_number: string } | null> => {
     if (!activeBusiness?.id) {
       toast.error('No hay negocio activo');
       return null;
@@ -129,7 +136,9 @@ export function useRetailSales() {
         _cash_received: data.cash_received ?? null,
         _change_given: data.change_given ?? null,
         _register_session_id: data.register_session_id ?? null,
-      });
+        // Parámetro nuevo de la 0027: `as never` hasta que se regenere types.ts.
+        _seller_session_id: data.seller_session_id ?? null,
+      } as never);
 
       if (error) throw error;
 
@@ -147,7 +156,9 @@ export function useRetailSales() {
       return { id: sale.id, sale_number: saleNumber };
     } catch (error) {
       console.error('Error creating sale:', error);
-      toast.error((error as { message?: string } | null)?.message || 'Error al registrar venta');
+      const message = (error as { message?: string } | null)?.message || 'Error al registrar venta';
+      toast.error(message);
+      opts.onError?.(message);
       return null;
 
     } finally {

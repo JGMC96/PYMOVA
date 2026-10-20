@@ -23,6 +23,10 @@ import { useCashRegister } from '@/hooks/useCashRegister';
 import type { ProductVariant } from '@/hooks/useProductVariants';
 import { PAYMENT_LABELS } from '@/lib/storeProfiles';
 import { SaleTicketDialog, TicketData } from './SaleTicketDialog';
+import { SellerBar } from './SellerBar';
+import { SellerPinDialog } from './SellerPinDialog';
+import { useSellerSession } from '@/contexts/SellerSessionContext';
+import { isSellerSessionError } from '@/lib/sellerSession';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { DEFAULT_TAX_RATE, taxBreakdown } from '@/lib/tax';
@@ -39,6 +43,7 @@ export function POSPanel() {
   const { settings } = useBusinessSettings();
   const { profile } = useStoreProfile();
   const { openSession, refresh: refreshRegister } = useCashRegister();
+  const sellerSession = useSellerSession();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [barcode, setBarcode] = useState('');
@@ -219,6 +224,11 @@ export function POSPanel() {
       toast.error('El efectivo recibido es menor que el total');
       return;
     }
+    // Con dependientes con PIN, la venta tiene que ir a nombre de alguien.
+    if (sellerSession.requiresSeller && !sellerSession.seller) {
+      sellerSession.setPinDialogOpen(true);
+      return;
+    }
     setSelectedPayment(method);
 
     const snapshot = cart.map((item) => {
@@ -227,6 +237,7 @@ export function POSPanel() {
       return { ...item, total: round2(item.total - disc) };
     });
 
+    let failure = '';
     const result = await createSale({
       payment_method: method,
       items: snapshot,
@@ -239,7 +250,14 @@ export function POSPanel() {
       cash_received: usesCash && !isNaN(cashReceived) ? cashReceived : null,
       change_given: change !== null && change >= 0 ? change : null,
       register_session_id: openSession?.id ?? null,
-    });
+      seller_session_id: sellerSession.seller?.sessionId ?? null,
+    }, { onError: (m) => { failure = m; } });
+
+    if (!result && sellerSession.seller && isSellerSessionError(failure)) {
+      // Si la sesión de vendedor ha caducado, se cierra y se vuelve a pedir el PIN.
+      void sellerSession.end();
+      if (sellerSession.requiresSeller) sellerSession.setPinDialogOpen(true);
+    }
 
     if (result) {
       setTicket({
@@ -256,6 +274,7 @@ export function POSPanel() {
         cashReceived: usesCash && !isNaN(cashReceived) ? cashReceived : null,
         change: change !== null && change >= 0 ? change : null,
         notes: notes.trim() || null,
+        cashier: sellerSession.seller?.name ?? null,
       });
       setTicketOpen(true);
       if (change !== null && change > 0) {
@@ -270,6 +289,14 @@ export function POSPanel() {
 
   return (
     <>
+      <SellerBar />
+      <SellerPinDialog
+        open={sellerSession.pinDialogOpen}
+        onOpenChange={sellerSession.setPinDialogOpen}
+        employees={sellerSession.employees}
+        onSubmit={sellerSession.start}
+        required={sellerSession.requiresSeller && !sellerSession.seller}
+      />
       {!openSession && (
         <div className="mb-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-600 dark:text-amber-400">
           No hay caja abierta. Para cobrar en efectivo, ábrela en la pestaña <strong>Caja</strong>. Con tarjeta o transferencia puedes vender igualmente.

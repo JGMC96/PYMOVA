@@ -22,6 +22,8 @@ export interface TicketData {
   cashReceived?: number | null;
   change?: number | null;
   notes?: string | null;
+  /** Dependiente que atendió, para «Atendido por». */
+  cashier?: string | null;
 }
 
 interface SaleTicketDialogProps {
@@ -43,6 +45,7 @@ export function toTicketDoc(t: TicketData): TicketDoc {
     cashReceived: t.cashReceived,
     change: t.change,
     notes: t.notes,
+    cashier: t.cashier ?? null,
     lines: t.items.map((i) => {
       const key = i.variant_id ?? i.product_id;
       const orig = t.originalTotals?.[key] ?? i.total;

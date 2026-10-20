@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useSaleReturns, type SaleDetailLine } from '@/hooks/useSaleReturns';
+import { useSellerSession } from '@/contexts/SellerSessionContext';
 import { useCashRegister } from '@/hooks/useCashRegister';
 import { round2 } from '@/lib/tax';
 
@@ -42,6 +43,7 @@ interface ReturnDialogProps {
 
 export function ReturnDialog({ open, onOpenChange, saleId, saleNumber, onCompleted }: ReturnDialogProps) {
   const { fetchSaleDetail, createReturn, isLoading, isSubmitting } = useSaleReturns();
+  const { seller } = useSellerSession();
   const { openSession } = useCashRegister();
   const [lines, setLines] = useState<SaleDetailLine[]>([]);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
@@ -71,7 +73,9 @@ export function ReturnDialog({ open, onOpenChange, saleId, saleNumber, onComplet
       .map((line) => ({ sale_item_id: line.sale_item_id, quantity: quantities[line.sale_item_id] || 0 }))
       .filter((i) => i.quantity > 0);
 
-    const result = await createReturn({ saleId, items, reason, refundMethod, restock });
+    const result = await createReturn({
+      saleId, items, reason, refundMethod, restock, sellerSessionId: seller?.sessionId ?? null,
+    });
     if (result) {
       onOpenChange(false);
       onCompleted?.();
