@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Receipt, CreditCard, Banknote, RefreshCw, RotateCcw, ScanLine, UserRoundPen, X } from 'lucide-react';
+import { Receipt, CreditCard, Banknote, Mail, RefreshCw, RotateCcw, ScanLine, UserRoundPen, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { normalizeTicketCode } from '@/lib/ticketCode';
@@ -20,6 +20,7 @@ import { useRetailSales, type SaleWithClient } from '@/hooks/useRetailSales';
 import { useSaleReturns, type SaleReturn } from '@/hooks/useSaleReturns';
 import { ReturnDialog } from './ReturnDialog';
 import { RefundTicketDialog } from './RefundTicketDialog';
+import { SendReceiptDialog } from './SendReceiptDialog';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
@@ -40,6 +41,7 @@ export function SalesHistory() {
   const { isAdmin } = useRoleAccess('admin');
   const [sellerFilter, setSellerFilter] = useState(ALL_SELLERS);
   const [reassign, setReassign] = useState<{ id: string; number: string; sellerEmployeeId: string | null } | null>(null);
+  const [emailFor, setEmailFor] = useState<{ id: string; number: string } | null>(null);
   const sellerName = (id: string | null | undefined) => (id ? (employees.find((e) => e.id === id)?.name ?? '—') : '—');
 
   // Mientras se escribe, se filtran las ventas cargadas; con Intro (lo que manda el
@@ -283,6 +285,15 @@ export function SalesHistory() {
                         <Button
                           variant="ghost"
                           size="sm"
+                          onClick={() => setEmailFor({ id: sale.id, number: sale.sale_number })}
+                          aria-label="Enviar ticket por correo"
+                          title="Enviar ticket por correo"
+                        >
+                          <Mail className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => setSelectedSale({ id: sale.id, number: sale.sale_number })}
                         >
                           <RotateCcw className="w-4 h-4 mr-2" />
@@ -315,6 +326,7 @@ export function SalesHistory() {
         }}
         onReturned={(id) => setRefundTicket({ id, justCreated: true })}
       />
+      <SendReceiptDialog sale={emailFor} onClose={() => setEmailFor(null)} onClientChanged={() => refreshSales()} />
       <RefundTicketDialog
         returnId={refundTicket?.id ?? null}
         justCreated={refundTicket?.justCreated}
