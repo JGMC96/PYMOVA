@@ -27,7 +27,7 @@ BEGIN
   IF current_user IN ('authenticated', 'anon') THEN
     IF (NEW.id, NEW.business_id, NEW.email, NEW.role, NEW.invited_by, NEW.token,
         NEW.expires_at, NEW.accepted_by, NEW.accepted_at, NEW.created_at)
-        IS DISTINCT FROM
+       IS DISTINCT FROM
        (OLD.id, OLD.business_id, OLD.email, OLD.role, OLD.invited_by, OLD.token,
         OLD.expires_at, OLD.accepted_by, OLD.accepted_at, OLD.created_at)
        OR (NEW.status IS DISTINCT FROM OLD.status
