@@ -204,6 +204,13 @@
       "when": 1792517686395,
       "tag": "0028_vendedor_obligatorio",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1792518286253,
+      "tag": "0029_ventas_por_vendedor_propietario",
+      "breakpoints": true
     }
   ]
 }
