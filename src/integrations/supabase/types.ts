@@ -437,6 +437,8 @@ export type Database = {
           name: string
           notes: string | null
           phone: string | null
+          receipt_email_consent: boolean
+          receipt_email_consent_at: string | null
           updated_at: string
         }
         Insert: {
@@ -452,6 +454,8 @@ export type Database = {
           name: string
           notes?: string | null
           phone?: string | null
+          receipt_email_consent?: boolean
+          receipt_email_consent_at?: string | null
           updated_at?: string
         }
         Update: {
@@ -467,6 +471,8 @@ export type Database = {
           name?: string
           notes?: string | null
           phone?: string | null
+          receipt_email_consent?: boolean
+          receipt_email_consent_at?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -3634,6 +3640,55 @@ export type Database = {
         Returns: string
       }
       owned_business_count: { Args: { _user_id: string }; Returns: number }
+      pos_client_actor: {
+        Args: { _business_id: string; _seller_session_id: string }
+        Returns: string
+      }
+      pos_find_or_create_client: {
+        Args: {
+          _business_id: string
+          _email?: string
+          _name: string
+          _phone?: string
+          _receipt_consent?: boolean
+          _seller_session_id?: string
+        }
+        Returns: {
+          client_id: string
+          created: boolean
+          email: string
+          name: string
+          receipt_email_consent: boolean
+        }[]
+      }
+      pos_normalize_email: { Args: { _email: string }; Returns: string }
+      pos_search_clients: {
+        Args: { _business_id: string; _limit?: number; _query: string }
+        Returns: {
+          email: string
+          id: string
+          name: string
+          phone: string
+          receipt_email_consent: boolean
+        }[]
+      }
+      pos_set_receipt_consent: {
+        Args: {
+          _client_id: string
+          _consent: boolean
+          _email?: string
+          _seller_session_id?: string
+        }
+        Returns: undefined
+      }
+      pos_set_sale_client: {
+        Args: {
+          _client_id: string
+          _sale_id: string
+          _seller_session_id?: string
+        }
+        Returns: undefined
+      }
       read_email_batch: {
         Args: { batch_size: number; queue_name: string; vt: number }
         Returns: {

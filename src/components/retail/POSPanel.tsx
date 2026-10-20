@@ -24,6 +24,8 @@ import type { ProductVariant } from '@/hooks/useProductVariants';
 import { PAYMENT_LABELS } from '@/lib/storeProfiles';
 import { SaleTicketDialog, TicketData } from './SaleTicketDialog';
 import { SellerBar } from './SellerBar';
+import { PosClientPicker } from './PosClientPicker';
+import { canEmailReceipt, type PosClient } from '@/hooks/usePosClients';
 import { useSellerSession } from '@/contexts/SellerSessionContext';
 import { discountPct, isSellerSessionError } from '@/lib/sellerSession';
 import { toast } from 'sonner';
@@ -54,6 +56,7 @@ export function POSPanel() {
   const [tipInput, setTipInput] = useState('');
   const [cashInput, setCashInput] = useState('');
   const [notes, setNotes] = useState('');
+  const [client, setClient] = useState<PosClient | null>(null);
   const [breakdownOpen, setBreakdownOpen] = useState(false);
   const [variantProduct, setVariantProduct] = useState<ProductWithStock | null>(null);
   const [ticket, setTicket] = useState<TicketData | null>(null);
@@ -184,6 +187,7 @@ export function POSPanel() {
     setTipInput('');
     setCashInput('');
     setNotes('');
+    setClient(null);
   };
 
   const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -246,6 +250,7 @@ export function POSPanel() {
     let failure = '';
     const result = await createSale({
       payment_method: method,
+      client_id: client?.id ?? null,
       items: snapshot,
       notes: notes.trim() || undefined,
       subtotal,
@@ -282,6 +287,9 @@ export function POSPanel() {
         change: change !== null && change >= 0 ? change : null,
         notes: notes.trim() || null,
         cashier: seller?.name ?? null,
+        saleId: result.id,
+        clientName: client?.name ?? null,
+        clientCanEmail: canEmailReceipt(client),
       });
       setTicketOpen(true);
       if (change !== null && change > 0) {
@@ -554,6 +562,8 @@ export function POSPanel() {
             <p className="text-xs text-muted-foreground">
               {itemCount} {itemCount === 1 ? 'producto' : 'productos'}
             </p>
+
+            <PosClientPicker value={client} onChange={setClient} className="mt-3" />
 
             <Separator className="my-3" />
 
