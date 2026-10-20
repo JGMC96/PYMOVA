@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Receipt, CreditCard, Banknote, RefreshCw, RotateCcw, ScanLine, X } from 'lucide-react';
+import { Receipt, CreditCard, Banknote, RefreshCw, RotateCcw, ScanLine, UserRoundPen, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { normalizeTicketCode } from '@/lib/ticketCode';
@@ -19,22 +19,38 @@ import {
 import { useRetailSales, type SaleWithClient } from '@/hooks/useRetailSales';
 import { useSaleReturns, type SaleReturn } from '@/hooks/useSaleReturns';
 import { ReturnDialog } from './ReturnDialog';
+import { ReassignSellerDialog } from './ReassignSellerDialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useSellerSession } from '@/contexts/SellerSessionContext';
+import { useRoleAccess } from '@/hooks/useRoleAccess';
+
+const ALL_SELLERS = '__all__';
+const NO_SELLER = '__none__';
 
 export function SalesHistory() {
   const { sales, isLoading, refreshSales, findSaleByTicket } = useRetailSales();
   const [query, setQuery] = useState('');
   const [found, setFound] = useState<SaleWithClient | null>(null);
   const [searching, setSearching] = useState(false);
+  const { employees } = useSellerSession();
+  const { isAdmin } = useRoleAccess('admin');
+  const [sellerFilter, setSellerFilter] = useState(ALL_SELLERS);
+  const [reassign, setReassign] = useState<{ id: string; number: string; sellerEmployeeId: string | null } | null>(null);
+  const sellerName = (id: string | null | undefined) => (id ? (employees.find((e) => e.id === id)?.name ?? '—') : '—');
 
   // Mientras se escribe, se filtran las ventas cargadas; con Intro (lo que manda el
   // lector de códigos de barras) se busca el ticket exacto, aunque sea antiguo.
   const visibleSales = useMemo(() => {
     if (found) return [found];
+    const bySeller =
+      sellerFilter === ALL_SELLERS
+        ? sales
+        : sales.filter((s) => (sellerFilter === NO_SELLER ? !s.seller_employee_id : s.seller_employee_id === sellerFilter));
     const q = query.trim().toUpperCase();
-    if (!q) return sales;
+    if (!q) return bySeller;
     const code = normalizeTicketCode(q);
-    return sales.filter((s) => s.sale_number.includes(q) || (code !== null && s.sale_number === code));
-  }, [sales, query, found]);
+    return bySeller.filter((s) => s.sale_number.includes(q) || (code !== null && s.sale_number === code));
+  }, [sales, query, found, sellerFilter]);
 
   const searchTicket = async () => {
     const code = normalizeTicketCode(query);
@@ -121,7 +137,8 @@ export function SalesHistory() {
         </Button>
       </CardHeader>
       <CardContent>
-        <div className="relative mb-4">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row">
+        <div className="relative flex-1">
           <ScanLine className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             value={query}
@@ -153,6 +170,23 @@ export function SalesHistory() {
             </button>
           )}
         </div>
+        {employees.length > 0 && (
+          <Select value={sellerFilter} onValueChange={setSellerFilter}>
+            <SelectTrigger className="sm:w-56" aria-label="Filtrar por vendedor">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_SELLERS}>Todos los vendedores</SelectItem>
+              <SelectItem value={NO_SELLER}>Sin vendedor</SelectItem>
+              {employees.map((e) => (
+                <SelectItem key={e.id} value={e.id}>
+                  {e.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+        </div>
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
             <div className="animate-spin w-6 h-6 border-4 border-primary border-t-transparent rounded-full" />
@@ -169,6 +203,7 @@ export function SalesHistory() {
                 <TableHead># Venta</TableHead>
                 <TableHead>Fecha</TableHead>
                 <TableHead>Cliente</TableHead>
+                <TableHead>Vendedor</TableHead>
                 <TableHead>Método</TableHead>
                 <TableHead className="text-right">Total</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
@@ -195,6 +230,7 @@ export function SalesHistory() {
                     <TableCell>
                       <Badge variant="outline">{sale.client_name}</Badge>
                     </TableCell>
+                    <TableCell>{sellerName(sale.seller_employee_id)}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         {getPaymentIcon(sale.payment_method)}
@@ -205,14 +241,29 @@ export function SalesHistory() {
                       {Number(sale.total).toFixed(2)} €
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setSelectedSale({ id: sale.id, number: sale.sale_number })}
-                      >
-                        <RotateCcw className="w-4 h-4 mr-2" />
-                        Devolver
-                      </Button>
+                      <div className="flex justify-end gap-1">
+                        {isAdmin && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              setReassign({ id: sale.id, number: sale.sale_number, sellerEmployeeId: sale.seller_employee_id ?? null })
+                            }
+                            aria-label="Cambiar vendedor"
+                            title="Cambiar vendedor"
+                          >
+                            <UserRoundPen className="w-4 h-4" />
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setSelectedSale({ id: sale.id, number: sale.sale_number })}
+                        >
+                          <RotateCcw className="w-4 h-4 mr-2" />
+                          Devolver
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
@@ -222,6 +273,12 @@ export function SalesHistory() {
         )}
       </CardContent>
 
+      <ReassignSellerDialog
+        open={!!reassign}
+        onOpenChange={(open) => !open && setReassign(null)}
+        sale={reassign}
+        onCompleted={() => refreshSales()}
+      />
       <ReturnDialog
         open={!!selectedSale}
         onOpenChange={(open) => !open && setSelectedSale(null)}

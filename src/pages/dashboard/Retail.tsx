@@ -1,4 +1,4 @@
-import { ShoppingCart, Receipt, Package, Wallet, Globe, Printer } from 'lucide-react';
+import { ShoppingCart, Receipt, Package, Wallet, Globe, Printer, Users } from 'lucide-react';
 import { TicketSettingsPanel } from '@/components/retail/TicketSettingsPanel';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -10,14 +10,19 @@ import { SalesHistory } from '@/components/retail/SalesHistory';
 import { InventoryView } from '@/components/retail/InventoryView';
 import { CashRegisterPanel } from '@/components/retail/CashRegisterPanel';
 import { EcommercePanel } from '@/components/retail/EcommercePanel';
+import { SellersPanel } from '@/components/retail/SellersPanel';
+import { SellerSessionProvider } from '@/contexts/SellerSessionContext';
+import { useRoleAccess } from '@/hooks/useRoleAccess';
 import { useStoreProfile } from '@/hooks/useStoreProfile';
 import { STORE_PROFILE_LIST, type StoreProfile } from '@/lib/storeProfiles';
 
 const Retail = () => {
   const { profileKey, profile, updateProfile, isSaving } = useStoreProfile();
+  const { isAdmin } = useRoleAccess('admin');
 
   return (
     <RequireModule module="retail">
+      <SellerSessionProvider>
       <div className="space-y-6">
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
           <div>
@@ -73,6 +78,12 @@ const Retail = () => {
               <Printer className="w-4 h-4" />
               Tickets
             </TabsTrigger>
+            {isAdmin && (
+              <TabsTrigger value="sellers" className="flex items-center gap-2">
+                <Users className="w-4 h-4" />
+                Vendedores
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="pos" className="mt-6">
@@ -98,8 +109,15 @@ const Retail = () => {
           <TabsContent value="tickets" className="mt-6">
             <TicketSettingsPanel />
           </TabsContent>
+
+          {isAdmin && (
+            <TabsContent value="sellers" className="mt-6">
+              <SellersPanel />
+            </TabsContent>
+          )}
         </Tabs>
       </div>
+      </SellerSessionProvider>
     </RequireModule>
   );
 };
