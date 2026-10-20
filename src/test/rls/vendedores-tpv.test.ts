@@ -1,7 +1,8 @@
 // @vitest-environment node
 // Vendedores en el TPV: dependientes con o sin cuenta, PIN cifrado, sesión de
 // vendedor ligada a quien tiene el TPV abierto, vendedor en ventas, devoluciones y
-// fichajes, reasignación por admins con motivo e informe por vendedor.
+// fichajes, reasignación por admins con motivo e informe por vendedor (solo el
+// propietario, 0029).
 // 0028: con dependientes con PIN no se vende ni se devuelve sin sesión de vendedor;
 // la sesión dura 3 horas; cada uno puede cambiar su PIN con el actual.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -280,9 +281,9 @@ describe.skipIf(!RLS_DB_URL)('RLS · vendedores en el TPV', () => {
     expect(await asUser(sql, admin, (tx) => tx`SELECT id FROM sale_seller_changes WHERE sale_id = ${venta}`)).toHaveLength(1);
   });
 
-  it('el informe por vendedor cuadra ventas y devoluciones y es solo de admins', async () => {
+  it('el informe por vendedor cuadra ventas y devoluciones y es solo del propietario', async () => {
     const hoy = new Date().toISOString().slice(0, 10);
-    const filas = await asUser(sql, admin, (tx) => tx`
+    const filas = await asUser(sql, owner, (tx) => tx`
       SELECT * FROM public.get_sales_by_seller(${negocio}, ${hoy}::date, ${hoy}::date)`);
     const esperado = await sql`
       SELECT s.seller_employee_id AS emp, count(*)::int AS n, sum(s.total) AS t FROM sales s WHERE s.business_id = ${negocio} GROUP BY 1`;
@@ -297,9 +298,11 @@ describe.skipIf(!RLS_DB_URL)('RLS · vendedores en el TPV', () => {
     expect(deAna.returns_count).toBe(1);
     expect(Number(deAna.net_total)).toBe(r2(Number(deAna.sales_total) - Number(deAna.returns_total)));
 
-    await expect(
-      asUser(sql, staff, (tx) => tx`SELECT * FROM public.get_sales_by_seller(${negocio}, ${hoy}::date, ${hoy}::date)`),
-    ).rejects.toMatchObject(PERMISO_DENEGADO);
+    for (const user of [admin, staff, ajeno]) {
+      await expect(
+        asUser(sql, user, (tx) => tx`SELECT * FROM public.get_sales_by_seller(${negocio}, ${hoy}::date, ${hoy}::date)`),
+      ).rejects.toMatchObject(PERMISO_DENEGADO);
+    }
   });
 
   it('cada uno cambia su PIN con el actual; los fallos cuentan para el bloqueo', async () => {
