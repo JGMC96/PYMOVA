@@ -2,6 +2,8 @@
 // Vendedores en el TPV: dependientes con o sin cuenta, PIN cifrado, sesión de
 // vendedor ligada a quien tiene el TPV abierto, vendedor en ventas, devoluciones y
 // fichajes, reasignación por admins con motivo e informe por vendedor.
+// 0028: con dependientes con PIN no se vende ni se devuelve sin sesión de vendedor;
+// la sesión dura 3 horas; cada uno puede cambiar su PIN con el actual.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { asAnon, asUser, createTestDb, createUser, RLS_DB_URL, type Sql, type TestDb } from './harness';
 
@@ -161,12 +163,29 @@ describe.skipIf(!RLS_DB_URL)('RLS · vendedores en el TPV', () => {
     expect(k).toEqual({ failed_attempts: 0, locked_until: null });
   });
 
-  it('la venta queda a nombre de la sesión; sin sesión, al empleado de la cuenta', async () => {
-    const sesion = (await empezar(staff, ana, '1234')).session_id!;
-    expect(await vendedorDe(await vender(staff, sesion))).toBe(ana);
-    // Sin sesión: el staff tiene empleado propio; el owner no tiene ninguno.
-    expect(await vendedorDe(await vender(staff, null))).toBe(empleadoStaff);
-    expect(await vendedorDe(await vender(owner, null))).toBeNull();
+  it('la venta queda a nombre de la sesión, que dura 3 horas; sin sesión no se vende', async () => {
+    const inicio = await empezar(staff, ana, '1234');
+    expect(await vendedorDe(await vender(staff, inicio.session_id))).toBe(ana);
+    const [s] = await sql`SELECT extract(epoch FROM expires_at - created_at)::int AS seg FROM pos_seller_sessions WHERE id = ${inicio.session_id}`;
+    expect(s.seg).toBe(3 * 3600);
+    // Con dependientes con PIN, nadie vende sin identificarse: ni el staff ni el owner.
+    await expect(vender(staff, null)).rejects.toThrow(/sesión de vendedor/i);
+    await expect(vender(owner, null)).rejects.toThrow(/sesión de vendedor/i);
+  });
+
+  it('en un negocio sin dependientes con PIN se sigue vendiendo sin sesión, a nombre de la cuenta', async () => {
+    const duena = await createUser(sql, 'duena-sin-pin@ejemplo.test');
+    const [b] = await asUser(sql, duena, (tx) => tx<{ id: string }[]>`SELECT public.create_business('Sin PIN', null) AS id`);
+    const [p] = await sql<{ id: string }[]>`
+      INSERT INTO products (business_id, name, price, stock_quantity, track_inventory) VALUES (${b.id}, 'Calcetín', 6, 10, true) RETURNING id`;
+    const [e] = await asUser(sql, duena, (tx) => tx<{ id: string }[]>`SELECT public.ensure_hr_employee(${b.id}) AS id`);
+    const base = r2(6 / (1 + IVA / 100));
+    const items = [{ product_id: p.id, variant_id: null, product_name: 'Calcetín', quantity: 1, unit_price: 6, total: 6 }];
+    const [v] = await asUser(sql, duena, (tx) => tx<{ sale_id: string }[]>`
+      SELECT * FROM public.create_sale_with_items(
+        _business_id => ${b.id}, _items => ${sql.json(items as never)}::jsonb, _payment_method => 'card',
+        _subtotal => ${base}, _tax => ${r2(6 - base)}, _total => 6)`);
+    expect(await vendedorDe(v.sale_id)).toBe(e.id);
   });
 
   it('la sesión solo vale para quien la abrió, en su negocio y hasta que caduca', async () => {
@@ -205,6 +224,13 @@ describe.skipIf(!RLS_DB_URL)('RLS · vendedores en el TPV', () => {
         'Talla', 'cash', true, ${sesion})`);
     const [r] = await sql`SELECT seller_employee_id FROM sale_returns WHERE id = ${dev.return_id}`;
     expect(r.seller_employee_id).toBe(ana);
+    // Sin sesión no hay devolución.
+    const venta2 = await vender(staff, sesion);
+    const [item2] = await sql`SELECT id FROM sale_items WHERE sale_id = ${venta2}`;
+    await expect(
+      asUser(sql, staff, (tx) => tx`
+        SELECT * FROM public.create_sale_return(${negocio}, ${venta2}, ${sql.json([{ sale_item_id: item2.id, quantity: 1 }])}::jsonb, 'Talla', 'card', true)`),
+    ).rejects.toThrow(/sesión de vendedor/i);
 
     const [entrada] = await asUser(sql, staff, (tx) => tx<{ id: string }[]>`
       SELECT public.clock_action(${negocio}, 'clock_in', null, null, null, ${sesion}) AS id`);
@@ -219,7 +245,7 @@ describe.skipIf(!RLS_DB_URL)('RLS · vendedores en el TPV', () => {
   });
 
   it('nadie cambia el vendedor escribiendo en la tabla; reasignar es de admins, con motivo y rastro', async () => {
-    const venta = await vender(staff, null);
+    const venta = await vender(staff, (await empezar(staff, empleadoStaff, '2468')).session_id);
     const directo = await asUser(sql, owner, (tx) => tx`UPDATE sales SET seller_employee_id = ${ana} WHERE id = ${venta}`);
     expect(directo.count).toBe(0);
     expect(await vendedorDe(venta)).toBe(empleadoStaff);
@@ -274,5 +300,27 @@ describe.skipIf(!RLS_DB_URL)('RLS · vendedores en el TPV', () => {
     await expect(
       asUser(sql, staff, (tx) => tx`SELECT * FROM public.get_sales_by_seller(${negocio}, ${hoy}::date, ${hoy}::date)`),
     ).rejects.toMatchObject(PERMISO_DENEGADO);
+  });
+
+  it('cada uno cambia su PIN con el actual; los fallos cuentan para el bloqueo', async () => {
+    const cambiar = async (actual: string, nuevo: string, user = staff) => {
+      const [r] = await asUser(sql, user, (tx) => tx<{ ok: boolean; error: string | null; locked_seconds: number }[]>`
+        SELECT * FROM public.change_own_pin(${negocio}, ${ana}, ${actual}, ${nuevo})`);
+      return r;
+    };
+    const abierta = (await empezar(staff, ana, '1234')).session_id!;
+    expect(await cambiar('9999', '4321')).toMatchObject({ ok: false, error: 'PIN incorrecto' });
+    await expect(cambiar('1234', '12')).rejects.toThrow(/4 y 6 cifras/);
+    await expect(cambiar('1234', '4321', ajeno)).rejects.toMatchObject(PERMISO_DENEGADO);
+    expect(await cambiar('1234', '4321')).toMatchObject({ ok: true, error: null });
+    // El PIN viejo deja de valer, el nuevo sí, y la sesión que estaba abierta se cierra.
+    expect((await empezar(staff, ana, '1234')).ok).toBe(false);
+    await expect(vender(staff, abierta)).rejects.toThrow(/sesión de vendedor/i);
+    expect((await empezar(staff, ana, '4321')).ok).toBe(true);
+    // Los fallos al cambiarlo bloquean igual que al identificarse.
+    for (let i = 0; i < 4; i++) await cambiar('0000', '5555');
+    expect((await cambiar('0000', '5555')).locked_seconds).toBeGreaterThan(0);
+    expect((await empezar(staff, ana, '4321')).error).toMatch(/Demasiados intentos/);
+    await sql`UPDATE hr_employee_pins SET locked_until = NULL WHERE employee_id = ${ana}`;
   });
 });

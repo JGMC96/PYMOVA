@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useSellers, type SellerReportRow } from '@/hooks/useSellers';
-import { IDLE_LOCK_MINUTES, isValidPin, type PosEmployee } from '@/lib/sellerSession';
+import { isValidPin, SELLER_SESSION_HOURS, type PosEmployee } from '@/lib/sellerSession';
 
 const eur = (n: number) => `${n.toFixed(2)} €`;
 const monthStart = () => new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
@@ -51,8 +51,10 @@ export function SellersPanel() {
               Dependientes
             </CardTitle>
             <CardDescription>
-              Cada dependiente se identifica en el TPV con su PIN y la venta queda a su nombre. No necesitan cuenta ni
-              correo. El TPV vuelve a pedir el PIN tras {IDLE_LOCK_MINUTES} minutos sin uso.
+              Con algún dependiente con PIN, nadie cobra ni devuelve sin identificarse. Al cobrar, el TPV pide el PIN
+              si no hay nadie conectado, usa a la persona conectada si solo hay una y pregunta quién ha hecho la venta
+              si hay varias. Quien mete su PIN queda conectado {SELLER_SESSION_HOURS} horas. No necesitan cuenta ni
+              correo, y cada uno puede cambiar su PIN en el TPV.
             </CardDescription>
           </div>
           <div className="flex gap-2 shrink-0">
@@ -162,6 +164,7 @@ export function SellersPanel() {
 
       <PinDialog
         target={pinTarget}
+        firstPin={!employees.some((e) => e.has_pin && e.is_active)}
         busy={isSaving}
         onClose={() => setPinTarget(null)}
         onSave={async (pin) => {
@@ -224,11 +227,14 @@ function EmployeeRow({
 
 function PinDialog({
   target,
+  firstPin,
   busy,
   onClose,
   onSave,
 }: {
   target: PinTarget;
+  /** Ningún dependiente activo tiene PIN todavía: este será el primero. */
+  firstPin: boolean;
   busy: boolean;
   onClose: () => void;
   onSave: (pin: string) => Promise<void>;
@@ -271,6 +277,12 @@ function PinDialog({
             />
           </div>
           {repeat && pin !== repeat && <p className="text-sm text-destructive">Los dos PIN no coinciden.</p>}
+          {firstPin && (
+            <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-400" role="note">
+              Es el primer PIN del negocio: desde que lo guardes, el TPV pedirá identificarse para cobrar y devolver.
+              Pon el PIN a todos los que venden seguidos, en un momento tranquilo.
+            </p>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>

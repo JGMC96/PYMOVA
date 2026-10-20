@@ -1,15 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import {
-  IDLE_LOCK_MS,
-  isIdleLocked,
+  activeSellers,
   isSellerSessionError,
   isValidPin,
   lockedMessage,
-  parseStoredSeller,
+  minutesLeft,
+  parseStoredSellers,
   requiresSeller,
+  SELLER_SESSION_MS,
   sellableEmployees,
+  sellerChoice,
   sellerStorageKey,
+  withSeller,
   type PosEmployee,
+  type StoredSeller,
 } from '@/lib/sellerSession';
 
 const emp = (p: Partial<PosEmployee>): PosEmployee => ({
@@ -20,6 +24,14 @@ const emp = (p: Partial<PosEmployee>): PosEmployee => ({
   has_account: false,
   user_id: null,
   ...p,
+});
+
+const conectado = (employeeId: string, startedAt: number): StoredSeller => ({
+  sessionId: `s-${employeeId}-${startedAt}`,
+  employeeId,
+  name: employeeId,
+  startedAt,
+  expiresAt: startedAt + SELLER_SESSION_MS,
 });
 
 describe('isValidPin', () => {
@@ -33,16 +45,8 @@ describe('isValidPin', () => {
   });
 });
 
-describe('bloqueo por inactividad', () => {
-  it('se bloquea a los 5 minutos sin actividad', () => {
-    expect(isIdleLocked(0, IDLE_LOCK_MS - 1)).toBe(false);
-    expect(isIdleLocked(0, IDLE_LOCK_MS)).toBe(true);
-    expect(isIdleLocked(1_000, 2_000, 500)).toBe(true);
-  });
-});
-
 describe('dependientes del TPV', () => {
-  it('solo cuentan los activos con PIN, y con alguno el TPV exige vendedor', () => {
+  it('solo cuentan los activos con PIN, y con alguno no se vende sin identificarse', () => {
     const lista = [emp({ id: 'a' }), emp({ id: 'b', has_pin: false }), emp({ id: 'c', is_active: false })];
     expect(sellableEmployees(lista).map((e) => e.id)).toEqual(['a']);
     expect(requiresSeller(lista)).toBe(true);
@@ -51,22 +55,44 @@ describe('dependientes del TPV', () => {
   });
 });
 
-describe('sesión guardada', () => {
-  it('lee solo valores completos y bien formados', () => {
-    const ok = { sessionId: 's', employeeId: 'e', name: 'Ana', startedAt: 1 };
-    expect(parseStoredSeller(JSON.stringify(ok))).toEqual(ok);
-    expect(parseStoredSeller(null)).toBeNull();
-    expect(parseStoredSeller('{')).toBeNull();
-    expect(parseStoredSeller(JSON.stringify({ sessionId: 's' }))).toBeNull();
-    expect(sellerStorageKey('b1')).toBe('pymova.seller.b1');
+describe('personas conectadas', () => {
+  it('duran 3 horas y salen por orden de llegada', () => {
+    const t0 = 1_000_000;
+    const lista = [conectado('juan', t0 + 10), conectado('ana', t0)];
+    expect(activeSellers(lista, t0 + 60_000).map((s) => s.employeeId)).toEqual(['ana', 'juan']);
+    expect(activeSellers(lista, t0 + SELLER_SESSION_MS).map((s) => s.employeeId)).toEqual(['juan']);
+    expect(activeSellers(lista, t0 + SELLER_SESSION_MS + 10)).toEqual([]);
+    expect(minutesLeft(lista[1], t0)).toBe(180);
+    expect(minutesLeft(lista[1], t0 + SELLER_SESSION_MS + 1)).toBe(0);
+  });
+
+  it('al cobrar: nadie → PIN, una persona → esa, varias → preguntar', () => {
+    expect(sellerChoice([])).toBe('login');
+    expect(sellerChoice([conectado('ana', 1)])).toBe('auto');
+    expect(sellerChoice([conectado('ana', 1), conectado('juan', 2)])).toBe('ask');
+  });
+
+  it('una persona solo aparece una vez: volver a conectarse sustituye su sesión', () => {
+    const lista = withSeller([conectado('ana', 1), conectado('juan', 2)], conectado('ana', 3));
+    expect(lista.map((s) => s.sessionId)).toEqual(['s-juan-2', 's-ana-3']);
+  });
+
+  it('la lista guardada se lee solo si tiene la forma correcta', () => {
+    const ok = conectado('ana', 1);
+    expect(parseStoredSellers(JSON.stringify([ok, { sessionId: 'x' }, null]))).toEqual([ok]);
+    expect(parseStoredSellers(JSON.stringify(ok))).toEqual([]);
+    expect(parseStoredSellers(null)).toEqual([]);
+    expect(parseStoredSellers('{')).toEqual([]);
+    expect(sellerStorageKey('b1')).toBe('pymova.sellers.b1');
   });
 });
 
 describe('mensajes', () => {
-  it('redondea el bloqueo hacia arriba en minutos y reconoce el error de sesión', () => {
+  it('redondea el bloqueo hacia arriba en minutos y reconoce los errores de sesión', () => {
     expect(lockedMessage(30)).toBe('Demasiados intentos. Espera 1 minuto.');
     expect(lockedMessage(300)).toBe('Demasiados intentos. Espera 5 minutos.');
     expect(isSellerSessionError('La sesión de vendedor no es válida: vuelve a introducir el PIN')).toBe(true);
+    expect(isSellerSessionError('Falta la sesión de vendedor: identifícate con tu PIN en el TPV')).toBe(true);
     expect(isSellerSessionError('Abre la caja')).toBe(false);
     expect(isSellerSessionError(null)).toBe(false);
   });

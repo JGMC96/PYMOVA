@@ -1,19 +1,17 @@
-// Sesión de vendedor del TPV (quién atiende): reglas puras, sin red ni React.
+// Personas conectadas al TPV (quién vende): reglas puras, sin red ni React.
+// Quien mete su PIN queda conectado SELLER_SESSION_HOURS en ese TPV. Al cobrar: si no
+// hay nadie se pide el PIN, si hay una persona se usa esa y si hay varias se pregunta.
 
-/** PIN de 4 a 6 cifras, como exige set_employee_pin. */
+/** PIN de 4 a 6 cifras, como exigen set_employee_pin y change_own_pin. */
 export const PIN_PATTERN = /^[0-9]{4,6}$/;
 
 export function isValidPin(pin: string): boolean {
   return PIN_PATTERN.test(pin);
 }
 
-/** Minutos sin tocar la pantalla tras los que el TPV vuelve a pedir el PIN. */
-export const IDLE_LOCK_MINUTES = 5;
-export const IDLE_LOCK_MS = IDLE_LOCK_MINUTES * 60 * 1000;
-
-export function isIdleLocked(lastActivityMs: number, nowMs: number, limitMs = IDLE_LOCK_MS): boolean {
-  return nowMs - lastActivityMs >= limitMs;
-}
+/** Horas que dura una persona conectada tras meter su PIN (igual que en el servidor, 0028). */
+export const SELLER_SESSION_HOURS = 3;
+export const SELLER_SESSION_MS = SELLER_SESSION_HOURS * 60 * 60 * 1000;
 
 export interface PosEmployee {
   id: string;
@@ -29,7 +27,7 @@ export function sellableEmployees(employees: PosEmployee[]): PosEmployee[] {
   return employees.filter((e) => e.is_active && e.has_pin);
 }
 
-/** Si hay algún dependiente con PIN, el TPV exige vendedor para cobrar. */
+/** Si hay algún dependiente con PIN, no se vende ni se devuelve sin identificarse. */
 export function requiresSeller(employees: PosEmployee[]): boolean {
   return sellableEmployees(employees).length > 0;
 }
@@ -39,29 +37,57 @@ export interface StoredSeller {
   employeeId: string;
   name: string;
   startedAt: number;
+  expiresAt: number;
 }
 
 export function sellerStorageKey(businessId: string): string {
-  return `pymova.seller.${businessId}`;
+  return `pymova.sellers.${businessId}`;
 }
 
-/** Lee la sesión guardada en sessionStorage; null si no es válida. */
-export function parseStoredSeller(raw: string | null): StoredSeller | null {
-  if (!raw) return null;
+function isStoredSeller(v: unknown): v is StoredSeller {
+  const s = v as Partial<StoredSeller> | null;
+  return (
+    !!s &&
+    typeof s.sessionId === 'string' &&
+    typeof s.employeeId === 'string' &&
+    typeof s.name === 'string' &&
+    typeof s.startedAt === 'number' &&
+    typeof s.expiresAt === 'number'
+  );
+}
+
+/** Lee la lista guardada; ignora lo que no tenga la forma correcta. */
+export function parseStoredSellers(raw: string | null): StoredSeller[] {
+  if (!raw) return [];
   try {
-    const v = JSON.parse(raw) as Partial<StoredSeller>;
-    if (
-      typeof v.sessionId === 'string' &&
-      typeof v.employeeId === 'string' &&
-      typeof v.name === 'string' &&
-      typeof v.startedAt === 'number'
-    ) {
-      return { sessionId: v.sessionId, employeeId: v.employeeId, name: v.name, startedAt: v.startedAt };
-    }
+    const v = JSON.parse(raw) as unknown;
+    return Array.isArray(v) ? v.filter(isStoredSeller) : [];
   } catch {
-    // Valor corrupto: se ignora.
+    return [];
   }
-  return null;
+}
+
+/** Conectados que no han caducado, por orden de llegada. */
+export function activeSellers(list: StoredSeller[], nowMs: number): StoredSeller[] {
+  return list.filter((s) => s.expiresAt > nowMs).sort((a, b) => a.startedAt - b.startedAt);
+}
+
+/** Añade o sustituye a una persona (una sola sesión por persona en el TPV). */
+export function withSeller(list: StoredSeller[], seller: StoredSeller): StoredSeller[] {
+  return [...list.filter((s) => s.employeeId !== seller.employeeId), seller];
+}
+
+export type SellerChoice = 'login' | 'auto' | 'ask';
+
+/** Al cobrar: nadie conectado → PIN; una persona → esa; varias → preguntar quién. */
+export function sellerChoice(active: StoredSeller[]): SellerChoice {
+  if (active.length === 0) return 'login';
+  return active.length === 1 ? 'auto' : 'ask';
+}
+
+/** Minutos que le quedan a una persona conectada (redondeo hacia arriba). */
+export function minutesLeft(seller: StoredSeller, nowMs: number): number {
+  return Math.max(0, Math.ceil((seller.expiresAt - nowMs) / 60_000));
 }
 
 /** Texto del bloqueo por intentos fallidos. */
@@ -70,7 +96,7 @@ export function lockedMessage(lockedSeconds: number): string {
   return `Demasiados intentos. Espera ${min} ${min === 1 ? 'minuto' : 'minutos'}.`;
 }
 
-/** ¿El error del servidor es por una sesión de vendedor caducada o inválida? */
+/** ¿El error del servidor es por una sesión de vendedor que falta, caducó o no vale? */
 export function isSellerSessionError(message: string | null | undefined): boolean {
   return /sesi[oó]n de vendedor/i.test(message ?? '');
 }
