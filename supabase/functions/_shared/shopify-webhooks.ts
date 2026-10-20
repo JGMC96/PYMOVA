@@ -2,12 +2,17 @@
 // El endpoint HTTP sólo encola y responde 200; aquí se hace el trabajo real.
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
 import {
+  catalogAction,
   isCatalogTopic,
   levelFromInventoryWebhook,
   ORDER_TOPICS,
   orderGidFromPayload,
+  PRODUCT_BY_ID_QUERY,
+  productGidFromPayload,
   retryDelaySeconds,
+  type ShopifyProductNode,
 } from '../_shared/shopify-core.ts';
+import { upsertShopifyProduct } from '../_shared/shopify-catalog.ts';
 import { shopifyGraphql } from '../_shared/shopify-client.ts';
 import {
   buildUpsertArgs,
@@ -26,10 +31,17 @@ export interface QueuedEvent {
   shop_domain: string | null;
 }
 
+/** Estado compartido por los eventos de un mismo lote de la cola. */
+export interface DrainContext {
+  /** Productos ya leídos de Shopify en este lote: los avisos repetidos no vuelven a leerlo. */
+  seenProducts: Set<string>;
+}
+
 /** Ejecuta un evento encolado. Devuelve el estado final. */
 export async function processEvent(
   admin: SupabaseClient,
   event: QueuedEvent,
+  ctx: DrainContext = { seenProducts: new Set() },
 ): Promise<{ status: string; message: string }> {
   const topic = event.topic;
   const payload = event.payload ?? {};
@@ -110,6 +122,13 @@ export async function processEvent(
     return { status: 'ignored', message: 'Artículo de Shopify no emparejado con Pymova' };
   }
 
+  // Catálogo: los productos activos de Shopify entran solos; Shopify manda en los que
+  // ya están (nombre, precio, tallas). Borradores y archivados no entran, y si ya
+  // estaban se desactivan. Nunca se borra nada: tienen ventas e historial.
+  if (topic === 'products/create' || topic === 'products/update' || topic === 'products/delete') {
+    return await processProductEvent(admin, event.business_id, topic, payload, ctx);
+  }
+
   if (isCatalogTopic(topic)) {
     return {
       status: 'processed',
@@ -118,6 +137,89 @@ export async function processEvent(
   }
 
   return { status: 'ignored', message: `Evento ${topic} sin acción asociada` };
+}
+
+/** Aviso de producto: lo lee en vivo de Shopify y lo crea, actualiza o desactiva. */
+async function processProductEvent(
+  admin: SupabaseClient,
+  businessId: string,
+  topic: string,
+  payload: Record<string, unknown>,
+  ctx: DrainContext,
+): Promise<{ status: string; message: string }> {
+  const gid = productGidFromPayload(payload);
+  if (!gid) return { status: 'ignored', message: 'Aviso de producto sin identificador' };
+
+  const { data: connection } = await admin
+    .from('shopify_connections')
+    .select('business_id, uninstalled_at')
+    .eq('business_id', businessId)
+    .maybeSingle();
+  if (!connection || connection.uninstalled_at) {
+    return { status: 'ignored', message: 'Sin tienda de Shopify vinculada' };
+  }
+
+  if (topic !== 'products/delete' && ctx.seenProducts.has(gid)) {
+    return { status: 'processed', message: 'Producto ya leído de Shopify en este lote' };
+  }
+
+  const { data: local } = await admin
+    .from('products')
+    .select('id, name, is_active')
+    .eq('business_id', businessId)
+    .eq('external_source', 'shopify')
+    .eq('external_id', gid)
+    .maybeSingle();
+
+  // Un borrado no se consulta: el producto ya no existe en Shopify.
+  let node: ShopifyProductNode | null = null;
+  if (topic !== 'products/delete') {
+    const data = await shopifyGraphql<{ product: ShopifyProductNode | null }>(
+      PRODUCT_BY_ID_QUERY,
+      { id: gid },
+      { requiredScopes: ['read_products', 'read_inventory'] },
+    );
+    node = data.product;
+    ctx.seenProducts.add(gid);
+  }
+
+  const action = catalogAction(node?.status ?? null, !!local);
+
+  if (action === 'skip') {
+    return {
+      status: 'ignored',
+      message: node
+        ? `Borrador o archivado en Shopify: «${node.title}» entrará cuando se active`
+        : 'Producto borrado en Shopify que no estaba en Pymova',
+    };
+  }
+
+  if (action === 'deactivate') {
+    if (local!.is_active) {
+      const { error } = await admin
+        .from('products')
+        .update({ is_active: false, updated_at: new Date().toISOString() })
+        .eq('id', local!.id);
+      if (error) throw error;
+    }
+    return {
+      status: 'processed',
+      message: node
+        ? `Producto desactivado (no está activo en Shopify): ${local!.name}`
+        : `Producto desactivado (borrado en Shopify): ${local!.name}`,
+    };
+  }
+
+  const result = await upsertShopifyProduct(admin, businessId, node!, {
+    createdBy: null,
+    stock: 'new-items',
+    deactivateMissingVariants: true,
+  });
+  const issues = result.issues.map((i) => i.message).join('; ');
+  return {
+    status: 'processed',
+    message: `${result.created ? 'Producto importado' : 'Producto actualizado'}: ${node!.title}${issues ? ` (${issues})` : ''}`,
+  };
 }
 
 /** Guarda los envíos (fulfillments) de un pedido evitando duplicados. */
@@ -192,10 +294,11 @@ export async function drainWebhookQueue(admin: SupabaseClient, limit = 20): Prom
     .limit(limit);
 
   let handled = 0;
+  const ctx: DrainContext = { seenProducts: new Set() };
   for (const event of (events ?? []) as QueuedEvent[]) {
     const attempts = (event.attempts ?? 0) + 1;
     try {
-      const result = await processEvent(admin, event);
+      const result = await processEvent(admin, event, ctx);
       await admin
         .from('integration_webhook_events')
         .update({

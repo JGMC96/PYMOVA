@@ -363,6 +363,28 @@ export const PRODUCTS_QUERY = `
   }
 `;
 
+/** Un producto por su GID, con los mismos campos que un nodo de PRODUCTS_QUERY. */
+export const PRODUCT_BY_ID_QUERY = `
+  query ProductById($id: ID!) {
+    product(id: $id) {
+      id
+      title
+      handle
+      description
+      productType
+      vendor
+      status
+      updatedAt
+      featuredImage { url altText }
+      priceRangeV2 { minVariantPrice { amount currencyCode } }
+      variants(first: 25) {
+        pageInfo { hasNextPage endCursor }
+        edges { node { ${VARIANT_FIELDS} } }
+      }
+    }
+  }
+`;
+
 /** Página adicional de variantes de un producto concreto. */
 export const PRODUCT_VARIANTS_PAGE_QUERY = `
   query ProductVariants($id: ID!, $after: String) {
@@ -807,4 +829,60 @@ export function levelsFromInventoryItemNodes(
     }
   }
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// Catálogo desde Shopify (webhooks products/create, products/update, products/delete)
+// ---------------------------------------------------------------------------
+
+/** Payload REST de un webhook de producto → GID del producto (null si no es válido). */
+export function productGidFromPayload(payload: Record<string, unknown>): string | null {
+  const gid = payload.admin_graphql_api_id;
+  if (typeof gid === 'string' && gid.startsWith('gid://shopify/Product/')) return gid;
+  const id = payload.id;
+  if (typeof id === 'number' && Number.isSafeInteger(id) && id > 0) return `gid://shopify/Product/${id}`;
+  if (typeof id === 'string' && /^\d+$/.test(id)) return `gid://shopify/Product/${id}`;
+  return null;
+}
+
+export type CatalogAction = 'import' | 'update' | 'deactivate' | 'skip';
+
+/**
+ * Qué hacer con un producto de Shopify según su estado (null = ya no existe en
+ * Shopify) y si ya está en Pymova. Solo entran los activos; un borrador o archivado
+ * que ya estaba se desactiva, y uno que no estaba se ignora hasta que se active.
+ */
+export function catalogAction(status: string | null, existsLocally: boolean): CatalogAction {
+  if (status === 'ACTIVE') return existsLocally ? 'update' : 'import';
+  return existsLocally ? 'deactivate' : 'skip';
+}
+
+/** Variantes locales (por su id de Shopify) que ya no existen en el producto de Shopify. */
+export function variantsToDeactivate(localExternalIds: string[], shopifyIds: string[]): string[] {
+  const current = new Set(shopifyIds);
+  return localExternalIds.filter((id) => !current.has(id));
+}
+
+/** Emparejamiento local de un artículo de inventario. */
+export interface LevelPairing {
+  local_product_id: string | null;
+  local_variant_id: string | null;
+}
+
+/**
+ * Filas de inventario cuyo artículo es nuevo para Pymova o ha cambiado de
+ * emparejamiento: son las únicas a las que un aviso de producto pone stock. El stock
+ * de los artículos ya conocidos lo traen inventory_levels/update y el refresco nocturno.
+ */
+export function levelRowsNeedingStock<T extends { inventory_item_gid: string }>(
+  rows: T[],
+  known: Map<string, LevelPairing>,
+  expected: (row: T) => LevelPairing,
+): T[] {
+  return rows.filter((row) => {
+    const before = known.get(row.inventory_item_gid);
+    if (!before) return true;
+    const now = expected(row);
+    return before.local_product_id !== now.local_product_id || before.local_variant_id !== now.local_variant_id;
+  });
 }
