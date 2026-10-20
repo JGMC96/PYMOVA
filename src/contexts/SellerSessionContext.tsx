@@ -61,7 +61,7 @@ export function SellerSessionProvider({ children }: { children: ReactNode }) {
     setIsLoadingEmployees(true);
     const { data, error } = await rpc('get_pos_employees', { _business_id: activeBusinessId });
     if (error) console.error('get_pos_employees', error);
-    setEmployees(((data ?? []) as PosEmployee[]) ?? []);
+    setEmployees((data ?? []) as PosEmployee[]);
     setIsLoadingEmployees(false);
   }, [activeBusinessId]);
 

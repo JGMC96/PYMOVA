@@ -2948,6 +2948,23 @@ export type Database = {
         Args: { _at?: string; _business_id: string }
         Returns: string
       }
+      business_requires_seller: {
+        Args: { _business_id: string }
+        Returns: boolean
+      }
+      change_own_pin: {
+        Args: {
+          _business_id: string
+          _employee_id: string
+          _new_pin: string
+          _old_pin: string
+        }
+        Returns: {
+          error: string
+          locked_seconds: number
+          ok: boolean
+        }[]
+      }
       claim_shopify_shop: {
         Args: {
           _api_version?: string
@@ -3475,6 +3492,14 @@ export type Database = {
           _is_active?: boolean
         }
         Returns: string
+      }
+      verify_employee_pin: {
+        Args: { _business_id: string; _employee_id: string; _pin: string }
+        Returns: {
+          error: string
+          locked_seconds: number
+          ok: boolean
+        }[]
       }
     }
     Enums: {
