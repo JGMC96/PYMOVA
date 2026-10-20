@@ -3,7 +3,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { serviceClient, shopifyGraphql, ShopifyError } from '../_shared/shopify-client.ts';
-import { refundAmountForReturn } from '../_shared/shopify-core.ts';
+import { refundAmountForReturn, shopifyTag } from '../_shared/shopify-core.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
@@ -21,6 +21,14 @@ const ORDER_QUERY = `
       id
       lineItems(first: 100) { nodes { id title quantity variant { id } } }
       transactions(first: 20) { id kind status gateway }
+    }
+  }
+`;
+
+const TAGS_ADD = `
+  mutation PosReturnTags($id: ID!, $tags: [String!]!) {
+    tagsAdd(id: $id, tags: $tags) {
+      userErrors { field message }
     }
   }
 `;
@@ -56,7 +64,7 @@ Deno.serve(async (req) => {
 
     const { data: returnsData } = await admin
       .from('sale_returns')
-      .select('id, sale_id, return_number, reason, total, shopify_refund_attempts, sales!inner(shopify_order_gid, sale_number, total), sale_return_items(product_id, variant_id, product_name, quantity, unit_price, total)')
+      .select('id, sale_id, return_number, reason, total, seller_employee_id, shopify_refund_attempts, sales!inner(shopify_order_gid, sale_number, total), sale_return_items(product_id, variant_id, product_name, quantity, unit_price, total)')
       .eq('business_id', businessId)
       .is('shopify_refund_gid', null)
       .not('sales.shopify_order_gid', 'is', null)
@@ -69,6 +77,7 @@ Deno.serve(async (req) => {
       return_number: string;
       reason: string | null;
       total: number | string;
+      seller_employee_id: string | null;
       shopify_refund_attempts: number;
       sales: { shopify_order_gid: string | null; sale_number: string; total: number | string };
       sale_return_items: { product_id: string | null; variant_id: string | null; product_name: string; quantity: number; unit_price: number; total: number | null }[];
@@ -131,10 +140,18 @@ Deno.serve(async (req) => {
           );
         }
 
+        const sellerName = ret.seller_employee_id
+          ? ((await admin.rpc('employee_display_name', { _employee_id: ret.seller_employee_id })).data as string | null)
+          : null;
+
         const parent = data.order.transactions.find((t) => ['SALE', 'CAPTURE'].includes(t.kind) && t.status === 'SUCCESS');
         const input: Record<string, unknown> = {
           orderId: orderGid,
-          note: [`Devolución en tienda Pymova ${ret.return_number}`, ret.reason].filter(Boolean).join(' — '),
+          note: [
+            `Devolución en tienda Pymova ${ret.return_number}`,
+            sellerName ? `Atendido por ${sellerName}` : null,
+            ret.reason,
+          ].filter(Boolean).join(' — '),
           notify: false,
           refundLineItems,
         };
@@ -150,6 +167,17 @@ Deno.serve(async (req) => {
         }>(REFUND_CREATE, { input, key: ret.id }, { requiredScopes: ['write_orders'] });
         const errors = result.refundCreate.userErrors ?? [];
         if (errors.length || !result.refundCreate.refund) throw new Error(errors.map((e) => e.message).join('; ') || 'Shopify no devolvió el reembolso');
+
+        // El número de la devolución como etiqueta del pedido: su ticket también lo encuentra.
+        // Si falla, el reembolso ya está hecho y no se repite.
+        const returnTag = shopifyTag(ret.return_number);
+        if (returnTag) {
+          try {
+            await shopifyGraphql(TAGS_ADD, { id: orderGid, tags: [returnTag] }, { requiredScopes: ['write_orders'] });
+          } catch (tagError) {
+            console.error('No se pudo etiquetar la devolución', tagError instanceof Error ? tagError.message : tagError);
+          }
+        }
 
         await admin.from('sale_returns').update({
           shopify_refund_gid: result.refundCreate.refund.id,
