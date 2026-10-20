@@ -12,23 +12,19 @@ import {
   CUSTOMERS_QUERY,
   LOCATIONS_QUERY,
   PRODUCTS_QUERY,
-  fetchAllInventoryLevels,
-  fetchAllVariants,
   missingScopes,
   resolveClientMatch,
   availableAtLocation,
-  variantUnitCost,
   INVENTORY_ITEMS_BATCH,
   INVENTORY_ITEMS_LEVELS_QUERY,
   levelsFromInventoryItemNodes,
   type InventoryItemLevelsNode,
-  type InventoryLevelRow,
   type ShopifyProductNode,
-  type ShopifyVariantNode,
 } from '../_shared/shopify-core.ts';
 import { drainWebhookQueue, syncFulfillmentsForOrder } from '../_shared/shopify-webhooks.ts';
 import { ORDERS_QUERY, buildUpsertArgs, type ShopifyAdminOrder } from '../_shared/shopify-admin.ts';
 import { consumeTicket, hasTicket } from '../_shared/scheduled-ticket.ts';
+import { applyLevels, upsertShopifyProduct, type LevelTotals } from '../_shared/shopify-catalog.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -90,31 +86,6 @@ function toClientProduct(node: ShopifyProductNode, stockByVariant: Map<string, n
       })),
     },
   };
-}
-
-type LevelTotals = { applied: number; stale: number; unknown: number };
-
-/** Aplica niveles de Shopify y recalcula el stock local (tienda + envíos pendientes). */
-async function applyLevels(
-  admin: SupabaseClient,
-  businessId: string,
-  levels: unknown[],
-  source: 'shopify' | 'import',
-): Promise<LevelTotals> {
-  const totals: LevelTotals = { applied: 0, stale: 0, unknown: 0 };
-  for (let i = 0; i < levels.length; i += 200) {
-    const { data, error } = await admin.rpc('apply_shopify_inventory_levels', {
-      _business_id: businessId,
-      _levels: levels.slice(i, i + 200),
-      _source: source,
-    });
-    if (error) throw error;
-    const row = (Array.isArray(data) ? data[0] : data) as LevelTotals | null;
-    totals.applied += row?.applied ?? 0;
-    totals.stale += row?.stale ?? 0;
-    totals.unknown += row?.unknown ?? 0;
-  }
-  return totals;
 }
 
 /**
@@ -498,165 +469,15 @@ Deno.serve(async (req) => {
 
             for (const { node } of data.products.edges) {
               try {
-                const { variants, complete } = await fetchAllVariants(
-                  (q, v, o) => shopifyGraphql(q, v, o),
-                  node,
-                );
-                if (!complete) {
-                  await logIssue(
-                    'product',
-                    node.title,
-                    node.id,
-                    'No se pudieron leer todas las variantes (paginación incompleta).',
-                  );
-                }
-
-                // Inventario por ubicación de cada variante.
-                const inventoryRows: InventoryLevelRow[] = [];
-                for (const variant of variants) {
-                  const { rows } = await fetchAllInventoryLevels(
-                    (q, v, o) => shopifyGraphql(q, v, o),
-                    variant as ShopifyVariantNode,
-                  );
-                  inventoryRows.push(...rows);
-                }
-
-                const first = variants[0];
-                const firstCost = first ? variantUnitCost(first as ShopifyVariantNode) : null;
-
-                const { data: existing } = await admin
-                  .from('products')
-                  .select('id')
-                  .eq('business_id', businessId)
-                  .eq('external_source', 'shopify')
-                  .eq('external_id', node.id)
-                  .maybeSingle();
-
-                const productPayload = {
-                  business_id: businessId,
-                  name: node.title,
-                  description: node.description || null,
-                  price: Number(node.priceRangeV2.minVariantPrice.amount) || 0,
-                  category: node.productType || null,
-                  sku: first?.sku ?? null,
-                  barcode: first?.barcode ?? null,
-                  // Solo sobrescribe el coste si Shopify lo informa (no borra el coste manual).
-                  ...(firstCost !== null ? { cost_price: firstCost } : {}),
-                  // El stock no se escribe aquí: lo pone applyLevels con la ubicación de la tienda.
-                  track_inventory: true,
-                  is_active: node.status === 'ACTIVE',
-                  external_id: node.id,
-                  external_source: 'shopify',
-                  updated_at: new Date().toISOString(),
-                };
-
-                let productId: string;
-                if (existing) {
-                  await admin.from('products').update(productPayload).eq('id', existing.id);
-                  productId = existing.id;
-                  updated += 1;
-                } else {
-                  const { data: inserted, error } = await admin
-                    .from('products')
-                    .insert({ ...productPayload, stock_quantity: 0, created_by: userData.user.id })
-                    .select('id')
-                    .single();
-                  if (error) throw error;
-                  productId = inserted.id;
-                  created += 1;
-                }
-
-                const localVariantIds = new Map<string, string>();
-                if (variants.length > 1) {
-                  for (const v of variants) {
-                    const variantPayload = {
-                      business_id: businessId,
-                      product_id: productId,
-                      name: v.title,
-                      attributes: Object.fromEntries(
-                        v.selectedOptions.map((o) => [o.name, o.value]),
-                      ),
-                      sku: v.sku,
-                      barcode: v.barcode,
-                      price: Number(v.price) || null,
-                      ...(variantUnitCost(v as ShopifyVariantNode) !== null
-                        ? { cost_price: variantUnitCost(v as ShopifyVariantNode) }
-                        : {}),
-                      is_active: true,
-                      external_id: v.id,
-                      external_source: 'shopify',
-                      updated_at: new Date().toISOString(),
-                    };
-
-                    const { data: existingVariant } = await admin
-                      .from('product_variants')
-                      .select('id')
-                      .eq('business_id', businessId)
-                      .eq('external_source', 'shopify')
-                      .eq('external_id', v.id)
-                      .maybeSingle();
-
-                    if (existingVariant) {
-                      await admin
-                        .from('product_variants')
-                        .update(variantPayload)
-                        .eq('id', existingVariant.id);
-                      localVariantIds.set(v.id, existingVariant.id);
-                    } else {
-                      const { data: insertedVariant } = await admin
-                        .from('product_variants')
-                        .insert({ ...variantPayload, stock_quantity: 0, created_by: userData.user.id })
-                        .select('id')
-                        .maybeSingle();
-                      if (insertedVariant) localVariantIds.set(v.id, insertedVariant.id);
-                    }
-                  }
-                }
-
-                if (inventoryRows.length > 0) {
-                  // Dedup dentro del lote: dos variantes pueden compartir inventory_item.
-                  const deduped = [
-                    ...new Map(
-                      inventoryRows.map((r) => [`${r.inventory_item_gid}|${r.location_gid}`, r]),
-                    ).values(),
-                  ];
-                  const { error: invError } = await admin.from('shopify_inventory_levels').upsert(
-                    deduped.map((row) => ({
-                      business_id: businessId,
-                      variant_external_id: row.variant_external_id,
-                      local_variant_id: localVariantIds.get(row.variant_external_id) ?? null,
-                      local_product_id: productId,
-                      inventory_item_gid: row.inventory_item_gid,
-                      location_gid: row.location_gid,
-                      location_name: row.location_name ?? locations.get(row.location_gid) ?? null,
-                      available: row.available,
-                      synced_at: new Date().toISOString(),
-                      updated_at: new Date().toISOString(),
-                    })),
-                    { onConflict: 'business_id,inventory_item_gid,location_gid' },
-                  );
-                  if (invError) {
-                    await logIssue(
-                      'inventory',
-                      node.title,
-                      node.id,
-                      `No se pudo guardar el inventario por ubicación: ${invError.message}`,
-                    );
-                  } else {
-                    // Stock local = ubicación de la tienda (+ envíos pendientes).
-                    await applyLevels(
-                      admin,
-                      businessId,
-                      deduped.map((row) => ({
-                        inventory_item_gid: row.inventory_item_gid,
-                        location_gid: row.location_gid,
-                        location_name: row.location_name ?? null,
-                        available: row.available,
-                        updated_at: null,
-                      })),
-                      'import',
-                    );
-                  }
+                const result = await upsertShopifyProduct(admin, businessId, node, {
+                  createdBy: userData.user.id,
+                  stock: 'all',
+                  locations,
+                });
+                if (result.created) created += 1;
+                else updated += 1;
+                for (const issue of result.issues) {
+                  await logIssue(issue.entity, node.title, node.id, issue.message);
                 }
               } catch (err) {
                 await logIssue(

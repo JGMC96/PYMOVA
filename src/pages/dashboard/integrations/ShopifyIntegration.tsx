@@ -246,8 +246,10 @@ const ShopifyIntegration = () => {
           <CardTitle className="text-lg">Sincronización</CardTitle>
           <CardDescription>
 
+            Los productos activos de Shopify entran solos en Pymova, y sus cambios (nombre,
+            precio, tallas) se aplican al momento; los borradores entran cuando se activan.
             «Forzar sincronización» recorre todo el catálogo de Shopify (o el filtro de búsqueda
-            aplicado) y actualiza productos, variantes y precios en Pymova. El stock sigue a
+            aplicado) de una vez. El stock sigue a
             Shopify (ubicación de la tienda): cambia al momento con cada aviso de Shopify, se
             refresca entero cada noche y puedes refrescarlo cuando quieras con «Actualizar stock
             desde Shopify». Los pedidos y ventas de Shopify se gestionan desde Retail → E-commerce.
