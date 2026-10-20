@@ -1,4 +1,4 @@
-import { createClient } from 'npm:@supabase/supabase-js@2';
+import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import {
   READ_SCOPES,
@@ -16,7 +16,7 @@ import {
   fetchAllVariants,
   missingScopes,
   resolveClientMatch,
-  totalAvailable,
+  availableAtLocation,
   variantUnitCost,
   INVENTORY_ITEMS_BATCH,
   INVENTORY_ITEMS_LEVELS_QUERY,
@@ -28,6 +28,7 @@ import {
 } from '../_shared/shopify-core.ts';
 import { drainWebhookQueue, syncFulfillmentsForOrder } from '../_shared/shopify-webhooks.ts';
 import { ORDERS_QUERY, buildUpsertArgs, type ShopifyAdminOrder } from '../_shared/shopify-admin.ts';
+import { isServiceRoleRequest } from '../_shared/service-auth.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -91,6 +92,111 @@ function toClientProduct(node: ShopifyProductNode, stockByVariant: Map<string, n
   };
 }
 
+type LevelTotals = { applied: number; stale: number; unknown: number };
+
+/** Aplica niveles de Shopify y recalcula el stock local (tienda + envíos pendientes). */
+async function applyLevels(
+  admin: SupabaseClient,
+  businessId: string,
+  levels: unknown[],
+  source: 'shopify' | 'import',
+): Promise<LevelTotals> {
+  const totals: LevelTotals = { applied: 0, stale: 0, unknown: 0 };
+  for (let i = 0; i < levels.length; i += 200) {
+    const { data, error } = await admin.rpc('apply_shopify_inventory_levels', {
+      _business_id: businessId,
+      _levels: levels.slice(i, i + 200),
+      _source: source,
+    });
+    if (error) throw error;
+    const row = (Array.isArray(data) ? data[0] : data) as LevelTotals | null;
+    totals.applied += row?.applied ?? 0;
+    totals.stale += row?.stale ?? 0;
+    totals.unknown += row?.unknown ?? 0;
+  }
+  return totals;
+}
+
+/**
+ * Lee de Shopify el disponible actual de todos los artículos emparejados y pone el
+ * stock local al día (ubicación de la tienda + envíos pendientes). Deja la hora y el
+ * resultado en shopify_connections para verlo en la integración.
+ */
+async function refreshStock(admin: SupabaseClient, businessId: string) {
+  const record = (status: string) =>
+    admin
+      .from('shopify_connections')
+      .update({ last_stock_refresh_at: new Date().toISOString(), last_stock_refresh_status: status })
+      .eq('business_id', businessId);
+
+  try {
+    const items = new Set<string>();
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await admin
+        .from('shopify_inventory_levels')
+        .select('inventory_item_gid')
+        .eq('business_id', businessId)
+        .order('inventory_item_gid')
+        .range(from, from + 999);
+      if (error) throw error;
+      for (const row of data ?? []) items.add(row.inventory_item_gid);
+      if (!data || data.length < 1000) break;
+    }
+
+    const ids = [...items];
+    let read = 0;
+    const totals: LevelTotals = { applied: 0, stale: 0, unknown: 0 };
+    for (let i = 0; i < ids.length; i += INVENTORY_ITEMS_BATCH) {
+      const data = await run<{ nodes: Array<InventoryItemLevelsNode | null> }>(
+        INVENTORY_ITEMS_LEVELS_QUERY,
+        { ids: ids.slice(i, i + INVENTORY_ITEMS_BATCH) },
+        ['read_inventory'],
+      );
+      const levels = levelsFromInventoryItemNodes(data.nodes ?? []);
+      read += levels.length;
+      if (levels.length === 0) continue;
+      const r = await applyLevels(admin, businessId, levels, 'import');
+      totals.applied += r.applied;
+      totals.stale += r.stale;
+      totals.unknown += r.unknown;
+    }
+
+    await record(`ok: ${ids.length} artículos, ${totals.applied} niveles aplicados`);
+    return { items: ids.length, levels: read, ...totals };
+  } catch (error) {
+    await record(`error: ${errorText(error)}`.slice(0, 500));
+    throw error;
+  }
+}
+
+/**
+ * Tareas programadas (pg_cron con la clave de servicio): solo procesar la cola de
+ * avisos y refrescar el stock. El negocio sale de la conexión de la tienda.
+ */
+async function handleScheduledJob(admin: SupabaseClient, body: Record<string, unknown>): Promise<Response> {
+  const action = String(body.action ?? '');
+  try {
+    if (action === 'process-webhooks') {
+      const handled = await drainWebhookQueue(admin, Math.min(Number(body.limit ?? 50), 100));
+      return json({ ok: true, handled });
+    }
+    if (action === 'refresh-stock') {
+      const { data: connection } = await admin
+        .from('shopify_connections')
+        .select('business_id, uninstalled_at')
+        .eq('shop_domain', getShopDomain())
+        .maybeSingle();
+      if (!connection || connection.uninstalled_at) {
+        return json({ ok: true, skipped: 'Sin tienda de Shopify vinculada' });
+      }
+      return json({ ok: true, ...(await refreshStock(admin, connection.business_id)) });
+    }
+    return json({ error: 'Acción no permitida para tareas programadas' }, 403);
+  } catch (error) {
+    return json({ error: errorText(error) }, 500);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
@@ -101,6 +207,11 @@ Deno.serve(async (req) => {
   try {
     const authHeader = req.headers.get('Authorization') ?? '';
     if (!authHeader.startsWith('Bearer ')) return json({ error: 'No autorizado' }, 401);
+
+    // Tareas programadas: la pasarela ya ha verificado el JWT (verify_jwt = true).
+    if (isServiceRoleRequest(authHeader)) {
+      return await handleScheduledJob(admin, await req.json().catch(() => ({})));
+    }
 
     const userClient = createClient(SUPABASE_URL, ANON_KEY, {
       global: { headers: { Authorization: authHeader } },
@@ -196,24 +307,6 @@ Deno.serve(async (req) => {
       };
     };
 
-    /** Aplica niveles de Shopify y recalcula el stock local (tienda + envíos pendientes). */
-    const applyLevels = async (levels: unknown[], source: 'shopify' | 'import') => {
-      const totals = { applied: 0, stale: 0, unknown: 0 };
-      for (let i = 0; i < levels.length; i += 200) {
-        const { data, error } = await admin.rpc('apply_shopify_inventory_levels', {
-          _business_id: businessId,
-          _levels: levels.slice(i, i + 200),
-          _source: source,
-        });
-        if (error) throw error;
-        const row = (Array.isArray(data) ? data[0] : data) as typeof totals | null;
-        totals.applied += row?.applied ?? 0;
-        totals.stale += row?.stale ?? 0;
-        totals.unknown += row?.unknown ?? 0;
-      }
-      return totals;
-    };
-
     // ---------------------------------------------------------------- status
     if (action === 'status') {
       const connection = await loadConnection();
@@ -280,42 +373,13 @@ Deno.serve(async (req) => {
     // pone el stock local al día (ubicación de la tienda + envíos pendientes).
     if (action === 'refresh-stock') {
       await requireConnection();
-      const items = new Set<string>();
-      for (let from = 0; ; from += 1000) {
-        const { data, error } = await admin
-          .from('shopify_inventory_levels')
-          .select('inventory_item_gid')
-          .eq('business_id', businessId)
-          .order('inventory_item_gid')
-          .range(from, from + 999);
-        if (error) throw error;
-        for (const row of data ?? []) items.add(row.inventory_item_gid);
-        if (!data || data.length < 1000) break;
-      }
-
-      const ids = [...items];
-      let read = 0;
-      const totals = { applied: 0, stale: 0, unknown: 0 };
-      for (let i = 0; i < ids.length; i += INVENTORY_ITEMS_BATCH) {
-        const data = await run<{ nodes: Array<InventoryItemLevelsNode | null> }>(
-          INVENTORY_ITEMS_LEVELS_QUERY,
-          { ids: ids.slice(i, i + INVENTORY_ITEMS_BATCH) },
-          ['read_inventory'],
-        );
-        const levels = levelsFromInventoryItemNodes(data.nodes ?? []);
-        read += levels.length;
-        if (levels.length === 0) continue;
-        const r = await applyLevels(levels, 'import');
-        totals.applied += r.applied;
-        totals.stale += r.stale;
-        totals.unknown += r.unknown;
-      }
-      return json({ ok: true, items: ids.length, levels: read, ...totals });
+      return json({ ok: true, ...(await refreshStock(admin, businessId)) });
     }
 
     // --------------------------------------------------------- list-products
     if (action === 'list-products') {
-      await requireConnection();
+      const connection = await requireConnection();
+      const storeLocation = (connection as { default_location_gid?: string | null }).default_location_gid ?? null;
       const data = await run<{
         products: {
           pageInfo: { hasNextPage: boolean; endCursor: string | null };
@@ -343,7 +407,8 @@ Deno.serve(async (req) => {
                 available: e.node.quantities.find((q) => q.name === 'available')?.quantity ?? 0,
               }))
             : [];
-          stockByVariant.set(v.id, rows.length ? totalAvailable(rows) : null);
+          // Stock de la tienda (como en Pymova), no la suma de todas las ubicaciones.
+          stockByVariant.set(v.id, availableAtLocation(rows, storeLocation));
         }
       }
 
@@ -577,6 +642,8 @@ Deno.serve(async (req) => {
                   } else {
                     // Stock local = ubicación de la tienda (+ envíos pendientes).
                     await applyLevels(
+                      admin,
+                      businessId,
                       deduped.map((row) => ({
                         inventory_item_gid: row.inventory_item_gid,
                         location_gid: row.location_gid,

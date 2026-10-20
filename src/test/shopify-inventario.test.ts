@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  availableAtLocation,
   levelFromInventoryWebhook,
   levelsFromInventoryItemNodes,
   toShopifyGid,
@@ -62,5 +63,25 @@ describe('levelsFromInventoryItemNodes', () => {
       { inventory_item_gid: 'gid://shopify/InventoryItem/1', location_gid: 'gid://shopify/Location/1', location_name: 'Tienda', available: 4, updated_at: '2026-10-20T10:00:00Z' },
       { inventory_item_gid: 'gid://shopify/InventoryItem/1', location_gid: 'gid://shopify/Location/2', location_name: 'Almacén', available: 0, updated_at: null },
     ]);
+  });
+});
+
+describe('availableAtLocation', () => {
+  const fila = (location_gid: string, available: number) => ({
+    variant_external_id: 'v', inventory_item_gid: 'i', location_gid, location_name: '', available,
+  });
+  const filas = [fila('gid://shopify/Location/1', 4), fila('gid://shopify/Location/2', 7)];
+
+  it('da el disponible de la ubicación de la tienda', () => {
+    expect(availableAtLocation(filas, 'gid://shopify/Location/1')).toBe(4);
+  });
+
+  it('da 0 si el artículo no está en la tienda y la suma si no hay ubicación por defecto', () => {
+    expect(availableAtLocation([fila('gid://shopify/Location/2', 7)], 'gid://shopify/Location/1')).toBe(0);
+    expect(availableAtLocation(filas, null)).toBe(11);
+  });
+
+  it('sin niveles no hay dato', () => {
+    expect(availableAtLocation([], 'gid://shopify/Location/1')).toBeNull();
   });
 });

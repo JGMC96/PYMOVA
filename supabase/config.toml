@@ -23,3 +23,7 @@ verify_jwt = true
 
 [functions.shopify-orders-webhook]
 verify_jwt = false
+
+# Las tareas programadas llaman con la clave de servicio: la pasarela debe verificar el JWT.
+[functions.shopify-inventory-push]
+verify_jwt = true

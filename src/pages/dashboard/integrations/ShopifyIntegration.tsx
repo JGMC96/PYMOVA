@@ -247,8 +247,20 @@ const ShopifyIntegration = () => {
           <CardDescription>
 
             «Forzar sincronización» recorre todo el catálogo de Shopify (o el filtro de búsqueda
-            aplicado) y actualiza productos, variantes, precios y stock en Pymova. Los pedidos y
-            ventas de Shopify se gestionan desde Retail → E-commerce.
+            aplicado) y actualiza productos, variantes y precios en Pymova. El stock sigue a
+            Shopify (ubicación de la tienda): cambia al momento con cada aviso de Shopify, se
+            refresca entero cada noche y puedes refrescarlo cuando quieras con «Actualizar stock
+            desde Shopify». Los pedidos y ventas de Shopify se gestionan desde Retail → E-commerce.
+            <span className="block mt-2">
+              Último refresco de stock:{' '}
+              {connectionStatus?.connection?.last_stock_refresh_at
+                ? `${new Date(connectionStatus.connection.last_stock_refresh_at).toLocaleString('es-ES')}${
+                    connectionStatus.connection.last_stock_refresh_status
+                      ? ` (${connectionStatus.connection.last_stock_refresh_status})`
+                      : ''
+                  }`
+                : 'todavía no'}
+            </span>
           </CardDescription>
         </CardHeader>
         <CardContent>
