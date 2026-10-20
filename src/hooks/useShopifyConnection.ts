@@ -43,6 +43,8 @@ export function useShopifyConnection() {
   const [isLoading, setIsLoading] = useState(true);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  /** Productos procesados en la sincronización del catálogo en curso. */
+  const [syncProgress, setSyncProgress] = useState(0);
   const [isClaiming, setIsClaiming] = useState(false);
   const [isRefreshingStock, setIsRefreshingStock] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -111,12 +113,35 @@ export function useShopifyConnection() {
     async (scope: 'all' | 'catalog' | 'orders' | 'customers' = 'all') => {
       if (!activeBusinessId) return;
       setIsSyncing(true);
+      setSyncProgress(0);
       try {
-        const result = await invokeShopifySync<{ message: string; failed: number }>({
-          action: 'sync',
-          business_id: activeBusinessId,
-          scope,
-        });
+        type SyncResponse = {
+          message: string;
+          failed: number;
+          created?: number;
+          updated?: number;
+          partial?: boolean;
+          next_cursor?: string | null;
+          run_id?: string;
+        };
+        // El catálogo llega por lotes: se encadenan llamadas hasta que no queda cursor.
+        let after: string | null = null;
+        let runId: string | null = null;
+        let result: SyncResponse;
+        for (let batch = 0; ; batch++) {
+          result = await invokeShopifySync<SyncResponse>({
+            action: 'sync',
+            business_id: activeBusinessId,
+            scope,
+            after,
+            run_id: runId,
+            max_pages: 3,
+          });
+          setSyncProgress((result.created ?? 0) + (result.updated ?? 0) + (result.failed ?? 0));
+          if (!result.partial || !result.next_cursor || batch >= 100) break;
+          after = result.next_cursor;
+          runId = result.run_id ?? runId;
+        }
         if (result.failed > 0) {
           toast.warning('Sincronización completada con incidencias', {
             description: result.message,
@@ -194,6 +219,7 @@ export function useShopifyConnection() {
     isLoading,
     isVerifying,
     isSyncing,
+    syncProgress,
     isClaiming,
     error,
     refresh,
