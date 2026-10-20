@@ -399,21 +399,52 @@ Deno.serve(async (req) => {
       const scopeOption = String(body.scope ?? 'all');
       const days = Number(body.days ?? 60);
 
-      const { data: syncRun } = await admin
-        .from('integration_sync_runs')
-        .insert({
-          business_id: businessId,
-          integration_key: 'shopify',
-          scope: scopeOption,
-          status: 'running',
-          created_by: userData.user.id,
-        })
-        .select('id')
-        .single();
+      // El catálogo va por lotes: cada llamada procesa como mucho `max_pages` páginas de 10
+      // productos y devuelve `next_cursor` para seguir en la siguiente (una edge function no
+      // puede estar minutos seguidos). `run_id` continúa el mismo registro de sincronización.
+      const batchCursor = typeof body.after === 'string' && body.after ? body.after : null;
+      const maxPages = scopeOption === 'catalog' ? Math.min(Math.max(Number(body.max_pages ?? 3), 1), 10) : 50;
+      const continueRunId = typeof body.run_id === 'string' && body.run_id ? body.run_id : null;
 
-      let created = 0;
-      let updated = 0;
-      let failed = 0;
+      type SyncRunRow = { id: string; created_count: number; updated_count: number; failed_count: number };
+      let syncRun: SyncRunRow | null = null;
+      if (continueRunId) {
+        const { data } = await admin
+          .from('integration_sync_runs')
+          .select('id, created_count, updated_count, failed_count')
+          .eq('id', continueRunId)
+          .eq('business_id', businessId)
+          .eq('status', 'running')
+          .maybeSingle();
+        syncRun = (data as SyncRunRow | null) ?? null;
+        if (!syncRun) return json({ error: 'La sincronización que se quería continuar ya no está en marcha' }, 409);
+      } else {
+        // Una ejecución anterior que se quedó a medias (la función se cortó) no debe figurar como en marcha.
+        await admin
+          .from('integration_sync_runs')
+          .update({ status: 'error', message: 'Interrumpida: no terminó', finished_at: new Date().toISOString() })
+          .eq('business_id', businessId)
+          .eq('integration_key', 'shopify')
+          .eq('status', 'running')
+          .lt('started_at', new Date(Date.now() - 10 * 60000).toISOString());
+        const { data } = await admin
+          .from('integration_sync_runs')
+          .insert({
+            business_id: businessId,
+            integration_key: 'shopify',
+            scope: scopeOption,
+            status: 'running',
+            created_by: userData.user.id,
+          })
+          .select('id, created_count, updated_count, failed_count')
+          .single();
+        syncRun = (data as SyncRunRow | null) ?? null;
+      }
+
+      let created = syncRun?.created_count ?? 0;
+      let updated = syncRun?.updated_count ?? 0;
+      let failed = syncRun?.failed_count ?? 0;
+      let nextCursor: string | null = null;
       const messages: string[] = [];
 
       const firstErrors: string[] = [];
@@ -456,8 +487,8 @@ Deno.serve(async (req) => {
 
         // --- Catálogo: productos, variantes (paginadas) e inventario por ubicación ---
         if (scopeOption === 'all' || scopeOption === 'catalog') {
-          let cursor: string | null = null;
-          for (let page = 0; page < 50; page++) {
+          let cursor: string | null = batchCursor;
+          for (let page = 0; page < maxPages; page++) {
             const data: {
               products: {
                 pageInfo: { hasNextPage: boolean; endCursor: string | null };
@@ -491,7 +522,17 @@ Deno.serve(async (req) => {
 
             if (!data.products.pageInfo.hasNextPage || !data.products.pageInfo.endCursor) break;
             cursor = data.products.pageInfo.endCursor;
+            if (page === maxPages - 1) nextCursor = cursor;
           }
+        }
+
+        // Lote intermedio: se guarda el avance y el cliente sigue con `next_cursor`.
+        if (nextCursor && syncRun) {
+          await admin
+            .from('integration_sync_runs')
+            .update({ created_count: created, updated_count: updated, failed_count: failed, processed_count: created + updated + failed })
+            .eq('id', syncRun.id);
+          return json({ ok: true, partial: true, next_cursor: nextCursor, run_id: syncRun.id, created, updated, failed });
         }
 
         // --- Pedidos, líneas y envíos ---

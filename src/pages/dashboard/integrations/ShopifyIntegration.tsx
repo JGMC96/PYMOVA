@@ -33,6 +33,7 @@ const ShopifyIntegration = () => {
     isRefreshingStock,
     sync: syncCatalog,
     isSyncing: isCatalogSyncing,
+    syncProgress: catalogSyncProgress,
   } = useShopifyConnection();
 
   const {
@@ -195,7 +196,7 @@ const ShopifyIntegration = () => {
               <RefreshCw className="w-4 h-4 mr-2" />
             )}
             {isCatalogSyncing
-              ? 'Sincronizando catálogo…'
+              ? `Sincronizando catálogo… (${catalogSyncProgress})`
               : isSyncing
                 ? queue.phase === 'processing'
                   ? `Sincronizando… (${queue.processed}/${queue.total})`
