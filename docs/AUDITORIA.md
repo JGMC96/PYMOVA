@@ -140,6 +140,7 @@ Cada hallazgo indica dónde está, qué impacto tiene y cómo corregirlo. Las ru
 
 - **Qué pasa:** el efectivo esperado solo suma ventas en efectivo y no resta las devoluciones con `refund_method = 'cash'`. Con dos aperturas simultáneas, las dos pasan el `IF EXISTS`. Además, cualquier miembro puede insertar directamente en `cash_register_sessions`, con una caja ya cerrada y cifras inventadas (`:78`).
 - **Corrección:** restar las devoluciones en efectivo, crear un índice único parcial `(business_id) WHERE status = 'open'` y quitar el INSERT directo.
+- **Estado (20/10/2026):** corregido en `dz/0021`. La caja solo se abre y se cierra por RPC (sin INSERT ni UPDATE directo; aperturas y cierres auditados). Las devoluciones guardan su caja y el arqueo resta las de efectivo. El índice único ya existía; ahora la segunda apertura recibe «Ya hay una caja abierta». Además, por decisión del usuario: cualquier miembro puede cerrar la caja y cobrar o devolver en efectivo exige caja abierta. Las devoluciones valen lo cobrado en la línea, con su descuento, también en el reembolso de Shopify.
 
 **M3 · Cualquier miembro puede editar facturas, cobros, productos y variantes.** `sm/20260126161816:243-264` y `sm/20260729155359:38-40`.
 

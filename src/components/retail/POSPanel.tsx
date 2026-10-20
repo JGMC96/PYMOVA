@@ -211,6 +211,10 @@ export function POSPanel() {
   const handleCheckout = async (method: string = selectedPayment) => {
     if (cart.length === 0) return;
     const usesCash = method === 'cash';
+    if (usesCash && !openSession) {
+      toast.error('Abre la caja para cobrar en efectivo');
+      return;
+    }
     if (usesCash && !isNaN(cashReceived) && cashReceived < dueTotal) {
       toast.error('El efectivo recibido es menor que el total');
       return;
@@ -268,7 +272,7 @@ export function POSPanel() {
     <>
       {!openSession && (
         <div className="mb-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-600 dark:text-amber-400">
-          No hay caja abierta. Las ventas se registrarán sin asociar al arqueo diario — ábrela en la pestaña <strong>Caja</strong>.
+          No hay caja abierta. Para cobrar en efectivo, ábrela en la pestaña <strong>Caja</strong>. Con tarjeta o transferencia puedes vender igualmente.
         </div>
       )}
 
@@ -628,7 +632,7 @@ export function POSPanel() {
         <Button
           size="lg"
           className="h-14 text-base"
-          disabled={cart.length === 0 || isCreating}
+          disabled={cart.length === 0 || isCreating || (selectedPayment === 'cash' && !openSession)}
           onClick={() => handleCheckout()}
         >
           {isCreating ? 'Procesando...' : `Pagar ${dueTotal.toFixed(2)} €`}
@@ -645,7 +649,7 @@ export function POSPanel() {
                 size="lg"
                 variant="secondary"
                 className="h-14 text-base"
-                disabled={cart.length === 0 || isCreating}
+                disabled={cart.length === 0 || isCreating || (method === 'cash' && !openSession)}
                 onClick={() => handleCheckout(method)}
               >
                 <Icon className="w-5 h-5 mr-2" />

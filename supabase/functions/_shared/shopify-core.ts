@@ -685,11 +685,18 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
  * nunca por encima de lo que queda por reembolsar de la venta.
  */
 export function refundAmountForReturn(
-  items: { quantity: number; unit_price: number }[],
+  items: { quantity: number; unit_price: number; total?: number | null }[],
   saleTotal: number,
   alreadyRefunded: number,
 ): number {
-  const lines = round2(items.reduce((sum, i) => sum + Number(i.quantity) * Number(i.unit_price), 0));
+  // `total` es lo cobrado en la línea devuelta (con su descuento, dz/0021); las líneas
+  // antiguas sin total usan unidades × precio.
+  const lines = round2(
+    items.reduce(
+      (sum, i) => sum + (i.total != null ? Number(i.total) : Number(i.quantity) * Number(i.unit_price)),
+      0,
+    ),
+  );
   const pending = Math.max(0, round2(Number(saleTotal) - Number(alreadyRefunded)));
   return Math.max(0, Math.min(lines, pending));
 }

@@ -18,6 +18,8 @@ async function crearNegocio(sql: Sql, ownerEmail: string, nombre: string): Promi
     INSERT INTO products (business_id, name, price, stock_quantity, track_inventory) VALUES (${b.id}, 'Zueco', 10, 1000, true) RETURNING id`;
   const [v] = await sql<{ id: string }[]>`
     INSERT INTO product_variants (business_id, product_id, name, price, stock_quantity) VALUES (${b.id}, ${p.id}, 'T38', 10, 1000) RETURNING id`;
+  // Las ventas y devoluciones en efectivo necesitan una caja abierta (M2).
+  await asUser(sql, owner, (tx) => tx`SELECT public.open_register_session(${b.id}, 0)`);
   return { id: b.id, owner, producto: p.id, variante: v.id };
 }
 
