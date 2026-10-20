@@ -183,6 +183,13 @@
       "when": 1792494919585,
       "tag": "0025_ajustes_stock",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1792498354343,
+      "tag": "0026_stock_tareas_programadas",
+      "breakpoints": true
     }
   ]
 }

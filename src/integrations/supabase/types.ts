@@ -2250,6 +2250,27 @@ export type Database = {
           },
         ]
       }
+      scheduled_job_tickets: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          used_at: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          id?: string
+          used_at?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          used_at?: string | null
+        }
+        Relationships: []
+      }
       shopify_app_tokens: {
         Row: {
           access_token: string
@@ -2291,6 +2312,8 @@ export type Database = {
           id: string
           last_catalog_sync_at: string | null
           last_orders_sync_at: string | null
+          last_stock_refresh_at: string | null
+          last_stock_refresh_status: string | null
           last_sync_error: string | null
           last_sync_status: string | null
           last_verified_at: string | null
@@ -2313,6 +2336,8 @@ export type Database = {
           id?: string
           last_catalog_sync_at?: string | null
           last_orders_sync_at?: string | null
+          last_stock_refresh_at?: string | null
+          last_stock_refresh_status?: string | null
           last_sync_error?: string | null
           last_sync_status?: string | null
           last_verified_at?: string | null
@@ -2335,6 +2360,8 @@ export type Database = {
           id?: string
           last_catalog_sync_at?: string | null
           last_orders_sync_at?: string | null
+          last_stock_refresh_at?: string | null
+          last_stock_refresh_status?: string | null
           last_sync_error?: string | null
           last_sync_status?: string | null
           last_verified_at?: string | null
@@ -2775,6 +2802,8 @@ export type Database = {
           id: string
           last_catalog_sync_at: string | null
           last_orders_sync_at: string | null
+          last_stock_refresh_at: string | null
+          last_stock_refresh_status: string | null
           last_sync_error: string | null
           last_sync_status: string | null
           last_verified_at: string | null
@@ -2807,6 +2836,10 @@ export type Database = {
       close_register_session: {
         Args: { _counted_amount: number; _notes?: string; _session_id: string }
         Returns: undefined
+      }
+      consume_scheduled_job_ticket: {
+        Args: { _action: string; _ticket: string }
+        Returns: boolean
       }
       correct_work_session: {
         Args: {
@@ -3104,6 +3137,7 @@ export type Database = {
         Returns: boolean
       }
       is_super_admin: { Args: never; Returns: boolean }
+      issue_scheduled_job_ticket: { Args: { _action: string }; Returns: string }
       move_to_dlq: {
         Args: {
           dlq_name: string
@@ -3178,6 +3212,13 @@ export type Database = {
           _tracking_number?: string
         }
         Returns: undefined
+      }
+      shopify_pending_work: {
+        Args: never
+        Returns: {
+          pending_events: boolean
+          pending_pushes: boolean
+        }[]
       }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
