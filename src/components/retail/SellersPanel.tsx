@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useSellers, type SellerReportRow } from '@/hooks/useSellers';
+import { useRoleAccess } from '@/hooks/useRoleAccess';
 import { isValidPin, SELLER_SESSION_HOURS, type PosEmployee } from '@/lib/sellerSession';
 
 const eur = (n: number) => `${n.toFixed(2)} €`;
@@ -20,8 +21,9 @@ const today = () => new Date().toISOString().slice(0, 10);
 type PinTarget = { id: string; name: string } | null;
 type NameTarget = { id: string | null; name: string } | null;
 
-/** Pestaña «Vendedores» (admins): dependientes del TPV y ventas por vendedor. */
+/** Pestaña «Vendedores» (admins): dependientes del TPV; las ventas por vendedor, solo el propietario. */
 export function SellersPanel() {
+  const { isOwner } = useRoleAccess('owner');
   const { employees, isLoading, isSaving, myEmployee, createEmployee, renameEmployee, setActive, setPin, ensureMyEmployee, salesBySeller, refresh } =
     useSellers();
   const [pinTarget, setPinTarget] = useState<PinTarget>(null);
@@ -32,10 +34,11 @@ export function SellersPanel() {
   const [loadingReport, setLoadingReport] = useState(false);
 
   const loadReport = useCallback(async () => {
+    if (!isOwner) return;
     setLoadingReport(true);
     setReport(await salesBySeller(from, to));
     setLoadingReport(false);
-  }, [salesBySeller, from, to]);
+  }, [salesBySeller, from, to, isOwner]);
 
   useEffect(() => {
     void loadReport();
@@ -109,6 +112,7 @@ export function SellersPanel() {
         </CardContent>
       </Card>
 
+      {isOwner && (
       <Card>
         <CardHeader>
           <CardTitle>Ventas por vendedor</CardTitle>
@@ -161,6 +165,7 @@ export function SellersPanel() {
           )}
         </CardContent>
       </Card>
+      )}
 
       <PinDialog
         target={pinTarget}
