@@ -1,7 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Receipt, CreditCard, Banknote, RefreshCw, RotateCcw } from 'lucide-react';
+import { Receipt, CreditCard, Banknote, RefreshCw, RotateCcw, ScanLine, X } from 'lucide-react';
+import { toast } from 'sonner';
+import { Input } from '@/components/ui/input';
+import { normalizeTicketCode } from '@/lib/ticketCode';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -13,12 +16,53 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useRetailSales } from '@/hooks/useRetailSales';
+import { useRetailSales, type SaleWithClient } from '@/hooks/useRetailSales';
 import { useSaleReturns, type SaleReturn } from '@/hooks/useSaleReturns';
 import { ReturnDialog } from './ReturnDialog';
 
 export function SalesHistory() {
-  const { sales, isLoading, refreshSales } = useRetailSales();
+  const { sales, isLoading, refreshSales, findSaleByTicket } = useRetailSales();
+  const [query, setQuery] = useState('');
+  const [found, setFound] = useState<SaleWithClient | null>(null);
+  const [searching, setSearching] = useState(false);
+
+  // Mientras se escribe, se filtran las ventas cargadas; con Intro (lo que manda el
+  // lector de códigos de barras) se busca el ticket exacto, aunque sea antiguo.
+  const visibleSales = useMemo(() => {
+    if (found) return [found];
+    const q = query.trim().toUpperCase();
+    if (!q) return sales;
+    const code = normalizeTicketCode(q);
+    return sales.filter((s) => s.sale_number.includes(q) || (code !== null && s.sale_number === code));
+  }, [sales, query, found]);
+
+  const searchTicket = async () => {
+    const code = normalizeTicketCode(query);
+    if (!code) {
+      toast.error('No es un número de ticket válido');
+      return;
+    }
+    const local = sales.find((s) => s.sale_number === code);
+    if (local) {
+      setFound(local);
+      setQuery(code);
+      return;
+    }
+    setSearching(true);
+    const sale = await findSaleByTicket(code);
+    setSearching(false);
+    if (sale) {
+      setFound(sale);
+      setQuery(code);
+    } else {
+      toast.error(`No se encuentra el ticket ${code}`);
+    }
+  };
+
+  const clearSearch = () => {
+    setQuery('');
+    setFound(null);
+  };
   const { fetchReturns } = useSaleReturns();
   const [returns, setReturns] = useState<SaleReturn[]>([]);
   const [selectedSale, setSelectedSale] = useState<{ id: string; number: string } | null>(null);
@@ -77,14 +121,46 @@ export function SalesHistory() {
         </Button>
       </CardHeader>
       <CardContent>
+        <div className="relative mb-4">
+          <ScanLine className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setFound(null);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                void searchTicket();
+              } else if (e.key === 'Escape') {
+                clearSearch();
+              }
+            }}
+            placeholder="Escanea el código del ticket o escribe su número (VTA-000123)"
+            className="pl-9 pr-9"
+            aria-label="Buscar ticket"
+            disabled={searching}
+          />
+          {query && (
+            <button
+              type="button"
+              onClick={clearSearch}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              aria-label="Limpiar búsqueda"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
             <div className="animate-spin w-6 h-6 border-4 border-primary border-t-transparent rounded-full" />
           </div>
-        ) : sales.length === 0 ? (
+        ) : visibleSales.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             <Receipt className="w-12 h-12 mx-auto mb-4 opacity-50" />
-            <p>No hay ventas registradas</p>
+            <p>{query ? 'Ningún ticket coincide. Pulsa Intro para buscarlo entre todos.' : 'No hay ventas registradas'}</p>
           </div>
         ) : (
           <Table>
@@ -99,7 +175,7 @@ export function SalesHistory() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sales.map((sale) => {
+              {visibleSales.map((sale) => {
                 const refunded = returnedTotal(sale.id);
                 return (
                   <TableRow key={sale.id}>

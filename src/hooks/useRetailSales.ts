@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import type { Json } from '@/integrations/supabase/types';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { toast } from 'sonner';
 import { pushShopifyStock, pushShopifyPosOrders, pushShopifyPosRefunds } from '@/lib/shopifyStockPush';
@@ -83,10 +84,10 @@ export function useRetailSales() {
       toast.error('Error al cargar ventas');
     } else {
       setSales(
-        (data || []).map((sale: any) => ({
-          ...sale,
-          client_name: sale.clients?.name || 'Mostrador',
-        }))
+        (data || []).map((sale) => {
+          const row = sale as SaleWithClient & { clients?: { name?: string } | null };
+          return { ...row, client_name: row.clients?.name || 'Mostrador' };
+        })
       );
     }
     setIsLoading(false);
@@ -116,7 +117,7 @@ export function useRetailSales() {
           unit_price: item.unit_price,
           discount: item.discount ?? 0,
           total: item.total,
-        })) as any,
+        })) as unknown as Json,
         _payment_method: data.payment_method,
         _client_id: data.client_id || null,
         _notes: data.notes || null,
@@ -132,7 +133,7 @@ export function useRetailSales() {
 
       if (error) throw error;
 
-      const row = Array.isArray(result) ? result[0] : (result as any);
+      const row = (Array.isArray(result) ? result[0] : result) as { sale_id: string; sale_number: string };
       const sale = { id: row.sale_id as string };
       const saleNumber = row.sale_number as string;
 
@@ -144,9 +145,9 @@ export function useRetailSales() {
         .then(() => pushShopifyPosRefunds(activeBusiness.id));
       fetchSales();
       return { id: sale.id, sale_number: saleNumber };
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error creating sale:', error);
-      toast.error(error?.message || 'Error al registrar venta');
+      toast.error((error as { message?: string } | null)?.message || 'Error al registrar venta');
       return null;
 
     } finally {
@@ -154,11 +155,49 @@ export function useRetailSales() {
     }
   };
 
+  /**
+   * Busca una venta por su número de ticket («VTA-000123») o por el de una de sus
+   * devoluciones («DEV-000012»), aunque no esté entre las últimas 100 cargadas.
+   */
+  const findSaleByTicket = useCallback(
+    async (code: string): Promise<SaleWithClient | null> => {
+      if (!activeBusiness?.id) return null;
+      let saleNumber = code;
+      if (code.startsWith('DEV-')) {
+        const { data: ret } = await supabase
+          .from('sale_returns')
+          .select('sale_id')
+          .eq('business_id', activeBusiness.id)
+          .eq('return_number', code)
+          .maybeSingle();
+        if (!ret) return null;
+        const { data: sale } = await supabase
+          .from('sales')
+          .select('sale_number')
+          .eq('id', ret.sale_id)
+          .maybeSingle();
+        if (!sale) return null;
+        saleNumber = sale.sale_number;
+      }
+      const { data, error } = await supabase
+        .from('sales')
+        .select('*, clients(name)')
+        .eq('business_id', activeBusiness.id)
+        .eq('sale_number', saleNumber)
+        .maybeSingle();
+      if (error || !data) return null;
+      const row = data as SaleWithClient & { clients?: { name?: string } | null };
+      return { ...row, client_name: row.clients?.name || 'Mostrador' };
+    },
+    [activeBusiness?.id],
+  );
+
   return {
     sales,
     isLoading,
     isCreating,
     createSale,
+    findSaleByTicket,
     refreshSales: fetchSales,
   };
 }
