@@ -909,3 +909,34 @@ export const PRODUCTS_STATUS_QUERY = `
     }
   }
 `;
+
+// ---------------------------------------------------------------------------
+// Ventas del TPV en Shopify: número de ticket y vendedor
+// ---------------------------------------------------------------------------
+
+/** Texto apto para etiqueta de Shopify: sin comas, espacios simples, como mucho 40 caracteres. */
+export function shopifyTag(text: string | null | undefined): string | null {
+  const clean = String(text ?? '').replace(/,/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 40).trim();
+  return clean || null;
+}
+
+/**
+ * Etiquetas que identifican una venta del TPV en Shopify. El buscador de pedidos de
+ * Shopify busca en las etiquetas (no en la nota), así que con el número de ticket como
+ * etiqueta, el código de barras del ticket encuentra el pedido.
+ */
+export function posTicketTags(ticketNumber: string, sellerName: string | null | undefined): string[] {
+  const seller = shopifyTag(sellerName ? `Vendedor: ${sellerName}` : null);
+  return [shopifyTag(ticketNumber), seller].filter((t): t is string => !!t);
+}
+
+/** «Detalles adicionales» del pedido en Shopify: ticket y vendedor. */
+export function posOrderAttributes(
+  ticketNumber: string,
+  sellerName: string | null | undefined,
+): Array<{ key: string; value: string }> {
+  const attrs = [{ key: 'Ticket', value: ticketNumber }];
+  const seller = String(sellerName ?? '').trim();
+  if (seller) attrs.push({ key: 'Vendedor', value: seller });
+  return attrs;
+}

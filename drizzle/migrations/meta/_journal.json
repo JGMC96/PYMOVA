@@ -211,6 +211,13 @@
       "when": 1792518286253,
       "tag": "0029_ventas_por_vendedor_propietario",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1792523089277,
+      "tag": "0030_rol_personal_y_permisos",
+      "breakpoints": true
     }
   ]
 }
