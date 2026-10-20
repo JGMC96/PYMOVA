@@ -337,8 +337,10 @@ export type Database = {
       cash_register_sessions: {
         Row: {
           business_id: string
+          close_authorized_by_employee_id: string | null
           closed_at: string | null
           closed_by: string | null
+          closed_by_employee_id: string | null
           counted_amount: number | null
           created_at: string
           difference: number | null
@@ -353,8 +355,10 @@ export type Database = {
         }
         Insert: {
           business_id: string
+          close_authorized_by_employee_id?: string | null
           closed_at?: string | null
           closed_by?: string | null
+          closed_by_employee_id?: string | null
           counted_amount?: number | null
           created_at?: string
           difference?: number | null
@@ -369,8 +373,10 @@ export type Database = {
         }
         Update: {
           business_id?: string
+          close_authorized_by_employee_id?: string | null
           closed_at?: string | null
           closed_by?: string | null
+          closed_by_employee_id?: string | null
           counted_amount?: number | null
           created_at?: string
           difference?: number | null
@@ -389,6 +395,20 @@ export type Database = {
             columns: ["business_id"]
             isOneToOne: false
             referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cash_register_sessions_close_authorized_by_employee_id_fkey"
+            columns: ["close_authorized_by_employee_id"]
+            isOneToOne: false
+            referencedRelation: "hr_employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cash_register_sessions_closed_by_employee_id_fkey"
+            columns: ["closed_by_employee_id"]
+            isOneToOne: false
+            referencedRelation: "hr_employees"
             referencedColumns: ["id"]
           },
         ]
@@ -603,6 +623,54 @@ export type Database = {
             foreignKeyName: "hr_absences_employee_id_fkey"
             columns: ["employee_id"]
             isOneToOne: false
+            referencedRelation: "hr_employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hr_employee_permissions: {
+        Row: {
+          business_id: string
+          can_close_register: boolean
+          can_return: boolean
+          employee_id: string
+          id: string
+          max_discount_pct: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          business_id: string
+          can_close_register?: boolean
+          can_return?: boolean
+          employee_id: string
+          id?: string
+          max_discount_pct?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          business_id?: string
+          can_close_register?: boolean
+          can_return?: boolean
+          employee_id?: string
+          id?: string
+          max_discount_pct?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_employee_permissions_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_employee_permissions_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
             referencedRelation: "hr_employees"
             referencedColumns: ["id"]
           },
@@ -1822,6 +1890,57 @@ export type Database = {
         }
         Relationships: []
       }
+      pos_authorizations: {
+        Row: {
+          action: string
+          business_id: string
+          created_at: string
+          employee_id: string
+          expires_at: string
+          id: string
+          max_amount: number | null
+          requested_by: string
+          used_at: string | null
+        }
+        Insert: {
+          action: string
+          business_id: string
+          created_at?: string
+          employee_id: string
+          expires_at?: string
+          id?: string
+          max_amount?: number | null
+          requested_by: string
+          used_at?: string | null
+        }
+        Update: {
+          action?: string
+          business_id?: string
+          created_at?: string
+          employee_id?: string
+          expires_at?: string
+          id?: string
+          max_amount?: number | null
+          requested_by?: string
+          used_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pos_authorizations_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_authorizations_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "hr_employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pos_seller_sessions: {
         Row: {
           business_id: string
@@ -2162,6 +2281,7 @@ export type Database = {
       }
       sale_returns: {
         Row: {
+          authorized_by_employee_id: string | null
           business_id: string
           created_at: string
           created_by: string | null
@@ -2180,6 +2300,7 @@ export type Database = {
           total: number
         }
         Insert: {
+          authorized_by_employee_id?: string | null
           business_id: string
           created_at?: string
           created_by?: string | null
@@ -2198,6 +2319,7 @@ export type Database = {
           total?: number
         }
         Update: {
+          authorized_by_employee_id?: string | null
           business_id?: string
           created_at?: string
           created_by?: string | null
@@ -2216,6 +2338,13 @@ export type Database = {
           total?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "sale_returns_authorized_by_employee_id_fkey"
+            columns: ["authorized_by_employee_id"]
+            isOneToOne: false
+            referencedRelation: "hr_employees"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "sale_returns_business_id_fkey"
             columns: ["business_id"]
@@ -2310,6 +2439,7 @@ export type Database = {
       }
       sales: {
         Row: {
+          authorized_by_employee_id: string | null
           business_id: string
           cash_received: number | null
           change_given: number | null
@@ -2334,6 +2464,7 @@ export type Database = {
           total: number
         }
         Insert: {
+          authorized_by_employee_id?: string | null
           business_id: string
           cash_received?: number | null
           change_given?: number | null
@@ -2358,6 +2489,7 @@ export type Database = {
           total?: number
         }
         Update: {
+          authorized_by_employee_id?: string | null
           business_id?: string
           cash_received?: number | null
           change_given?: number | null
@@ -2382,6 +2514,13 @@ export type Database = {
           total?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "sales_authorized_by_employee_id_fkey"
+            columns: ["authorized_by_employee_id"]
+            isOneToOne: false
+            referencedRelation: "hr_employees"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "sales_business_id_fkey"
             columns: ["business_id"]
@@ -2944,6 +3083,22 @@ export type Database = {
           unknown: number
         }[]
       }
+      authorize_action: {
+        Args: {
+          _action: string
+          _amount?: number
+          _business_id: string
+          _employee_id: string
+          _pin: string
+        }
+        Returns: {
+          authorization_id: string
+          error: string
+          locked_seconds: number
+          name: string
+          ok: boolean
+        }[]
+      }
       business_local_date: {
         Args: { _at?: string; _business_id: string }
         Returns: string
@@ -3014,8 +3169,23 @@ export type Database = {
         Returns: string
       }
       close_register_session: {
-        Args: { _counted_amount: number; _notes?: string; _session_id: string }
+        Args: {
+          _authorization_id?: string
+          _counted_amount: number
+          _notes?: string
+          _seller_session_id?: string
+          _session_id: string
+        }
         Returns: undefined
+      }
+      consume_authorization: {
+        Args: {
+          _action: string
+          _amount: number
+          _authorization_id: string
+          _business_id: string
+        }
+        Returns: string
       }
       consume_scheduled_job_ticket: {
         Args: { _action: string; _ticket: string }
@@ -3097,6 +3267,7 @@ export type Database = {
       }
       create_sale_return: {
         Args: {
+          _authorization_id?: string
           _business_id: string
           _items: Json
           _reason?: string
@@ -3112,6 +3283,7 @@ export type Database = {
       }
       create_sale_with_items: {
         Args: {
+          _authorization_id?: string
           _business_id: string
           _cash_received?: number
           _change_given?: number
@@ -3142,6 +3314,15 @@ export type Database = {
       }
       email_queue_dispatch: { Args: never; Returns: undefined }
       employee_display_name: { Args: { _employee_id: string }; Returns: string }
+      employee_effective_permissions: {
+        Args: { _employee_id: string }
+        Returns: {
+          can_close_register: boolean
+          can_return: boolean
+          is_owner: boolean
+          max_discount_pct: number
+        }[]
+      }
       end_seller_session: { Args: { _session_id: string }; Returns: undefined }
       enqueue_email: {
         Args: { payload: Json; queue_name: string }
@@ -3258,6 +3439,19 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_pos_permissions: {
+        Args: { _business_id: string }
+        Returns: {
+          can_close_register: boolean
+          can_return: boolean
+          customized: boolean
+          employee_id: string
+          has_account: boolean
+          is_owner: boolean
+          max_discount_pct: number
+          name: string
+        }[]
+      }
       get_recent_activity: {
         Args: { _business_id: string; _limit?: number }
         Returns: {
@@ -3270,7 +3464,7 @@ export type Database = {
         }[]
       }
       get_register_summary: {
-        Args: { _session_id: string }
+        Args: { _seller_session_ids?: string[]; _session_id: string }
         Returns: {
           payment_method: string
           refunds_amount: number
@@ -3424,6 +3618,16 @@ export type Database = {
         Returns: string
       }
       set_active_business: { Args: { _business_id: string }; Returns: boolean }
+      set_employee_permissions: {
+        Args: {
+          _business_id: string
+          _can_close_register: boolean
+          _can_return: boolean
+          _employee_id: string
+          _max_discount_pct: number
+        }
+        Returns: undefined
+      }
       set_employee_pin: {
         Args: { _business_id: string; _employee_id: string; _pin: string }
         Returns: undefined
