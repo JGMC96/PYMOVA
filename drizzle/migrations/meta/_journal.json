@@ -239,6 +239,13 @@
       "when": 1792527017383,
       "tag": "0033_caja_por_dependiente",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1792529737246,
+      "tag": "0034_cliente_en_tpv",
+      "breakpoints": true
     }
   ]
 }
