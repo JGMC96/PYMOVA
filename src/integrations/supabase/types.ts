@@ -2435,6 +2435,7 @@ export type Database = {
           local_variant_id: string | null
           location_gid: string
           location_name: string | null
+          remote_updated_at: string | null
           synced_at: string
           updated_at: string
           variant_external_id: string | null
@@ -2450,6 +2451,7 @@ export type Database = {
           local_variant_id?: string | null
           location_gid: string
           location_name?: string | null
+          remote_updated_at?: string | null
           synced_at?: string
           updated_at?: string
           variant_external_id?: string | null
@@ -2465,6 +2467,7 @@ export type Database = {
           local_variant_id?: string | null
           location_gid?: string
           location_name?: string | null
+          remote_updated_at?: string | null
           synced_at?: string
           updated_at?: string
           variant_external_id?: string | null
@@ -2554,6 +2557,70 @@ export type Database = {
             columns: ["business_id"]
             isOneToOne: false
             referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stock_movements: {
+        Row: {
+          business_id: string
+          created_at: string
+          created_by: string | null
+          delta: number
+          id: string
+          note: string | null
+          product_id: string | null
+          reference_id: string | null
+          source: string
+          stock_after: number | null
+          variant_id: string | null
+        }
+        Insert: {
+          business_id: string
+          created_at?: string
+          created_by?: string | null
+          delta: number
+          id?: string
+          note?: string | null
+          product_id?: string | null
+          reference_id?: string | null
+          source: string
+          stock_after?: number | null
+          variant_id?: string | null
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          created_by?: string | null
+          delta?: number
+          id?: string
+          note?: string | null
+          product_id?: string | null
+          reference_id?: string | null
+          source?: string
+          stock_after?: number | null
+          variant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_movements_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_movements_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_movements_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_variants"
             referencedColumns: ["id"]
           },
         ]
@@ -2669,6 +2736,14 @@ export type Database = {
       apply_online_order_stock: {
         Args: { _direction: number; _order_id: string }
         Returns: undefined
+      }
+      apply_shopify_inventory_levels: {
+        Args: { _business_id: string; _levels: Json; _source?: string }
+        Returns: {
+          applied: number
+          stale: number
+          unknown: number
+        }[]
       }
       business_local_date: {
         Args: { _at?: string; _business_id: string }
@@ -3044,6 +3119,15 @@ export type Database = {
           msg_id: number
           read_ct: number
         }[]
+      }
+      recompute_local_stock: {
+        Args: {
+          _business_id: string
+          _product_id: string
+          _source?: string
+          _variant_id: string
+        }
+        Returns: undefined
       }
       request_absence: {
         Args: {
