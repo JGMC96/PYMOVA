@@ -117,6 +117,8 @@ export interface HrDashboard {
   vacation_days_total: number;
   vacation_days_used: number;
   vacation_days_pending: number;
+  /** Sesiones propias pendientes de revisión (se olvidó fichar la salida). */
+  my_pending_reviews: number;
 }
 
 // Marketing calendar

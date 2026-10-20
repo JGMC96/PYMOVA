@@ -77,6 +77,13 @@ export function TimeClockCard() {
               Tiempo en sesión: <span className="font-mono font-semibold">{elapsed}</span>
             </div>
           )}
+          {(dashboard?.my_pending_reviews ?? 0) > 0 && (
+            <p className="text-xs text-amber-500 max-w-sm">
+              {dashboard!.my_pending_reviews === 1
+                ? 'Tienes 1 fichaje pendiente de revisión: se quedó abierto más de 12 h. Un administrador lo corregirá.'
+                : `Tienes ${dashboard!.my_pending_reviews} fichajes pendientes de revisión: se quedaron abiertos más de 12 h. Un administrador los corregirá.`}
+            </p>
+          )}
 
           <AnimatePresence mode="wait" initial={false}>
             <motion.div key={state} {...stateAnim}>

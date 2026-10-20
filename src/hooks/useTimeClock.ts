@@ -52,27 +52,31 @@ export function useTimeClock() {
     const reqId = ++requestIdRef.current;
     setIsLoading(true);
     try {
-      const { data: dashData, error: dashErr } = await (supabase.rpc as any)('get_hr_dashboard', {
+      const { data: dashData, error: dashErr } = await supabase.rpc('get_hr_dashboard', {
         _business_id: activeBusinessId,
       });
       if (reqId !== requestIdRef.current) return;
       if (dashErr) throw dashErr;
       const row = Array.isArray(dashData) ? dashData[0] : dashData;
-      setDashboard(row as HrDashboard);
+      // my_pending_reviews llega con la 0020; types.ts se regenera después.
+      setDashboard((row ?? null) as unknown as HrDashboard | null);
 
       const empId = row?.my_employee_id;
       if (empId) {
+        // Fichajes de la sesión abierta (aunque empezara ayer) o, si no hay, los de hoy.
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        const { data: entries } = await (supabase
-          .from('hr_time_entries' as any)
+        const openSince = row?.my_session_clock_in ? new Date(row.my_session_clock_in) : null;
+        const since = openSince && openSince < today ? openSince : today;
+        const { data: entries } = await supabase
+          .from('hr_time_entries')
           .select('*')
           .eq('business_id', activeBusinessId)
           .eq('employee_id', empId)
-          .gte('occurred_at', today.toISOString())
-          .order('occurred_at', { ascending: false }) as any);
+          .gte('occurred_at', since.toISOString())
+          .order('occurred_at', { ascending: false });
         if (reqId !== requestIdRef.current) return;
-        setTodayEntries((entries || []) as HrTimeEntry[]);
+        setTodayEntries((entries || []) as unknown as HrTimeEntry[]);
       } else {
         setTodayEntries([]);
       }
@@ -99,20 +103,20 @@ export function useTimeClock() {
             description: 'El fichaje se registrará sin coordenadas.',
           });
         }
-        const { error } = await (supabase.rpc as any)('clock_action', {
+        // Sin coordenadas se omiten y la RPC usa NULL por defecto.
+        const { error } = await supabase.rpc('clock_action', {
           _business_id: activeBusinessId,
           _entry_type: entry_type,
-          _latitude: coords.lat ?? null,
-          _longitude: coords.lng ?? null,
-          _notes: null,
+          _latitude: coords.lat,
+          _longitude: coords.lng,
         });
         if (error) throw error;
         toast({ title: 'Fichaje registrado' });
         await fetchAll();
-      } catch (err: any) {
+      } catch (err) {
         toast({
           title: 'Error',
-          description: err?.message || 'No se pudo registrar el fichaje',
+          description: (err as { message?: string } | null)?.message || 'No se pudo registrar el fichaje',
           variant: 'destructive',
         });
       } finally {
