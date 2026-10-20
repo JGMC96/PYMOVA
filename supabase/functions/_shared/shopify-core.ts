@@ -886,3 +886,26 @@ export function levelRowsNeedingStock<T extends { inventory_item_gid: string }>(
     return before.local_product_id !== now.local_product_id || before.local_variant_id !== now.local_variant_id;
   });
 }
+
+/**
+ * Productos locales que ya no deben venderse: los que Shopify no devuelve (borrados) o
+ * devuelve sin estar activos. `nodes` es la respuesta de `nodes(ids:)` en el mismo orden.
+ */
+export function productsGoneFromShopify(
+  externalIds: string[],
+  nodes: Array<{ id?: string; status?: string } | null>,
+): string[] {
+  return externalIds.filter((id, i) => {
+    const node = nodes[i];
+    return !node || node.id !== id || node.status !== 'ACTIVE';
+  });
+}
+
+/** Estado de varios productos por GID (lotes de hasta 50). */
+export const PRODUCTS_STATUS_QUERY = `
+  query ProductsStatus($ids: [ID!]!) {
+    nodes(ids: $ids) {
+      ... on Product { id status }
+    }
+  }
+`;

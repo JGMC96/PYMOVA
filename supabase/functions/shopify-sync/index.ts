@@ -24,7 +24,12 @@ import {
 import { drainWebhookQueue, syncFulfillmentsForOrder } from '../_shared/shopify-webhooks.ts';
 import { ORDERS_QUERY, buildUpsertArgs, type ShopifyAdminOrder } from '../_shared/shopify-admin.ts';
 import { consumeTicket, hasTicket } from '../_shared/scheduled-ticket.ts';
-import { applyLevels, upsertShopifyProduct, type LevelTotals } from '../_shared/shopify-catalog.ts';
+import {
+  applyLevels,
+  deactivateProductsGoneFromShopify,
+  upsertShopifyProduct,
+  type LevelTotals,
+} from '../_shared/shopify-catalog.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -406,12 +411,12 @@ Deno.serve(async (req) => {
       const maxPages = scopeOption === 'catalog' ? Math.min(Math.max(Number(body.max_pages ?? 3), 1), 10) : 50;
       const continueRunId = typeof body.run_id === 'string' && body.run_id ? body.run_id : null;
 
-      type SyncRunRow = { id: string; created_count: number; updated_count: number; failed_count: number };
+      type SyncRunRow = { id: string; created_count: number; updated_count: number; failed_count: number; started_at: string };
       let syncRun: SyncRunRow | null = null;
       if (continueRunId) {
         const { data } = await admin
           .from('integration_sync_runs')
-          .select('id, created_count, updated_count, failed_count')
+          .select('id, created_count, updated_count, failed_count, started_at')
           .eq('id', continueRunId)
           .eq('business_id', businessId)
           .eq('status', 'running')
@@ -436,7 +441,7 @@ Deno.serve(async (req) => {
             status: 'running',
             created_by: userData.user.id,
           })
-          .select('id, created_count, updated_count, failed_count')
+          .select('id, created_count, updated_count, failed_count, started_at')
           .single();
         syncRun = (data as SyncRunRow | null) ?? null;
       }
@@ -533,6 +538,19 @@ Deno.serve(async (req) => {
             .update({ created_count: created, updated_count: updated, failed_count: failed, processed_count: created + updated + failed })
             .eq('id', syncRun.id);
           return json({ ok: true, partial: true, next_cursor: nextCursor, run_id: syncRun.id, created, updated, failed });
+        }
+
+        // Catálogo completo: lo que sigue activo aquí pero se ha borrado o desactivado en
+        // Shopify deja de venderse en el TPV.
+        if ((scopeOption === 'all' || scopeOption === 'catalog') && syncRun?.started_at) {
+          try {
+            const gone = await deactivateProductsGoneFromShopify(admin, businessId, syncRun.started_at);
+            if (gone.length > 0) {
+              messages.push(`${gone.length} desactivados por no estar activos en Shopify: ${gone.slice(0, 5).join(', ')}${gone.length > 5 ? '…' : ''}`);
+            }
+          } catch (err) {
+            messages.push(`No se pudieron revisar los productos borrados en Shopify: ${errorText(err)}`);
+          }
         }
 
         // --- Pedidos, líneas y envíos ---
