@@ -940,3 +940,9 @@ export function posOrderAttributes(
   if (seller) attrs.push({ key: 'Vendedor', value: seller });
   return attrs;
 }
+
+/** Búsqueda de Shopify del pedido creado para una venta del TPV (sourceIdentifier = id de la venta). */
+export function posOrderSearchQuery(saleId: string): string {
+  if (!/^[0-9a-f-]{36}$/i.test(saleId)) throw new Error('Identificador de venta no válido');
+  return `source_identifier:${saleId}`;
+}

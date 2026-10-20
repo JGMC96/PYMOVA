@@ -14,6 +14,7 @@ import { SellersPanel } from '@/components/retail/SellersPanel';
 import { SellerSessionProvider } from '@/contexts/SellerSessionContext';
 import { SellerDialog } from '@/components/retail/SellerDialog';
 import { useRoleAccess } from '@/hooks/useRoleAccess';
+import { ShopifyProblemsBanner } from '@/components/integrations/ShopifyProblemsBanner';
 import { useStoreProfile } from '@/hooks/useStoreProfile';
 import { STORE_PROFILE_LIST, type StoreProfile } from '@/lib/storeProfiles';
 
@@ -26,6 +27,7 @@ const Retail = () => {
       <SellerSessionProvider>
       <SellerDialog />
       <div className="space-y-6">
+        {isAdmin && <ShopifyProblemsBanner />}
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
           <div>
             <h1 className="text-3xl font-display font-bold text-foreground">

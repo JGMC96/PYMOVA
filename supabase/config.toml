@@ -29,3 +29,10 @@ verify_jwt = false
 # Igual que shopify-sync: tareas programadas con ticket; usuarios con auth.getUser().
 [functions.shopify-inventory-push]
 verify_jwt = false
+
+# Pedidos y reembolsos del TPV: tarea «shopify-tpv» con ticket; usuarios con auth.getUser().
+[functions.shopify-pos-order]
+verify_jwt = false
+
+[functions.shopify-pos-refund]
+verify_jwt = false
