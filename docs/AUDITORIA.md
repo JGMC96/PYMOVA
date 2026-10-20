@@ -190,6 +190,16 @@ Tres avisos recibidos del escáner de la plataforma y comprobados en el código:
 - **E2 · Correos y un token en los logs de las edge functions.** `handle-email-unsubscribe/index.ts:106` (token de baja en claro) y `send-transactional-email/index.ts` (correo completo en 7 logs). **Corregido:** `redactEmail` y `redactToken` en `_shared/privacy.ts`, con tests.
 - **E3 · Módulos comprobados solo en el cliente.** La RLS de `products` y del resto de tablas de módulos no mira si el negocio tiene el módulo activo; solo lo hace `RequireModule` en la interfaz. **Pendiente:** afecta a todas las tablas de módulos de pago y se decide con el usuario (cambio de RLS en todas ellas, o aceptar que un miembro pueda leer por API datos de un módulo no contratado).
 
+## Revisión de seguridad (20/10/2026)
+
+Revisión de los cambios de las PR #2 a #10, con una lectura independiente y cada hallazgo reproducido en el Postgres local:
+
+- **R1 · Un admin podía hacerse propietario (alta).** El trigger `protect_invitation_role` (`dz/0018`) solo vigilaba que el rol *pasara a* owner. Un admin podía crear una invitación owner en un negocio propio, moverla al negocio de la víctima con `invited_by` = su propietario y aceptarla con otra cuenta, o reactivar una invitación owner ya aceptada o revocada. **Corregido en `dz/0023`:** desde el cliente, una invitación solo se puede revocar.
+- **R2 · Devolver dos veces la misma línea (media).** `create_sale_return` (`dz/0021`) aceptaba la misma línea dos veces en una devolución: una venta de 100 € se devolvía por 200 €, reponía dos unidades y el arqueo cuadraba con 100 € de menos. Lo podía hacer cualquier miembro. **Corregido en `dz/0023`:** error si una línea se repite, el cálculo de lo ya devuelto incluye la propia devolución e índice único `(return_id, sale_item_id)`.
+- **R3 · Contadores esquivables borrando los ajustes (baja).** La política `FOR ALL` de `business_settings` dejaba a un admin borrar la fila y volver a crearla con otros contadores. **Corregido en `dz/0023`:** el cliente solo lee y actualiza los ajustes.
+- En producción no había ningún dato afectado (comprobado el 20/10: sin líneas repetidas, sin devoluciones mayores que su venta y sin invitaciones owner de quien no era owner).
+- **Escáner de Lovable (20/10):** Lovable aplicó por su cuenta la `dz/0022` (un empleado no puede crear ni pasar a aprobada su propia ausencia o permiso). Revisada, correcta y con test desde la `dz/0023`. Los avisos de marketing y productos (E3) quedan abiertos a propósito.
+
 ## Seguridad multi-tenant: lo que está bien
 
 - **Las 47 tablas** de `supabase/migrations/` y `shopify_inventory_pushes` tienen la RLS activa, y todas tienen políticas por `business_id` o rol (inventario completo hecho con las migraciones). `user_roles` se borró (`sm/20260126161816:7`).

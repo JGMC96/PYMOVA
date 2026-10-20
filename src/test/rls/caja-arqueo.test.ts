@@ -3,7 +3,7 @@
 // abierta, caja solo por RPC, efectivo solo con caja abierta y devoluciones
 // por lo cobrado (con descuento).
 import { readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { asAnon, asUser, createTestDb, createUser, RLS_DB_URL, type Sql, type TestDb } from './harness';
 
@@ -179,7 +179,9 @@ describe.skipIf(!RLS_DB_URL)('RLS Â· caja: devoluciones anteriores a la migraciÃ
   let sql: Sql;
 
   beforeAll(async () => {
-    db = await createTestDb({ skip: (f) => f.includes('0021_') });
+    // Sin la 0021 ni las posteriores (las siguientes ya dependen de sus columnas).
+    const numero = (f: string) => Number(basename(f).slice(0, 4));
+    db = await createTestDb({ skip: (f) => basename(dirname(f)) === 'migrations' && f.includes('drizzle') && numero(f) >= 21 });
     sql = db.sql;
   }, 120_000);
 
