@@ -246,6 +246,13 @@
       "when": 1792529737246,
       "tag": "0034_cliente_en_tpv",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1792530668151,
+      "tag": "0035_equipo_gestion",
+      "breakpoints": true
     }
   ]
 }
