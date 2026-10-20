@@ -20,11 +20,13 @@ const fmtDate = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' }) : '—';
 
 export function CashRegisterPanel() {
-  const { sellers, chooseSeller, can, authorize, dropSession } = useSellerSession();
+  const { sellers, employees, chooseSeller, can, authorize, dropSession } = useSellerSession();
   const {
-    openSession, history, summary, expectedCash, cashRefunds, isBlind, isLoading, isWorking,
+    openSession, history, summary, bySeller, expectedCash, cashRefunds, isBlind, isLoading, isWorking,
     openRegister, closeRegister, refresh,
   } = useCashRegister(sellers.map((s) => s.sessionId));
+  const personName = (id: string | null | undefined) =>
+    id ? employees.find((e) => e.id === id)?.name ?? '—' : '—';
 
   const [openingAmount, setOpeningAmount] = useState('');
   const [countedAmount, setCountedAmount] = useState('');
@@ -36,7 +38,13 @@ export function CashRegisterPanel() {
   const salesCount = summary.reduce((s, r) => s + Number(r.sales_count), 0);
 
   const handleOpen = async () => {
-    const ok = await openRegister(parseFloat(openingAmount) || 0);
+    // Con dependientes con PIN, abre una persona identificada (0033).
+    const pick = await chooseSeller('la apertura de caja');
+    if (pick.cancelled) return;
+    const ok = await openRegister(parseFloat(openingAmount) || 0, {
+      sellerSessionId: pick.seller?.sessionId ?? null,
+    });
+    if (!ok && pick.seller) dropSession(pick.seller.sessionId);
     if (ok) setOpeningAmount('');
   };
 
@@ -81,7 +89,9 @@ export function CashRegisterPanel() {
               </CardTitle>
               <CardDescription>
                 {openSession
-                  ? `Abierta el ${fmtDate(openSession.opened_at)}`
+                  ? `Abierta el ${fmtDate(openSession.opened_at)}${
+                      openSession.opened_by_employee_id ? ` por ${personName(openSession.opened_by_employee_id)}` : ''
+                    }`
                   : 'Abre la caja al empezar el turno para poder cuadrarla al cerrar.'}
               </CardDescription>
             </div>
@@ -244,6 +254,50 @@ export function CashRegisterPanel() {
         </Card>
       </div>
 
+      {openSession && bySeller.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Turno por vendedor</CardTitle>
+            <CardDescription>
+              {isBlind
+                ? 'Arqueo a ciegas: los importes se ven al cerrar o si se conecta alguien que puede cerrar la caja.'
+                : 'Ventas y devoluciones de cada persona en esta caja.'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Vendedor</TableHead>
+                  <TableHead className="text-center">Ventas</TableHead>
+                  <TableHead className="text-right">Vendido</TableHead>
+                  <TableHead className="text-right">En efectivo</TableHead>
+                  <TableHead className="text-center">Devoluciones</TableHead>
+                  <TableHead className="text-right">Neto</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {bySeller.map((r) => (
+                  <TableRow key={r.employee_id ?? 'none'}>
+                    <TableCell className="font-medium">{r.name}</TableCell>
+                    <TableCell className="text-center">{r.sales_count}</TableCell>
+                    <TableCell className="text-right">{r.sales_total === null ? '—' : fmt(Number(r.sales_total))}</TableCell>
+                    <TableCell className="text-right">{r.cash_total === null ? '—' : fmt(Number(r.cash_total))}</TableCell>
+                    <TableCell className="text-center">
+                      {r.refunds_count}
+                      {r.refunds_total === null || r.refunds_count === 0 ? '' : ` · −${fmt(Number(r.refunds_total))}`}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold">
+                      {r.net_total === null ? '—' : fmt(Number(r.net_total))}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>Historial de cierres</CardTitle>
@@ -259,6 +313,8 @@ export function CashRegisterPanel() {
                 <TableRow>
                   <TableHead>Apertura</TableHead>
                   <TableHead>Cierre</TableHead>
+                  <TableHead>Abrió</TableHead>
+                  <TableHead>Cerró</TableHead>
                   <TableHead className="text-right">Fondo</TableHead>
                   <TableHead className="text-right">Esperado</TableHead>
                   <TableHead className="text-right">Contado</TableHead>
@@ -270,6 +326,15 @@ export function CashRegisterPanel() {
                   <TableRow key={s.id}>
                     <TableCell>{fmtDate(s.opened_at)}</TableCell>
                     <TableCell>{fmtDate(s.closed_at)}</TableCell>
+                    <TableCell>{personName(s.opened_by_employee_id)}</TableCell>
+                    <TableCell>
+                      {personName(s.closed_by_employee_id)}
+                      {s.close_authorized_by_employee_id && (
+                        <span className="block text-xs text-muted-foreground">
+                          Autorizó {personName(s.close_authorized_by_employee_id)}
+                        </span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-right">{fmt(s.opening_amount)}</TableCell>
                     <TableCell className="text-right">{fmt(s.expected_amount)}</TableCell>
                     <TableCell className="text-right">{fmt(s.counted_amount)}</TableCell>

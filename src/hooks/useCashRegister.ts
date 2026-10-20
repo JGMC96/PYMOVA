@@ -8,9 +8,14 @@ export interface RegisterSession {
   business_id: string;
   status: 'open' | 'closed';
   opened_by: string | null;
+  /** Dependiente que abrió (0033). */
+  opened_by_employee_id?: string | null;
   opened_at: string;
   opening_amount: number;
   closed_by: string | null;
+  /** Dependiente que cerró y quien lo autorizó, si hizo falta (0030). */
+  closed_by_employee_id?: string | null;
+  close_authorized_by_employee_id?: string | null;
   closed_at: string | null;
   counted_amount: number | null;
   expected_amount: number | null;
@@ -27,6 +32,18 @@ export interface RegisterSummaryRow {
   refunds_amount: number | null;
 }
 
+/** Turno por vendedor (get_register_seller_summary, 0033). Importes null = a ciegas. */
+export interface RegisterSellerRow {
+  employee_id: string | null;
+  name: string;
+  sales_count: number;
+  sales_total: number | null;
+  cash_total: number | null;
+  refunds_count: number;
+  refunds_total: number | null;
+  net_total: number | null;
+}
+
 /**
  * Caja del negocio. `sellerSessionIds`: personas conectadas al TPV; si alguna puede cerrar
  * caja, el resumen trae importes (si no, arqueo a ciegas).
@@ -37,6 +54,7 @@ export function useCashRegister(sellerSessionIds: string[] = []) {
   const [openSession, setOpenSession] = useState<RegisterSession | null>(null);
   const [history, setHistory] = useState<RegisterSession[]>([]);
   const [summary, setSummary] = useState<RegisterSummaryRow[]>([]);
+  const [bySeller, setBySeller] = useState<RegisterSellerRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isWorking, setIsWorking] = useState(false);
 
@@ -70,8 +88,19 @@ export function useCashRegister(sellerSessionIds: string[] = []) {
         _seller_session_ids: sessionsKey ? sessionsKey.split(',') : [],
       } as never);
       setSummary((sum ?? []) as RegisterSummaryRow[]);
+      // RPC nueva de la 0033: `as never` hasta que se regenere types.ts.
+      const { data: perSeller } = await supabase.rpc('get_register_seller_summary' as never, {
+        _session_id: current.id,
+        _seller_session_ids: sessionsKey ? sessionsKey.split(',') : [],
+      } as never);
+      setBySeller(((perSeller ?? []) as RegisterSellerRow[]).map((r) => ({
+        ...r,
+        sales_count: Number(r.sales_count),
+        refunds_count: Number(r.refunds_count),
+      })));
     } else {
       setSummary([]);
+      setBySeller([]);
     }
 
     setIsLoading(false);
@@ -81,13 +110,18 @@ export function useCashRegister(sellerSessionIds: string[] = []) {
     fetchSessions();
   }, [fetchSessions]);
 
-  const openRegister = async (openingAmount: number): Promise<boolean> => {
+  const openRegister = async (
+    openingAmount: number,
+    opts: { sellerSessionId?: string | null } = {},
+  ): Promise<boolean> => {
     if (!activeBusiness?.id) return false;
     setIsWorking(true);
+    // Parámetro nuevo de la 0033: `as never` hasta que se regenere types.ts.
     const { error } = await supabase.rpc('open_register_session', {
       _business_id: activeBusiness.id,
       _opening_amount: openingAmount,
-    });
+      _seller_session_id: opts.sellerSessionId ?? null,
+    } as never);
     setIsWorking(false);
 
     if (error) {
@@ -140,6 +174,7 @@ export function useCashRegister(sellerSessionIds: string[] = []) {
     openSession,
     history,
     summary,
+    bySeller,
     expectedCash,
     cashRefunds,
     isBlind,
