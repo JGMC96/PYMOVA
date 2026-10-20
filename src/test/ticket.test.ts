@@ -22,3 +22,28 @@ describe('ticket con código de barras', () => {
     expect(html).not.toContain('*VTA-000123*');
   });
 });
+
+describe('ticket de abono', () => {
+  it('dice qué venta rectifica, en negativo, con el reembolso y el código DEV', () => {
+    const html = renderTicketBody(
+      { name: 'TUILUS' },
+      {
+        kind: 'refund',
+        number: 'DEV-000004',
+        originalNumber: 'VTA-000012',
+        createdAt: new Date('2026-10-20T10:00:00Z'),
+        lines: [{ name: 'Zueco Rio Tira · 38', quantity: 1, unitPrice: 155, total: 155 }],
+        taxRate: 21,
+        total: 155,
+        paymentMethod: 'store_credit',
+        cashier: 'Ana',
+      },
+    );
+    expect(html).toContain('TICKET DE ABONO');
+    expect(html).toContain('<span>Rectifica</span><span>VTA-000012</span>');
+    expect(html).toContain('-155,00');
+    expect(html).toContain('<span>Reembolso</span><span>Vale</span>');
+    expect(html).toContain('<span>Atendido por</span><span>Ana</span>');
+    expect(html).toContain('aria-label="Código de barras DEV-000004"');
+  });
+});

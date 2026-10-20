@@ -19,6 +19,10 @@ import {
 import { useRetailSales, type SaleWithClient } from '@/hooks/useRetailSales';
 import { useSaleReturns, type SaleReturn } from '@/hooks/useSaleReturns';
 import { ReturnDialog } from './ReturnDialog';
+import { RefundTicketDialog } from './RefundTicketDialog';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { ReassignSellerDialog } from './ReassignSellerDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useSellerSession } from '@/contexts/SellerSessionContext';
@@ -82,6 +86,8 @@ export function SalesHistory() {
   const { fetchReturns } = useSaleReturns();
   const [returns, setReturns] = useState<SaleReturn[]>([]);
   const [selectedSale, setSelectedSale] = useState<{ id: string; number: string } | null>(null);
+  // Ticket de abono abierto: recién registrado (se imprime solo) o reimpresión desde la lista.
+  const [refundTicket, setRefundTicket] = useState<{ id: string; justCreated: boolean } | null>(null);
 
   const loadReturns = useCallback(() => {
     fetchReturns().then(setReturns);
@@ -218,9 +224,28 @@ export function SalesHistory() {
                       <div className="flex items-center gap-2">
                         {sale.sale_number}
                         {refunded > 0 && (
-                          <Badge variant="destructive" className="text-xs">
-                            −{refunded.toFixed(2)} €
-                          </Badge>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button type="button" aria-label="Devoluciones de esta venta">
+                                <Badge variant="destructive" className="text-xs cursor-pointer">
+                                  −{refunded.toFixed(2)} €
+                                </Badge>
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start">
+                              <DropdownMenuLabel>Reimprimir abono</DropdownMenuLabel>
+                              {returns
+                                .filter((r) => r.sale_id === sale.id)
+                                .map((r) => (
+                                  <DropdownMenuItem
+                                    key={r.id}
+                                    onSelect={() => setRefundTicket({ id: r.id, justCreated: false })}
+                                  >
+                                    {r.return_number} · −{Number(r.total).toFixed(2)} €
+                                  </DropdownMenuItem>
+                                ))}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         )}
                       </div>
                     </TableCell>
@@ -288,6 +313,12 @@ export function SalesHistory() {
           loadReturns();
           refreshSales();
         }}
+        onReturned={(id) => setRefundTicket({ id, justCreated: true })}
+      />
+      <RefundTicketDialog
+        returnId={refundTicket?.id ?? null}
+        justCreated={refundTicket?.justCreated}
+        onClose={() => setRefundTicket(null)}
       />
     </Card>
   );
