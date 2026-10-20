@@ -14,6 +14,7 @@ import {
 import { useProductVariants } from '@/hooks/useProductVariants';
 import { useStoreProfile } from '@/hooks/useStoreProfile';
 import { useRoleAccess } from '@/hooks/useRoleAccess';
+import { useMyPermissions } from '@/hooks/useMyPermissions';
 import { StockAdjustDialog, type StockAdjustTarget } from './StockAdjustDialog';
 
 interface VariantsDialogProps {
@@ -31,6 +32,8 @@ export function VariantsDialog({
   const { variants, isLoading, isSaving, createVariant, deleteVariant, refreshVariants } = useProductVariants(productId);
   const { profile } = useStoreProfile();
   const { isAdmin } = useRoleAccess('admin');
+  // 0031: dar de alta o de baja tallas, con permiso de catálogo; costes y stock, con los suyos.
+  const { canEditCatalog, canSeeCosts, canAdjustStock } = useMyPermissions();
   const [adjustTarget, setAdjustTarget] = useState<StockAdjustTarget | null>(null);
 
   const [name, setName] = useState('');
@@ -95,6 +98,7 @@ export function VariantsDialog({
           </div>
         )}
 
+        {canEditCatalog && (
         <div className="grid grid-cols-1 sm:grid-cols-6 gap-2 items-end">
           <div className="sm:col-span-2">
             <Label className="text-xs">Nombre</Label>
@@ -118,6 +122,7 @@ export function VariantsDialog({
               onChange={(e) => setPrice(e.target.value)}
             />
           </div>
+          {canSeeCosts && (
           <div>
             <Label className="text-xs">Coste</Label>
             <Input
@@ -128,6 +133,7 @@ export function VariantsDialog({
               onChange={(e) => setCost(e.target.value)}
             />
           </div>
+          )}
           <div className="flex gap-2">
             {isAdmin && (
               <div className="flex-1">
@@ -145,6 +151,7 @@ export function VariantsDialog({
             </Button>
           </div>
         </div>
+        )}
 
         <Separator />
 
@@ -163,7 +170,7 @@ export function VariantsDialog({
                 <TableHead>Variante</TableHead>
                 <TableHead>Código</TableHead>
                 <TableHead className="text-right">Precio</TableHead>
-                <TableHead className="text-right">Coste</TableHead>
+                {canSeeCosts && <TableHead className="text-right">Coste</TableHead>}
                 <TableHead className="text-center">Stock</TableHead>
                 <TableHead />
               </TableRow>
@@ -176,15 +183,17 @@ export function VariantsDialog({
                   <TableCell className="text-right">
                     {(v.price ?? basePrice).toFixed(2)} €
                   </TableCell>
-                  <TableCell className="text-right text-muted-foreground">
-                    {v.cost_price != null ? `${v.cost_price.toFixed(2)} €` : '—'}
-                  </TableCell>
+                  {canSeeCosts && (
+                    <TableCell className="text-right text-muted-foreground">
+                      {v.cost_price != null ? `${v.cost_price.toFixed(2)} €` : '—'}
+                    </TableCell>
+                  )}
                   <TableCell className="text-center">
                     <div className="flex items-center justify-center gap-1">
                       <Badge variant={v.stock_quantity > 0 ? 'secondary' : 'destructive'}>
                         {v.stock_quantity}
                       </Badge>
-                      {isAdmin && (
+                      {canAdjustStock && (
                         <Button
                           variant="ghost"
                           size="icon"
@@ -205,15 +214,17 @@ export function VariantsDialog({
                     </div>
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-destructive"
-                      onClick={() => handleDelete(v.id)}
-                      disabled={isSaving}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    {canEditCatalog && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-destructive"
+                        onClick={() => handleDelete(v.id)}
+                        disabled={isSaving}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

@@ -16,6 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useDashboardMetrics } from "@/hooks/useDashboardMetrics";
 import { useRecentActivity, formatRelativeTime, type ActivityEventType } from "@/hooks/useRecentActivity";
 import { useMoney } from "@/hooks/useMoney";
+import { useRoleAccess } from "@/hooks/useRoleAccess";
 
 const formatChange = (value: number, isPercentage: boolean = true): string => {
   const prefix = value > 0 ? '+' : '';
@@ -38,7 +39,43 @@ const getActivityIcon = (type: ActivityEventType) => {
   }
 };
 
+/**
+ * Inicio. Las cifras del negocio (ingresos, cobros, facturas) son de administradores
+ * (0031): el personal ve un inicio con accesos al TPV y al fichaje.
+ */
 export const DashboardOverview = () => {
+  const { isAdmin, isLoading } = useRoleAccess("admin");
+  if (isLoading) return null;
+  return isAdmin ? <AdminOverview /> : <StaffOverview />;
+};
+
+const StaffOverview = () => {
+  const navigate = useNavigate();
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-display font-bold text-foreground">Inicio</h1>
+        <p className="text-muted-foreground">Accesos rápidos para tu turno</p>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Card className="cursor-pointer hover:border-primary/50" onClick={() => navigate("/dashboard/retail")}>
+          <CardHeader>
+            <CardTitle className="text-lg">Punto de venta</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground">Vender, devolver y consultar el stock.</CardContent>
+        </Card>
+        <Card className="cursor-pointer hover:border-primary/50" onClick={() => navigate("/dashboard/hr")}>
+          <CardHeader>
+            <CardTitle className="text-lg">Fichaje</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground">Entrada, salida, ausencias y permisos.</CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+};
+
+const AdminOverview = () => {
   const { format: formatPrice } = useMoney();
   const navigate = useNavigate();
   const metrics = useDashboardMetrics();

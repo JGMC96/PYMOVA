@@ -38,7 +38,7 @@ const Retail = () => {
             <Select
               value={profileKey}
               onValueChange={(v) => updateProfile(v as StoreProfile)}
-              disabled={isSaving}
+              disabled={isSaving || !isAdmin}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Tipo de tienda" />

@@ -10,6 +10,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
+import { useRoleAccess } from '@/hooks/useRoleAccess';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { PaymentWithInvoice } from '@/types/database';
@@ -45,6 +46,7 @@ function LoadingSkeleton() {
 }
 
 function EmptyState({ onNewPayment }: { onNewPayment: () => void }) {
+  const { isAdmin } = useRoleAccess('admin');
   return (
     <TableRow>
       <TableCell colSpan={5} className="h-48">
@@ -54,9 +56,11 @@ function EmptyState({ onNewPayment }: { onNewPayment: () => void }) {
           <p className="text-sm text-muted-foreground mt-1 mb-4">
             Registra tu primer pago contra una factura existente.
           </p>
-          <Button onClick={onNewPayment} size="sm">
-            Registrar pago
-          </Button>
+          {isAdmin && (
+            <Button onClick={onNewPayment} size="sm">
+              Registrar pago
+            </Button>
+          )}
         </div>
       </TableCell>
     </TableRow>

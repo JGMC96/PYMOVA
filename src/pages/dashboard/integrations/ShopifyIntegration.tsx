@@ -20,8 +20,39 @@ import { useShopifyOrdersSync } from '@/hooks/useShopifyOrdersSync';
 import { useShopifyConnection } from '@/hooks/useShopifyConnection';
 import { SyncQueuePanel } from '@/components/integrations/SyncQueuePanel';
 import { VariantMappingReport } from '@/components/integrations/VariantMappingReport';
+import { useRoleAccess } from '@/hooks/useRoleAccess';
 
+/** La integración la gestionan los administradores: el servidor rechaza al personal sus acciones. */
 const ShopifyIntegration = () => {
+  const { isAdmin, isLoading } = useRoleAccess('admin');
+  if (isLoading) return null;
+  if (!isAdmin) {
+    return (
+      <div className="space-y-6">
+        <Button variant="ghost" size="sm" asChild className="-ml-2">
+          <Link to="/dashboard/integrations">
+            <ArrowLeft className="w-4 h-4 mr-1.5" />
+            Integraciones
+          </Link>
+        </Button>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ShoppingBag className="w-5 h-5" />
+              Shopify
+            </CardTitle>
+            <CardDescription>
+              La integración con Shopify la gestiona un administrador. El stock y los pedidos se sincronizan solos.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
+  return <ShopifyIntegrationAdmin />;
+};
+
+const ShopifyIntegrationAdmin = () => {
   const {
     status: connectionStatus,
     isVerifying,

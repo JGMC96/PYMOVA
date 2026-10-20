@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { useRoleAccess } from '@/hooks/useRoleAccess';
 
 interface ClientsHeaderProps {
   searchTerm: string;
@@ -20,6 +21,8 @@ export function ClientsHeader({
   onShowInactiveChange,
   onNewClient,
 }: ClientsHeaderProps) {
+  // 0031: el personal consulta clientes; los crean y editan los administradores.
+  const { isAdmin } = useRoleAccess('admin');
   const [localSearch, setLocalSearch] = useState(searchTerm);
 
   // Debounce search input
@@ -45,10 +48,12 @@ export function ClientsHeader({
             Gestiona los clientes de tu negocio
           </p>
         </div>
-        <Button onClick={onNewClient}>
-          <Plus className="mr-2 h-4 w-4" />
-          Nuevo cliente
-        </Button>
+        {isAdmin && (
+          <Button onClick={onNewClient}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nuevo cliente
+          </Button>
+        )}
       </div>
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">

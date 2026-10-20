@@ -113,6 +113,9 @@ describe('permisos por persona', () => {
     max_discount_pct: 10,
     can_return: false,
     can_close_register: false,
+    can_edit_catalog: false,
+    can_see_costs: false,
+    can_adjust_stock: false,
     ...p,
   });
 

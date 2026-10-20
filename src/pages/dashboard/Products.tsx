@@ -5,6 +5,7 @@ import { ProductsHeader } from '@/components/products/ProductsHeader';
 import { ProductsTable } from '@/components/products/ProductsTable';
 import { ProductFormDialog } from '@/components/products/ProductFormDialog';
 import type { Product } from '@/types/database';
+import { useMyPermissions } from '@/hooks/useMyPermissions';
 
 export default function Products() {
   const {
@@ -18,6 +19,8 @@ export default function Products() {
     updateProduct,
     toggleProductStatus,
   } = useProducts();
+  // 0031: crear, editar y desactivar, con permiso de catálogo; costes y márgenes, con el suyo.
+  const { canEditCatalog, canSeeCosts } = useMyPermissions();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -59,6 +62,7 @@ export default function Products() {
           showInactive={showInactive}
           onShowInactiveChange={setShowInactive}
           onNewProduct={handleNewProduct}
+          canCreate={canEditCatalog}
         />
 
         <ProductsTable
@@ -68,6 +72,8 @@ export default function Products() {
           onEdit={handleEdit}
           onToggleStatus={handleToggleStatus}
           onNewProduct={handleNewProduct}
+          canEdit={canEditCatalog}
+          showCosts={canSeeCosts}
         />
 
         <ProductFormDialog
@@ -76,6 +82,7 @@ export default function Products() {
           product={editingProduct}
           onSubmit={handleSubmit}
           isSubmitting={isSubmitting}
+          showCosts={canSeeCosts}
         />
       </div>
     </RequireModule>
