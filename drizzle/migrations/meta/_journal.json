@@ -162,6 +162,13 @@
       "when": 1792490494752,
       "tag": "0022_hr_solicitudes_sin_autoaprobacion",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1792491386112,
+      "tag": "0023_seguridad_revision",
+      "breakpoints": true
     }
   ]
 }
