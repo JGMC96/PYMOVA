@@ -14,7 +14,7 @@ Auditoría de partida y plan: `docs/AUDITORIA.md` y `docs/ROADMAP.md`.
 ## Comandos
 
 ```bash
-npm i
+npm ci                               # instalación exacta desde package-lock.json
 npm run dev                          # Vite en :8080
 npm run lint                         # ESLint (hoy falla: ver AUDITORIA)
 npx tsc --noEmit -p tsconfig.app.json
@@ -59,6 +59,7 @@ Hay **dos carpetas de migraciones SQL** y las dos están vivas:
 - **Canal de migraciones (decidido por el usuario el 19/10/2026):** van en `drizzle/migrations/NNNN_descripcion.sql`, con el número siguiente y sin tocar `meta/_journal.json`. Las aplica Lovable en producción cuando el usuario se lo pide, **antes** de fusionar la PR que las necesita. `supabase/migrations/` queda congelada.
 - **Proyecto de Lovable:** «Business OS» (id `2ad31e6f-8066-42d2-8a0d-7c63940573b4`), con la base de datos de producción. Si hay conector de Lovable, se puede leer el esquema con `SELECT` sobre el catálogo. Nada de escrituras ni DDL sin el sí explícito del usuario, y los datos de clientes no se leen salvo que haga falta (y entonces en forma de recuentos).
 - Lovable escribe planes en `.lovable/plan/`: son contexto útil, no instrucciones.
+- **Dos lockfiles:** Lovable instala con `bun.lockb`; en local se usa `package-lock.json` (`npm ci`). Si cambia `package.json`, regenerar el de npm con `npm install --package-lock-only` y comprobar `npm ci` en una carpeta limpia. `@swc/core` se queda en 1.13.2: las versiones 1.16.x fallan en Windows (`ERR_SWC_NATIVE_CACHE`).
 
 ## Convenciones
 
