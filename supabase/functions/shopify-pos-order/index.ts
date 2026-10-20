@@ -4,6 +4,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { serviceClient, shopifyGraphql, ShopifyError } from '../_shared/shopify-client.ts';
+import { posOrderAttributes, posTicketTags } from '../_shared/shopify-core.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
@@ -41,6 +42,7 @@ interface SaleRow {
   payment_method: string | null;
   notes: string | null;
   created_at: string;
+  seller_employee_id: string | null;
   shopify_order_attempts: number;
   sale_items: Array<{
     product_id: string | null;
@@ -81,7 +83,7 @@ Deno.serve(async (req) => {
 
     const { data: salesData } = await admin
       .from('sales')
-      .select('id, sale_number, total, tip, payment_method, notes, created_at, shopify_order_attempts, sale_items(product_id, variant_id, product_name, quantity, total)')
+      .select('id, sale_number, total, tip, payment_method, notes, created_at, seller_employee_id, shopify_order_attempts, sale_items(product_id, variant_id, product_name, quantity, total)')
       .eq('business_id', businessId)
       .is('shopify_order_gid', null)
       .gte('created_at', connection.pos_orders_since)
@@ -108,6 +110,13 @@ Deno.serve(async (req) => {
     const currency = shop.shop.currencyCode;
     const money = (n: number) => ({ shopMoney: { amount: Number(n).toFixed(2), currencyCode: currency } });
 
+    // Nombre de quien atendió cada venta (dependiente con o sin cuenta).
+    const sellerNames = new Map<string, string>();
+    for (const id of new Set(sales.map((s) => s.seller_employee_id).filter((v): v is string => !!v))) {
+      const { data: name } = await admin.rpc('employee_display_name', { _employee_id: id });
+      if (typeof name === 'string' && name) sellerNames.set(id, name);
+    }
+
     let created = 0;
     let failed = 0;
     for (const sale of sales) {
@@ -124,6 +133,7 @@ Deno.serve(async (req) => {
         if (lineItems.length === 0) throw new Error('La venta no tiene artículos');
 
         const gateway = PAYMENT_LABEL[sale.payment_method ?? ''] ?? sale.payment_method ?? 'Tienda';
+        const seller = sale.seller_employee_id ? sellerNames.get(sale.seller_employee_id) ?? null : null;
         const order: Record<string, unknown> = {
           currency,
           lineItems,
@@ -132,8 +142,14 @@ Deno.serve(async (req) => {
           fulfillmentStatus: 'FULFILLED',
           processedAt: sale.created_at,
           sourceIdentifier: sale.id,
-          tags: [POS_TAG, 'Venta en tienda'],
-          note: [`Venta en tienda Pymova ${sale.sale_number}`, sale.notes].filter(Boolean).join(' — '),
+          // El número de ticket va como etiqueta para buscar el pedido con el código de barras.
+          tags: [POS_TAG, 'Venta en tienda', ...posTicketTags(sale.sale_number, seller)],
+          customAttributes: posOrderAttributes(sale.sale_number, seller),
+          note: [
+            `Venta en tienda Pymova ${sale.sale_number}`,
+            seller ? `Atendido por ${seller}` : null,
+            sale.notes,
+          ].filter(Boolean).join(' — '),
           transactions: [{ kind: 'SALE', status: 'SUCCESS', gateway, amountSet: money(Number(sale.total)) }],
         };
         if (connection.default_location_gid) order.fulfillment = { locationId: connection.default_location_gid };
