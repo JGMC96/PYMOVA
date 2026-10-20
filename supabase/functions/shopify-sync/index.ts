@@ -18,6 +18,10 @@ import {
   resolveClientMatch,
   totalAvailable,
   variantUnitCost,
+  INVENTORY_ITEMS_BATCH,
+  INVENTORY_ITEMS_LEVELS_QUERY,
+  levelsFromInventoryItemNodes,
+  type InventoryItemLevelsNode,
   type InventoryLevelRow,
   type ShopifyProductNode,
   type ShopifyVariantNode,
@@ -116,7 +120,7 @@ Deno.serve(async (req) => {
     const { data: isSuper } = await userClient.rpc('is_super_admin');
     if (!isMember && !isSuper) return json({ error: 'No tienes acceso a este negocio' }, 403);
 
-    const requiresAdmin = ['verify', 'sync', 'claim', 'process-webhooks'].includes(action);
+    const requiresAdmin = ['verify', 'sync', 'claim', 'process-webhooks', 'refresh-stock'].includes(action);
     if (requiresAdmin) {
       const { data: isAdmin } = await userClient.rpc('has_min_role', {
         _business_id: businessId,
@@ -192,6 +196,24 @@ Deno.serve(async (req) => {
       };
     };
 
+    /** Aplica niveles de Shopify y recalcula el stock local (tienda + envíos pendientes). */
+    const applyLevels = async (levels: unknown[], source: 'shopify' | 'import') => {
+      const totals = { applied: 0, stale: 0, unknown: 0 };
+      for (let i = 0; i < levels.length; i += 200) {
+        const { data, error } = await admin.rpc('apply_shopify_inventory_levels', {
+          _business_id: businessId,
+          _levels: levels.slice(i, i + 200),
+          _source: source,
+        });
+        if (error) throw error;
+        const row = (Array.isArray(data) ? data[0] : data) as typeof totals | null;
+        totals.applied += row?.applied ?? 0;
+        totals.stale += row?.stale ?? 0;
+        totals.unknown += row?.unknown ?? 0;
+      }
+      return totals;
+    };
+
     // ---------------------------------------------------------------- status
     if (action === 'status') {
       const connection = await loadConnection();
@@ -251,6 +273,44 @@ Deno.serve(async (req) => {
       await requireConnection();
       const handled = await drainWebhookQueue(admin, Number(body.limit ?? 20));
       return json({ ok: true, handled });
+    }
+
+    // ---------------------------------------------------------- refresh-stock
+    // Lee de Shopify el disponible actual de todos los artículos emparejados y
+    // pone el stock local al día (ubicación de la tienda + envíos pendientes).
+    if (action === 'refresh-stock') {
+      await requireConnection();
+      const items = new Set<string>();
+      for (let from = 0; ; from += 1000) {
+        const { data, error } = await admin
+          .from('shopify_inventory_levels')
+          .select('inventory_item_gid')
+          .eq('business_id', businessId)
+          .order('inventory_item_gid')
+          .range(from, from + 999);
+        if (error) throw error;
+        for (const row of data ?? []) items.add(row.inventory_item_gid);
+        if (!data || data.length < 1000) break;
+      }
+
+      const ids = [...items];
+      let read = 0;
+      const totals = { applied: 0, stale: 0, unknown: 0 };
+      for (let i = 0; i < ids.length; i += INVENTORY_ITEMS_BATCH) {
+        const data = await run<{ nodes: Array<InventoryItemLevelsNode | null> }>(
+          INVENTORY_ITEMS_LEVELS_QUERY,
+          { ids: ids.slice(i, i + INVENTORY_ITEMS_BATCH) },
+          ['read_inventory'],
+        );
+        const levels = levelsFromInventoryItemNodes(data.nodes ?? []);
+        read += levels.length;
+        if (levels.length === 0) continue;
+        const r = await applyLevels(levels, 'import');
+        totals.applied += r.applied;
+        totals.stale += r.stale;
+        totals.unknown += r.unknown;
+      }
+      return json({ ok: true, items: ids.length, levels: read, ...totals });
     }
 
     // --------------------------------------------------------- list-products
@@ -385,19 +445,16 @@ Deno.serve(async (req) => {
 
                 // Inventario por ubicación de cada variante.
                 const inventoryRows: InventoryLevelRow[] = [];
-                const perVariantStock = new Map<string, number>();
                 for (const variant of variants) {
                   const { rows } = await fetchAllInventoryLevels(
                     (q, v, o) => shopifyGraphql(q, v, o),
                     variant as ShopifyVariantNode,
                   );
                   inventoryRows.push(...rows);
-                  perVariantStock.set(variant.id, totalAvailable(rows));
                 }
 
                 const first = variants[0];
                 const firstCost = first ? variantUnitCost(first as ShopifyVariantNode) : null;
-                const productStock = [...perVariantStock.values()].reduce((a, b) => a + b, 0);
 
                 const { data: existing } = await admin
                   .from('products')
@@ -417,7 +474,7 @@ Deno.serve(async (req) => {
                   barcode: first?.barcode ?? null,
                   // Solo sobrescribe el coste si Shopify lo informa (no borra el coste manual).
                   ...(firstCost !== null ? { cost_price: firstCost } : {}),
-                  stock_quantity: productStock,
+                  // El stock no se escribe aquí: lo pone applyLevels con la ubicación de la tienda.
                   track_inventory: true,
                   is_active: node.status === 'ACTIVE',
                   external_id: node.id,
@@ -433,7 +490,7 @@ Deno.serve(async (req) => {
                 } else {
                   const { data: inserted, error } = await admin
                     .from('products')
-                    .insert({ ...productPayload, created_by: userData.user.id })
+                    .insert({ ...productPayload, stock_quantity: 0, created_by: userData.user.id })
                     .select('id')
                     .single();
                   if (error) throw error;
@@ -457,7 +514,6 @@ Deno.serve(async (req) => {
                       ...(variantUnitCost(v as ShopifyVariantNode) !== null
                         ? { cost_price: variantUnitCost(v as ShopifyVariantNode) }
                         : {}),
-                      stock_quantity: perVariantStock.get(v.id) ?? 0,
                       is_active: true,
                       external_id: v.id,
                       external_source: 'shopify',
@@ -481,7 +537,7 @@ Deno.serve(async (req) => {
                     } else {
                       const { data: insertedVariant } = await admin
                         .from('product_variants')
-                        .insert({ ...variantPayload, created_by: userData.user.id })
+                        .insert({ ...variantPayload, stock_quantity: 0, created_by: userData.user.id })
                         .select('id')
                         .maybeSingle();
                       if (insertedVariant) localVariantIds.set(v.id, insertedVariant.id);
@@ -517,6 +573,18 @@ Deno.serve(async (req) => {
                       node.title,
                       node.id,
                       `No se pudo guardar el inventario por ubicación: ${invError.message}`,
+                    );
+                  } else {
+                    // Stock local = ubicación de la tienda (+ envíos pendientes).
+                    await applyLevels(
+                      deduped.map((row) => ({
+                        inventory_item_gid: row.inventory_item_gid,
+                        location_gid: row.location_gid,
+                        location_name: row.location_name ?? null,
+                        available: row.available,
+                        updated_at: null,
+                      })),
+                      'import',
                     );
                   }
                 }

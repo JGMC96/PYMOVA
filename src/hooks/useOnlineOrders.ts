@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { toast } from 'sonner';
 import { pushShopifyOrderStatus, pushShopifyRefund } from '@/hooks/useShopifyOrdersSync';
+import { pushShopifyStock } from '@/lib/shopifyStockPush';
 
 export type OnlineOrderStatus =
   | 'pending'
@@ -170,6 +171,8 @@ export function useOnlineOrders() {
         });
         if (error) throw error;
         toast.success(`Pedido marcado como ${ORDER_STATUS_LABEL[status].toLowerCase()}`);
+        // Los cambios de stock de pedidos creados en Pymova se mandan a Shopify.
+        void pushShopifyStock(activeBusinessId);
 
         const order = orders.find((o) => o.id === orderId);
         if (
@@ -245,6 +248,8 @@ export function useOnlineOrders() {
         toast.success(
           `${payload.kind === 'exchange' ? 'Cambio' : 'Devolución'} ${row?.return_number ?? ''} registrado`,
         );
+        // La reposición de stock (también la de pedidos de Shopify) se manda a Shopify.
+        void pushShopifyStock(activeBusinessId);
 
         const order = orders.find((o) => o.id === orderId);
         if (

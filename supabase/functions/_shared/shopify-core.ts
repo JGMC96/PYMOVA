@@ -700,3 +700,98 @@ export function refundAmountForReturn(
   const pending = Math.max(0, round2(Number(saleTotal) - Number(alreadyRefunded)));
   return Math.max(0, Math.min(lines, pending));
 }
+
+// ---------------------------------------------------------------------------
+// Inventario desde Shopify (webhooks inventory_levels/update y refresco de stock)
+// ---------------------------------------------------------------------------
+
+/** Nivel de inventario listo para `apply_shopify_inventory_levels`. */
+export interface ShopifyLevelUpdate {
+  inventory_item_gid: string;
+  location_gid: string;
+  available: number;
+  updated_at: string | null;
+  location_name?: string | null;
+}
+
+/** Id numérico o GID de Shopify → GID del tipo indicado (null si no es válido). */
+export function toShopifyGid(kind: 'InventoryItem' | 'Location', id: unknown): string | null {
+  if (typeof id === 'string' && id.startsWith(`gid://shopify/${kind}/`)) return id;
+  if (typeof id === 'number' && Number.isSafeInteger(id) && id > 0) return `gid://shopify/${kind}/${id}`;
+  if (typeof id === 'string' && /^\d+$/.test(id)) return `gid://shopify/${kind}/${id}`;
+  return null;
+}
+
+/** Payload REST del webhook inventory_levels/update → nivel a aplicar. */
+export function levelFromInventoryWebhook(payload: Record<string, unknown>): ShopifyLevelUpdate | null {
+  const item = toShopifyGid('InventoryItem', payload.inventory_item_id);
+  const location = toShopifyGid('Location', payload.location_id);
+  const available = typeof payload.available === 'number' && Number.isFinite(payload.available)
+    ? Math.trunc(payload.available)
+    : null;
+  if (!item || !location || available === null) return null;
+  return {
+    inventory_item_gid: item,
+    location_gid: location,
+    available,
+    updated_at: typeof payload.updated_at === 'string' ? payload.updated_at : null,
+  };
+}
+
+/** Disponible de varios inventory items en todas sus ubicaciones (lotes de 40). */
+export const INVENTORY_ITEMS_LEVELS_QUERY = `
+  query InventoryItemsLevels($ids: [ID!]!) {
+    nodes(ids: $ids) {
+      ... on InventoryItem {
+        id
+        inventoryLevels(first: 10) {
+          edges {
+            node {
+              updatedAt
+              location { id name }
+              quantities(names: ["available"]) { name quantity }
+            }
+          }
+        }
+      }
+    }
+  }
+`;
+
+export const INVENTORY_ITEMS_BATCH = 40;
+
+export interface InventoryItemLevelsNode {
+  id: string;
+  inventoryLevels?: {
+    edges: Array<{
+      node: {
+        updatedAt?: string | null;
+        location: { id: string; name?: string | null };
+        quantities: Array<{ name: string; quantity: number }>;
+      };
+    }>;
+  };
+}
+
+/** Respuesta de INVENTORY_ITEMS_LEVELS_QUERY → niveles a aplicar. */
+export function levelsFromInventoryItemNodes(
+  nodes: Array<InventoryItemLevelsNode | null | Record<string, never>>,
+): ShopifyLevelUpdate[] {
+  const out: ShopifyLevelUpdate[] = [];
+  for (const node of nodes) {
+    if (!node || typeof (node as InventoryItemLevelsNode).id !== 'string') continue;
+    const item = node as InventoryItemLevelsNode;
+    for (const { node: level } of item.inventoryLevels?.edges ?? []) {
+      const available = level.quantities.find((q) => q.name === 'available')?.quantity;
+      if (typeof available !== 'number') continue;
+      out.push({
+        inventory_item_gid: item.id,
+        location_gid: level.location.id,
+        location_name: level.location.name ?? null,
+        available,
+        updated_at: level.updatedAt ?? null,
+      });
+    }
+  }
+  return out;
+}

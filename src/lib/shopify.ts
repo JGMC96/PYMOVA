@@ -34,6 +34,22 @@ export interface ShopifyProductsPage {
   endCursor: string | null;
 }
 
+export interface StockRefreshResult {
+  items: number;
+  levels: number;
+  applied: number;
+  stale: number;
+  unknown: number;
+}
+
+/**
+ * Pone el stock de Pymova al día con Shopify: disponible en la tienda
+ * (ubicación por defecto) más los envíos aún pendientes. Solo admins.
+ */
+export function refreshShopifyStock(businessId: string): Promise<StockRefreshResult> {
+  return invokeShopifySync<StockRefreshResult>({ action: 'refresh-stock', business_id: businessId });
+}
+
 /** Invoca `shopify-sync` y normaliza los errores devueltos por el backend. */
 export async function invokeShopifySync<T = unknown>(
   body: Record<string, unknown>,
