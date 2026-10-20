@@ -349,6 +349,7 @@ export type Database = {
           notes: string | null
           opened_at: string
           opened_by: string | null
+          opened_by_employee_id: string | null
           opening_amount: number
           status: Database["public"]["Enums"]["register_status"]
           updated_at: string
@@ -367,6 +368,7 @@ export type Database = {
           notes?: string | null
           opened_at?: string
           opened_by?: string | null
+          opened_by_employee_id?: string | null
           opening_amount?: number
           status?: Database["public"]["Enums"]["register_status"]
           updated_at?: string
@@ -385,6 +387,7 @@ export type Database = {
           notes?: string | null
           opened_at?: string
           opened_by?: string | null
+          opened_by_employee_id?: string | null
           opening_amount?: number
           status?: Database["public"]["Enums"]["register_status"]
           updated_at?: string
@@ -407,6 +410,13 @@ export type Database = {
           {
             foreignKeyName: "cash_register_sessions_closed_by_employee_id_fkey"
             columns: ["closed_by_employee_id"]
+            isOneToOne: false
+            referencedRelation: "hr_employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cash_register_sessions_opened_by_employee_id_fkey"
+            columns: ["opened_by_employee_id"]
             isOneToOne: false
             referencedRelation: "hr_employees"
             referencedColumns: ["id"]
@@ -3493,6 +3503,19 @@ export type Database = {
           title: string
         }[]
       }
+      get_register_seller_summary: {
+        Args: { _seller_session_ids?: string[]; _session_id: string }
+        Returns: {
+          cash_total: number
+          employee_id: string
+          name: string
+          net_total: number
+          refunds_count: number
+          refunds_total: number
+          sales_count: number
+          sales_total: number
+        }[]
+      }
       get_register_summary: {
         Args: { _seller_session_ids?: string[]; _session_id: string }
         Returns: {
@@ -3603,7 +3626,11 @@ export type Database = {
         Returns: number
       }
       open_register_session: {
-        Args: { _business_id: string; _opening_amount?: number }
+        Args: {
+          _business_id: string
+          _opening_amount?: number
+          _seller_session_id?: string
+        }
         Returns: string
       }
       owned_business_count: { Args: { _user_id: string }; Returns: number }

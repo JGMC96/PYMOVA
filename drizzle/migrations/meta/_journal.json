@@ -232,6 +232,13 @@
       "when": 1792525110838,
       "tag": "0032_shopify_envios_fiables",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1792527017383,
+      "tag": "0033_caja_por_dependiente",
+      "breakpoints": true
     }
   ]
 }
