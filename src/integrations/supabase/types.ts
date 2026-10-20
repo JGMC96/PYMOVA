@@ -631,8 +631,11 @@ export type Database = {
       hr_employee_permissions: {
         Row: {
           business_id: string
+          can_adjust_stock: boolean | null
           can_close_register: boolean
+          can_edit_catalog: boolean | null
           can_return: boolean
+          can_see_costs: boolean | null
           employee_id: string
           id: string
           max_discount_pct: number
@@ -641,8 +644,11 @@ export type Database = {
         }
         Insert: {
           business_id: string
+          can_adjust_stock?: boolean | null
           can_close_register?: boolean
+          can_edit_catalog?: boolean | null
           can_return?: boolean
+          can_see_costs?: boolean | null
           employee_id: string
           id?: string
           max_discount_pct?: number
@@ -651,8 +657,11 @@ export type Database = {
         }
         Update: {
           business_id?: string
+          can_adjust_stock?: boolean | null
           can_close_register?: boolean
+          can_edit_catalog?: boolean | null
           can_return?: boolean
+          can_see_costs?: boolean | null
           employee_id?: string
           id?: string
           max_discount_pct?: number
@@ -3317,8 +3326,11 @@ export type Database = {
       employee_effective_permissions: {
         Args: { _employee_id: string }
         Returns: {
+          can_adjust_stock: boolean
           can_close_register: boolean
+          can_edit_catalog: boolean
           can_return: boolean
+          can_see_costs: boolean
           is_owner: boolean
           max_discount_pct: number
         }[]
@@ -3411,6 +3423,14 @@ export type Database = {
           vacation_days_used: number
         }[]
       }
+      get_my_permissions: {
+        Args: { _business_id: string }
+        Returns: {
+          can_adjust_stock: boolean
+          can_edit_catalog: boolean
+          can_see_costs: boolean
+        }[]
+      }
       get_platform_audit_log: {
         Args: { _business_id?: string; _limit?: number; _offset?: number }
         Returns: {
@@ -3442,8 +3462,11 @@ export type Database = {
       get_pos_permissions: {
         Args: { _business_id: string }
         Returns: {
+          can_adjust_stock: boolean
           can_close_register: boolean
+          can_edit_catalog: boolean
           can_return: boolean
+          can_see_costs: boolean
           customized: boolean
           employee_id: string
           has_account: boolean
@@ -3543,6 +3566,10 @@ export type Database = {
       }
       is_super_admin: { Args: never; Returns: boolean }
       issue_scheduled_job_ticket: { Args: { _action: string }; Returns: string }
+      member_can: {
+        Args: { _business_id: string; _perm: string }
+        Returns: boolean
+      }
       move_to_dlq: {
         Args: {
           dlq_name: string
@@ -3621,8 +3648,11 @@ export type Database = {
       set_employee_permissions: {
         Args: {
           _business_id: string
+          _can_adjust_stock?: boolean
           _can_close_register: boolean
+          _can_edit_catalog?: boolean
           _can_return: boolean
+          _can_see_costs?: boolean
           _employee_id: string
           _max_discount_pct: number
         }
