@@ -12,6 +12,7 @@ import { CashRegisterPanel } from '@/components/retail/CashRegisterPanel';
 import { EcommercePanel } from '@/components/retail/EcommercePanel';
 import { SellersPanel } from '@/components/retail/SellersPanel';
 import { SellerSessionProvider } from '@/contexts/SellerSessionContext';
+import { SellerDialog } from '@/components/retail/SellerDialog';
 import { useRoleAccess } from '@/hooks/useRoleAccess';
 import { useStoreProfile } from '@/hooks/useStoreProfile';
 import { STORE_PROFILE_LIST, type StoreProfile } from '@/lib/storeProfiles';
@@ -23,6 +24,7 @@ const Retail = () => {
   return (
     <RequireModule module="retail">
       <SellerSessionProvider>
+      <SellerDialog />
       <div className="space-y-6">
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
           <div>

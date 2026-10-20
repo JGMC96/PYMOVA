@@ -1,47 +1,71 @@
-import { useState } from 'react';
-import { Clock, Lock, UserRound, Users } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Clock, KeyRound, LogOut, UserRound, UserRoundPlus, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useSellerSession } from '@/contexts/SellerSessionContext';
-import { IDLE_LOCK_MINUTES } from '@/lib/sellerSession';
+import { minutesLeft, SELLER_SESSION_HOURS } from '@/lib/sellerSession';
 
-/** Franja «Atiende: …» del TPV, con cambio de dependiente, bloqueo y fichaje. */
+const remaining = (min: number) => (min >= 60 ? `${Math.floor(min / 60)} h ${min % 60} min` : `${min} min`);
+
+/** Franja del TPV con las personas conectadas, alta con PIN, cambio de PIN y fichaje. */
 export function SellerBar() {
-  const { seller, requiresSeller, employees, setPinDialogOpen, end, clock } = useSellerSession();
+  const { sellers, requiresSeller, employees, openLogin, openChangePin, disconnect, disconnectAll, clock } = useSellerSession();
   const [clocking, setClocking] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   // Sin dependientes con PIN no hay nada que elegir: la venta queda a nombre de la cuenta.
   if (!requiresSeller && employees.length === 0) return null;
 
   const fichar = async (type: 'clock_in' | 'clock_out') => {
     setClocking(true);
-    const error = await clock(type);
+    const r = await clock(type);
     setClocking(false);
-    if (error) toast.error(error);
-    else toast.success(type === 'clock_in' ? 'Entrada fichada' : 'Salida fichada');
+    if (!r) return;
+    if (r.error) toast.error(r.error);
+    else toast.success(`${type === 'clock_in' ? 'Entrada' : 'Salida'} fichada${r.name ? `: ${r.name}` : ''}`);
   };
 
   return (
     <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border bg-card px-4 py-2.5 text-sm">
       <UserRound className="w-4 h-4 text-primary shrink-0" />
-      {seller ? (
-        <span>
-          Atiende: <strong>{seller.name}</strong>
+      {sellers.length === 0 ? (
+        <span className={requiresSeller ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}>
+          {requiresSeller
+            ? `Nadie conectado: al cobrar se pedirá el PIN (vale ${SELLER_SESSION_HOURS} horas).`
+            : 'Sin dependientes con PIN.'}
         </span>
-      ) : requiresSeller ? (
-        <span className="text-amber-600 dark:text-amber-400">Nadie se ha identificado todavía.</span>
       ) : (
-        <span className="text-muted-foreground">Sin dependiente identificado.</span>
+        <>
+          <span className="text-muted-foreground">Conectados:</span>
+          {sellers.map((s) => (
+            <Badge key={s.sessionId} variant="secondary" className="gap-1 py-1 pl-2.5 pr-1 text-sm font-normal">
+              <span title={`Le quedan ${remaining(minutesLeft(s, now))}`}>{s.name}</span>
+              <button
+                type="button"
+                onClick={() => void disconnect(s.employeeId)}
+                className="rounded p-0.5 hover:bg-background"
+                aria-label={`Desconectar a ${s.name}`}
+                title="Salir"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </Badge>
+          ))}
+        </>
       )}
       <span className="flex-1" />
       {requiresSeller && (
-        <Button type="button" variant="outline" size="sm" onClick={() => setPinDialogOpen(true)}>
-          <Users className="w-4 h-4 mr-1.5" />
-          {seller ? 'Cambiar' : 'Identificarse'}
-        </Button>
-      )}
-      {seller && (
         <>
+          <Button type="button" variant="outline" size="sm" onClick={openLogin}>
+            <UserRoundPlus className="w-4 h-4 mr-1.5" />
+            Conectarse
+          </Button>
           <Button type="button" variant="outline" size="sm" onClick={() => fichar('clock_in')} disabled={clocking}>
             <Clock className="w-4 h-4 mr-1.5" />
             Entrada
@@ -50,17 +74,17 @@ export function SellerBar() {
             <Clock className="w-4 h-4 mr-1.5" />
             Salida
           </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => void end()}
-            title={`Se bloquea solo tras ${IDLE_LOCK_MINUTES} minutos sin uso`}
-          >
-            <Lock className="w-4 h-4 mr-1.5" />
-            Bloquear
+          <Button type="button" variant="ghost" size="sm" onClick={openChangePin}>
+            <KeyRound className="w-4 h-4 mr-1.5" />
+            Cambiar mi PIN
           </Button>
         </>
+      )}
+      {sellers.length > 1 && (
+        <Button type="button" variant="ghost" size="sm" onClick={() => void disconnectAll()}>
+          <LogOut className="w-4 h-4 mr-1.5" />
+          Salir todos
+        </Button>
       )}
     </div>
   );
