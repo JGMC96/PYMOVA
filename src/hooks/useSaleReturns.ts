@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { toast } from 'sonner';
 import { pushShopifyStock, pushShopifyPosRefunds } from '@/lib/shopifyStockPush';
+import type { TicketDoc } from '@/lib/ticket';
 
 export interface SaleDetailLine {
   sale_item_id: string;
@@ -23,6 +24,38 @@ export interface SaleReturn {
   refund_method: string | null;
   total: number;
   created_at: string;
+}
+
+/** Devolución leída de la base de datos → ticket de abono. */
+export function refundTicketDoc(
+  row: {
+    return_number: string;
+    refund_method: string | null;
+    reason: string | null;
+    total: number | string;
+    created_at: string;
+    sales: { sale_number: string } | null;
+    sale_return_items: { product_name: string; quantity: number | string; unit_price: number | string; total: number | string | null }[];
+  },
+  taxRate: number,
+  cashier: string | null,
+): TicketDoc {
+  return {
+    kind: 'refund',
+    number: row.return_number,
+    originalNumber: row.sales?.sale_number ?? null,
+    createdAt: new Date(row.created_at),
+    taxRate,
+    total: Number(row.total),
+    paymentMethod: row.refund_method ?? undefined,
+    notes: row.reason,
+    cashier,
+    lines: row.sale_return_items.map((i) => {
+      const quantity = Number(i.quantity);
+      const total = i.total != null ? Number(i.total) : quantity * Number(i.unit_price);
+      return { name: i.product_name, quantity, unitPrice: Number(i.unit_price), total };
+    }),
+  };
 }
 
 export function useSaleReturns() {
@@ -70,7 +103,7 @@ export function useSaleReturns() {
       restock?: boolean;
       sellerSessionId?: string | null;
       authorizationId?: string | null;
-    }): Promise<string | null> => {
+    }): Promise<{ id: string; number: string } | null> => {
       if (!activeBusiness?.id) {
         toast.error('No hay negocio activo');
         return null;
@@ -108,10 +141,42 @@ export function useSaleReturns() {
         pushShopifyPosRefunds(bizId)
       );
       toast.success(`Devolución ${row?.return_number} registrada`);
-      return row?.return_number ?? null;
+      return row?.return_id ? { id: row.return_id as string, number: row.return_number as string } : null;
     },
     [activeBusiness?.id]
   );
 
-  return { fetchSaleDetail, fetchReturns, createReturn, isLoading, isSubmitting };
+  /** Ticket de abono de una devolución (para imprimirlo o reimprimirlo). */
+  const fetchRefundTicket = useCallback(
+    async (returnId: string, taxRate: number): Promise<TicketDoc | null> => {
+      const { data, error } = await supabase
+        .from('sale_returns')
+        .select('return_number, refund_method, reason, total, created_at, seller_employee_id, sales(sale_number), sale_return_items(product_name, quantity, unit_price, total)')
+        .eq('id', returnId)
+        .maybeSingle();
+      if (error || !data) {
+        toast.error('No se pudo cargar el ticket de la devolución');
+        return null;
+      }
+      const row = data as unknown as {
+        return_number: string;
+        refund_method: string | null;
+        reason: string | null;
+        total: number | string;
+        created_at: string;
+        seller_employee_id: string | null;
+        sales: { sale_number: string } | null;
+        sale_return_items: { product_name: string; quantity: number | string; unit_price: number | string; total: number | string | null }[];
+      };
+      let cashier: string | null = null;
+      if (row.seller_employee_id) {
+        const { data: name } = await supabase.rpc('employee_display_name' as never, { _employee_id: row.seller_employee_id } as never);
+        cashier = typeof name === 'string' ? name : null;
+      }
+      return refundTicketDoc(row, taxRate, cashier);
+    },
+    [],
+  );
+
+  return { fetchSaleDetail, fetchReturns, createReturn, fetchRefundTicket, isLoading, isSubmitting };
 }
