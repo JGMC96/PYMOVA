@@ -176,6 +176,13 @@
       "when": 1792493219860,
       "tag": "0024_stock_desde_shopify",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1792494919585,
+      "tag": "0025_ajustes_stock",
+      "breakpoints": true
     }
   ]
 }

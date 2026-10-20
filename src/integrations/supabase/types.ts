@@ -2706,6 +2706,16 @@ export type Database = {
     }
     Functions: {
       accept_business_invitation: { Args: { _token: string }; Returns: string }
+      adjust_stock: {
+        Args: {
+          _business_id: string
+          _new_quantity: number
+          _product_id: string
+          _reason: string
+          _variant_id: string
+        }
+        Returns: number
+      }
       admin_update_subscription: {
         Args: {
           _business_id: string
