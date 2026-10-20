@@ -3614,6 +3614,7 @@ export type Database = {
       }
       is_super_admin: { Args: never; Returns: boolean }
       issue_scheduled_job_ticket: { Args: { _action: string }; Returns: string }
+      leave_business: { Args: { _business_id: string }; Returns: undefined }
       member_can: {
         Args: { _business_id: string; _perm: string }
         Returns: boolean
@@ -3710,6 +3711,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      remove_member: {
+        Args: { _business_id: string; _user_id: string }
+        Returns: undefined
+      }
       request_absence: {
         Args: {
           _absence_type: Database["public"]["Enums"]["absence_type"]
@@ -3732,6 +3737,10 @@ export type Database = {
           _start_time: string
         }
         Returns: string
+      }
+      retire_member: {
+        Args: { _business_id: string; _user_id: string }
+        Returns: undefined
       }
       retry_shopify_problems: {
         Args: { _business_id: string }
@@ -3806,6 +3815,14 @@ export type Database = {
           ok: boolean
           session_id: string
         }[]
+      }
+      transfer_ownership: {
+        Args: {
+          _business_id: string
+          _keep_owner?: boolean
+          _new_owner: string
+        }
+        Returns: undefined
       }
       upsert_external_order: {
         Args: {

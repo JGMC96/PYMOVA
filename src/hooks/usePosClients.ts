@@ -78,7 +78,7 @@ export function usePosClients() {
         toast.error('No se pudo buscar el cliente');
         return [];
       }
-      return ((data ?? null) as unknown as PosClient[] | null) ?? [];
+      return (data as unknown as PosClient[] | null) ?? [];
     },
     [activeBusiness?.id],
   );
