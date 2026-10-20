@@ -22,6 +22,8 @@ export interface RegisterSummaryRow {
   payment_method: string;
   sales_count: number;
   total_amount: number;
+  refunds_count: number;
+  refunds_amount: number;
 }
 
 export function useCashRegister() {
@@ -110,15 +112,20 @@ export function useCashRegister() {
     return true;
   };
 
+  // Misma fórmula que close_register_session: fondo + ventas en efectivo − devoluciones en efectivo.
+  const cashRow = summary.find((s) => s.payment_method === 'cash');
+  const cashRefunds = Number(cashRow?.refunds_amount ?? 0);
   const expectedCash =
-    (openSession?.opening_amount ?? 0) +
-    (summary.find((s) => s.payment_method === 'cash')?.total_amount ?? 0);
+    Math.round(
+      (Number(openSession?.opening_amount ?? 0) + Number(cashRow?.total_amount ?? 0) - cashRefunds) * 100,
+    ) / 100;
 
   return {
     openSession,
     history,
     summary,
     expectedCash,
+    cashRefunds,
     isLoading,
     isWorking,
     openRegister,

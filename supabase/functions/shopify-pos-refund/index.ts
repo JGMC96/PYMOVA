@@ -56,7 +56,7 @@ Deno.serve(async (req) => {
 
     const { data: returnsData } = await admin
       .from('sale_returns')
-      .select('id, sale_id, return_number, reason, total, shopify_refund_attempts, sales!inner(shopify_order_gid, sale_number, total), sale_return_items(product_id, variant_id, product_name, quantity, unit_price)')
+      .select('id, sale_id, return_number, reason, total, shopify_refund_attempts, sales!inner(shopify_order_gid, sale_number, total), sale_return_items(product_id, variant_id, product_name, quantity, unit_price, total)')
       .eq('business_id', businessId)
       .is('shopify_refund_gid', null)
       .not('sales.shopify_order_gid', 'is', null)
@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
       total: number | string;
       shopify_refund_attempts: number;
       sales: { shopify_order_gid: string | null; sale_number: string; total: number | string };
-      sale_return_items: { product_id: string | null; variant_id: string | null; product_name: string; quantity: number; unit_price: number }[];
+      sale_return_items: { product_id: string | null; variant_id: string | null; product_name: string; quantity: number; unit_price: number; total: number | null }[];
     }
     const returns = (returnsData ?? []) as unknown as ReturnRow[];
     if (returns.length === 0) return json({ status: 'ok', created: 0, failed: 0 });

@@ -20,7 +20,7 @@ const fmtDate = (iso: string | null) =>
 
 export function CashRegisterPanel() {
   const {
-    openSession, history, summary, expectedCash, isLoading, isWorking,
+    openSession, history, summary, expectedCash, cashRefunds, isLoading, isWorking,
     openRegister, closeRegister, refresh,
   } = useCashRegister();
 
@@ -108,6 +108,12 @@ export function CashRegisterPanel() {
                       {salesCount} · {fmt(salesTotal)}
                     </span>
                   </div>
+                  {cashRefunds > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Devoluciones en efectivo</span>
+                      <span className="text-destructive">−{fmt(cashRefunds)}</span>
+                    </div>
+                  )}
                   <Separator />
                   <div className="flex justify-between font-semibold">
                     <span>Efectivo esperado</span>

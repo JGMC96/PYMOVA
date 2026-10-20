@@ -21,6 +21,16 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useSaleReturns, type SaleDetailLine } from '@/hooks/useSaleReturns';
+import { useCashRegister } from '@/hooks/useCashRegister';
+import { round2 } from '@/lib/tax';
+
+/** Lo cobrado en la línea por las unidades a devolver (con su descuento), igual que create_sale_return. */
+const lineRefund = (line: SaleDetailLine, qty: number) => {
+  if (qty <= 0 || Number(line.quantity) <= 0) return 0;
+  const unit = Number(line.total) / Number(line.quantity);
+  const already = Number(line.returned_quantity);
+  return round2(round2((already + qty) * unit) - round2(already * unit));
+};
 
 interface ReturnDialogProps {
   open: boolean;
@@ -32,6 +42,7 @@ interface ReturnDialogProps {
 
 export function ReturnDialog({ open, onOpenChange, saleId, saleNumber, onCompleted }: ReturnDialogProps) {
   const { fetchSaleDetail, createReturn, isLoading, isSubmitting } = useSaleReturns();
+  const { openSession } = useCashRegister();
   const [lines, setLines] = useState<SaleDetailLine[]>([]);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [reason, setReason] = useState('');
@@ -49,10 +60,10 @@ export function ReturnDialog({ open, onOpenChange, saleId, saleNumber, onComplet
 
   const remaining = (line: SaleDetailLine) => Number(line.quantity) - Number(line.returned_quantity);
 
-  const totalRefund = lines.reduce(
-    (sum, line) => sum + (quantities[line.sale_item_id] || 0) * Number(line.unit_price),
-    0
+  const totalRefund = round2(
+    lines.reduce((sum, line) => sum + lineRefund(line, quantities[line.sale_item_id] || 0), 0),
   );
+  const cashWithoutRegister = refundMethod === 'cash' && !openSession;
 
   const handleSubmit = async () => {
     if (!saleId) return;
@@ -163,6 +174,11 @@ export function ReturnDialog({ open, onOpenChange, saleId, saleNumber, onComplet
               <span className="text-sm text-muted-foreground">Total a reembolsar</span>
               <span className="text-lg font-semibold">{totalRefund.toFixed(2)} €</span>
             </div>
+            {cashWithoutRegister && (
+              <p className="text-sm text-destructive">
+                Abre la caja para devolver en efectivo, o elige otro método de reembolso.
+              </p>
+            )}
           </div>
         )}
 
@@ -170,7 +186,7 @@ export function ReturnDialog({ open, onOpenChange, saleId, saleNumber, onComplet
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          <Button onClick={handleSubmit} disabled={isSubmitting || totalRefund <= 0}>
+          <Button onClick={handleSubmit} disabled={isSubmitting || totalRefund <= 0 || cashWithoutRegister}>
             {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
             Registrar devolución
           </Button>

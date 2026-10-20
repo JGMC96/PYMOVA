@@ -22,4 +22,9 @@ describe('refundAmountForReturn', () => {
   it('redondea a céntimos', () => {
     expect(refundAmountForReturn([{ quantity: 3, unit_price: 33.333 }], 500, 0)).toBe(100);
   });
+
+  it('usa lo cobrado en la línea (con descuento) cuando la devolución lo trae', () => {
+    expect(refundAmountForReturn([{ quantity: 1, unit_price: 99, total: 89.1 }], 178.2, 0)).toBe(89.1);
+    expect(refundAmountForReturn([{ quantity: 1, unit_price: 99, total: null }], 178.2, 0)).toBe(99);
+  });
 });
