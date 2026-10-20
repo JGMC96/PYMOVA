@@ -2463,6 +2463,7 @@ export type Database = {
           sale_number: string
           seller_employee_id: string | null
           shopify_order_attempts: number
+          shopify_order_claimed_at: string | null
           shopify_order_error: string | null
           shopify_order_gid: string | null
           shopify_order_name: string | null
@@ -2488,6 +2489,7 @@ export type Database = {
           sale_number: string
           seller_employee_id?: string | null
           shopify_order_attempts?: number
+          shopify_order_claimed_at?: string | null
           shopify_order_error?: string | null
           shopify_order_gid?: string | null
           shopify_order_name?: string | null
@@ -2513,6 +2515,7 @@ export type Database = {
           sale_number?: string
           seller_employee_id?: string | null
           shopify_order_attempts?: number
+          shopify_order_claimed_at?: string | null
           shopify_order_error?: string | null
           shopify_order_gid?: string | null
           shopify_order_name?: string | null
@@ -3129,6 +3132,10 @@ export type Database = {
           ok: boolean
         }[]
       }
+      claim_pos_sales_for_shopify: {
+        Args: { _business_id: string; _limit?: number }
+        Returns: string[]
+      }
       claim_shopify_shop: {
         Args: {
           _api_version?: string
@@ -3535,6 +3542,18 @@ export type Database = {
           table_name: string
         }[]
       }
+      get_shopify_problems: {
+        Args: { _business_id: string }
+        Returns: {
+          attempts: number
+          error: string
+          happened_at: string
+          kind: string
+          record_id: string
+          reference: string
+          state: string
+        }[]
+      }
       get_user_role_in_business: {
         Args: { _business_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
@@ -3632,6 +3651,15 @@ export type Database = {
         }
         Returns: string
       }
+      retry_shopify_problems: {
+        Args: { _business_id: string }
+        Returns: {
+          returns_count: number
+          sales_count: number
+          stock_count: number
+          webhooks_count: number
+        }[]
+      }
       review_absence: {
         Args: { _absence_id: string; _approve: boolean; _notes?: string }
         Returns: undefined
@@ -3669,6 +3697,13 @@ export type Database = {
           _tracking_number?: string
         }
         Returns: undefined
+      }
+      shopify_pending_pos_work: {
+        Args: never
+        Returns: {
+          pending_orders: boolean
+          pending_refunds: boolean
+        }[]
       }
       shopify_pending_work: {
         Args: never
