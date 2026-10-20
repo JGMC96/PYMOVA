@@ -155,6 +155,13 @@
       "when": 1792489705481,
       "tag": "0021_caja_arqueo",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1792490494752,
+      "tag": "0022_hr_solicitudes_sin_autoaprobacion",
+      "breakpoints": true
     }
   ]
 }
