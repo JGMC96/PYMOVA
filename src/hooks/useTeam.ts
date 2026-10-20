@@ -24,6 +24,9 @@ export interface TeamInvitation {
   status: string;
   expires_at: string;
   created_at: string;
+  accepted_at: string | null;
+  updated_at: string;
+  invited_by: string | null;
 }
 
 export function useTeam() {
@@ -75,7 +78,7 @@ export function useTeam() {
       supabase.rpc('get_business_team', { _business_id: activeBusinessId }),
       supabase
         .from('business_invitations')
-        .select('id, email, role, token, status, expires_at, created_at')
+        .select('id, email, role, token, status, expires_at, created_at, accepted_at, updated_at, invited_by')
         .eq('business_id', activeBusinessId)
         .order('created_at', { ascending: false }),
     ]);
@@ -116,7 +119,7 @@ export function useTeam() {
           role,
           invited_by: user.id,
         })
-        .select('id, email, role, token, status, expires_at, created_at')
+        .select('id, email, role, token, status, expires_at, created_at, accepted_at, updated_at, invited_by')
         .single();
 
       if (error) {
@@ -233,6 +236,59 @@ export function useTeam() {
     [activeBusinessId, fetchAll],
   );
 
+  /** 0035: quita a una persona del negocio (propietario: a cualquiera; administrador: a personal). */
+  const removeMember = useCallback(
+    async (userId: string) => {
+      if (!activeBusinessId) return false;
+      const { error } = await supabase.rpc('remove_member' as never, {
+        _business_id: activeBusinessId,
+        _user_id: userId,
+      } as never);
+      if (error) {
+        toast({ title: 'No se pudo quitar', description: error.message, variant: 'destructive' });
+        return false;
+      }
+      toast({ title: 'Persona quitada del negocio' });
+      await fetchAll();
+      return true;
+    },
+    [activeBusinessId, fetchAll],
+  );
+
+  /** 0035: salir del negocio activo. El último propietario tiene que transferir antes. */
+  const leaveBusiness = useCallback(async () => {
+    if (!activeBusinessId) return false;
+    const { error } = await supabase.rpc('leave_business' as never, {
+      _business_id: activeBusinessId,
+    } as never);
+    if (error) {
+      toast({ title: 'No has podido salir', description: error.message, variant: 'destructive' });
+      return false;
+    }
+    toast({ title: 'Has salido del negocio' });
+    return true;
+  }, [activeBusinessId]);
+
+  /** 0035: da la propiedad a otro miembro activo; si no se queda, el actual pasa a administrador. */
+  const transferOwnership = useCallback(
+    async (newOwnerId: string, keepOwner: boolean) => {
+      if (!activeBusinessId) return false;
+      const { error } = await supabase.rpc('transfer_ownership' as never, {
+        _business_id: activeBusinessId,
+        _new_owner: newOwnerId,
+        _keep_owner: keepOwner,
+      } as never);
+      if (error) {
+        toast({ title: 'No se pudo transferir', description: error.message, variant: 'destructive' });
+        return false;
+      }
+      toast({ title: 'Propiedad transferida' });
+      await fetchAll();
+      return true;
+    },
+    [activeBusinessId, fetchAll],
+  );
+
   return {
     members,
     invitations,
@@ -245,5 +301,8 @@ export function useTeam() {
     revokeInvitation,
     updateMemberRole,
     setMemberActive,
+    removeMember,
+    leaveBusiness,
+    transferOwnership,
   };
 }
