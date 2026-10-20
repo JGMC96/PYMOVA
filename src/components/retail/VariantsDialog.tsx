@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Trash2, Layers } from 'lucide-react';
+import { Plus, Trash2, Layers, Edit2 } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
@@ -13,6 +13,8 @@ import {
 } from '@/components/ui/table';
 import { useProductVariants } from '@/hooks/useProductVariants';
 import { useStoreProfile } from '@/hooks/useStoreProfile';
+import { useRoleAccess } from '@/hooks/useRoleAccess';
+import { StockAdjustDialog, type StockAdjustTarget } from './StockAdjustDialog';
 
 interface VariantsDialogProps {
   open: boolean;
@@ -26,8 +28,10 @@ interface VariantsDialogProps {
 export function VariantsDialog({
   open, onOpenChange, productId, productName, basePrice, onChanged,
 }: VariantsDialogProps) {
-  const { variants, isLoading, isSaving, createVariant, deleteVariant } = useProductVariants(productId);
+  const { variants, isLoading, isSaving, createVariant, deleteVariant, refreshVariants } = useProductVariants(productId);
   const { profile } = useStoreProfile();
+  const { isAdmin } = useRoleAccess('admin');
+  const [adjustTarget, setAdjustTarget] = useState<StockAdjustTarget | null>(null);
 
   const [name, setName] = useState('');
   const [barcode, setBarcode] = useState('');
@@ -42,7 +46,8 @@ export function VariantsDialog({
       barcode: barcode.trim() || null,
       price: price ? parseFloat(price) : null,
       cost_price: cost ? parseFloat(cost) : null,
-      stock_quantity: parseInt(stock, 10) || 0,
+      // El stock inicial solo lo pone un admin; el resto, con un ajuste.
+      stock_quantity: isAdmin ? parseInt(stock, 10) || 0 : 0,
     });
     if (ok) {
       setName('');
@@ -124,15 +129,17 @@ export function VariantsDialog({
             />
           </div>
           <div className="flex gap-2">
-            <div className="flex-1">
-              <Label className="text-xs">Stock</Label>
-              <Input
-                type="number"
-                min={0}
-                value={stock}
-                onChange={(e) => setStock(e.target.value)}
-              />
-            </div>
+            {isAdmin && (
+              <div className="flex-1">
+                <Label className="text-xs">Stock inicial</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={stock}
+                  onChange={(e) => setStock(e.target.value)}
+                />
+              </div>
+            )}
             <Button onClick={handleCreate} disabled={isSaving || !name.trim()} size="icon">
               <Plus className="w-4 h-4" />
             </Button>
@@ -173,9 +180,29 @@ export function VariantsDialog({
                     {v.cost_price != null ? `${v.cost_price.toFixed(2)} €` : '—'}
                   </TableCell>
                   <TableCell className="text-center">
-                    <Badge variant={v.stock_quantity > 0 ? 'secondary' : 'destructive'}>
-                      {v.stock_quantity}
-                    </Badge>
+                    <div className="flex items-center justify-center gap-1">
+                      <Badge variant={v.stock_quantity > 0 ? 'secondary' : 'destructive'}>
+                        {v.stock_quantity}
+                      </Badge>
+                      {isAdmin && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          title="Ajustar stock"
+                          onClick={() =>
+                            setAdjustTarget({
+                              productId,
+                              variantId: v.id,
+                              name: `${productName} · ${v.name}`,
+                              current: v.stock_quantity,
+                            })
+                          }
+                        >
+                          <Edit2 className="w-3 h-3" />
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="text-right">
                     <Button
@@ -193,6 +220,14 @@ export function VariantsDialog({
             </TableBody>
           </Table>
         )}
+        <StockAdjustDialog
+          target={adjustTarget}
+          onClose={() => setAdjustTarget(null)}
+          onDone={() => {
+            refreshVariants();
+            onChanged?.();
+          }}
+        />
       </DialogContent>
     </Dialog>
   );

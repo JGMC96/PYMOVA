@@ -69,25 +69,7 @@ export function useInventory() {
     fetchProducts();
   }, [fetchProducts]);
 
-  const updateStock = async (productId: string, newQuantity: number): Promise<boolean> => {
-    setIsUpdating(true);
-    const { error } = await supabase
-      .from('products')
-      .update({ stock_quantity: newQuantity })
-      .eq('id', productId);
-
-    setIsUpdating(false);
-
-    if (error) {
-      console.error('Error updating stock:', error);
-      toast.error('Error al actualizar stock');
-      return false;
-    }
-
-    toast.success('Stock actualizado');
-    fetchProducts();
-    return true;
-  };
+  // El stock se cambia con useStockAdjust (adjust_stock, solo admins y con motivo).
 
   const toggleTracking = async (productId: string, trackInventory: boolean): Promise<boolean> => {
     setIsUpdating(true);
@@ -113,7 +95,6 @@ export function useInventory() {
     products,
     isLoading,
     isUpdating,
-    updateStock,
     toggleTracking,
     refreshProducts: fetchProducts,
   };
