@@ -8,13 +8,17 @@ import { supabase } from '@/integrations/supabase/client';
 import { useBusiness } from '@/contexts/BusinessContext';
 import {
   activeSellers,
+  authorizers,
+  hasPermission,
   parseStoredSellers,
   requiresSeller as computeRequiresSeller,
   SELLER_SESSION_MS,
   sellerChoice,
   sellerStorageKey,
   withSeller,
+  type PosAction,
   type PosEmployee,
+  type PosPermission,
   type StoredSeller,
 } from '@/lib/sellerSession';
 
@@ -36,7 +40,15 @@ export interface SellerPick {
  * - 'login': nombre y PIN (nadie conectado, o «Otra persona», o «Añadir persona»);
  * - 'change-pin': cambiar el PIN con el actual.
  */
-export type SellerDialogMode = 'ask' | 'login' | 'change-pin';
+export type SellerDialogMode = 'ask' | 'login' | 'change-pin' | 'authorize';
+
+export interface SellerDialogState {
+  mode: SellerDialogMode;
+  purpose: string;
+  /** Solo en 'authorize': qué se autoriza y, si es un descuento, el %. */
+  action?: PosAction;
+  amount?: number;
+}
 
 interface SellerSessionValue {
   employees: PosEmployee[];
@@ -45,7 +57,17 @@ interface SellerSessionValue {
   sellers: StoredSeller[];
   /** Hay dependientes con PIN: no se vende ni se devuelve sin identificarse. */
   requiresSeller: boolean;
-  dialog: { mode: SellerDialogMode; purpose: string } | null;
+  dialog: SellerDialogState | null;
+  permissions: PosPermission[];
+  /** Permisos de una persona (null si no se conocen). */
+  permissionsOf: (employeeId: string) => PosPermission | null;
+  /** ¿Puede hacerlo esa persona sin autorización? Sin dependientes con PIN, siempre. */
+  can: (seller: StoredSeller | null, action: PosAction, amount?: number) => boolean;
+  /** Pide el PIN de alguien con permiso; devuelve el id de la autorización o null si se cancela. */
+  authorize: (action: PosAction, purpose: string, amount?: number) => Promise<string | null>;
+  /** Quién puede autorizar una acción. */
+  authorizersFor: (action: PosAction, amount?: number) => PosEmployee[];
+  authorizeWithPin: (employeeId: string, pin: string) => Promise<PinResult>;
   /** Cobrar, devolver o fichar: decide quién (puede abrir el diálogo). */
   chooseSeller: (purpose?: string) => Promise<SellerPick>;
   /** Respuesta del diálogo: la persona elegida o conectada, o null si se cancela. */
@@ -80,8 +102,10 @@ export function SellerSessionProvider({ children }: { children: ReactNode }) {
   const [isLoadingEmployees, setIsLoadingEmployees] = useState(true);
   const [stored, setStored] = useState<StoredSeller[]>([]);
   const [now, setNow] = useState(() => Date.now());
-  const [dialog, setDialog] = useState<{ mode: SellerDialogMode; purpose: string } | null>(null);
+  const [dialog, setDialog] = useState<SellerDialogState | null>(null);
+  const [permissions, setPermissions] = useState<PosPermission[]>([]);
   const pending = useRef<((pick: SellerPick) => void) | null>(null);
+  const pendingAuth = useRef<((id: string | null) => void) | null>(null);
 
   const storageKey = activeBusinessId ? sellerStorageKey(activeBusinessId) : null;
 
@@ -92,9 +116,16 @@ export function SellerSessionProvider({ children }: { children: ReactNode }) {
       return;
     }
     setIsLoadingEmployees(true);
-    const { data, error } = await rpc('get_pos_employees', { _business_id: activeBusinessId });
-    if (error) console.error('get_pos_employees', error);
-    setEmployees((data ?? []) as PosEmployee[]);
+    const [emps, perms] = await Promise.all([
+      rpc('get_pos_employees', { _business_id: activeBusinessId }),
+      rpc('get_pos_permissions', { _business_id: activeBusinessId }),
+    ]);
+    if (emps.error) console.error('get_pos_employees', emps.error);
+    if (perms.error) console.error('get_pos_permissions', perms.error);
+    setEmployees((emps.data ?? []) as PosEmployee[]);
+    setPermissions(
+      ((perms.data ?? []) as PosPermission[]).map((p) => ({ ...p, max_discount_pct: Number(p.max_discount_pct) })),
+    );
     setIsLoadingEmployees(false);
   }, [activeBusinessId]);
 
@@ -142,12 +173,70 @@ export function SellerSessionProvider({ children }: { children: ReactNode }) {
   const sellers = useMemo(() => activeSellers(stored, now), [stored, now]);
   const requiresSeller = computeRequiresSeller(employees);
 
+  const permissionsOf = useCallback(
+    (employeeId: string) => permissions.find((p) => p.employee_id === employeeId) ?? null,
+    [permissions],
+  );
+
+  const can = useCallback(
+    (seller: StoredSeller | null, action: PosAction, amount = 0) =>
+      !requiresSeller || !seller || hasPermission(permissionsOf(seller.employeeId), action, amount),
+    [requiresSeller, permissionsOf],
+  );
+
+  const authorize = useCallback((action: PosAction, purpose: string, amount?: number): Promise<string | null> => {
+    pendingAuth.current?.(null);
+    return new Promise<string | null>((resolve) => {
+      pendingAuth.current = resolve;
+      setDialog({ mode: 'authorize', purpose, action, amount });
+    });
+  }, []);
+
+  const authorizersFor = useCallback(
+    (action: PosAction, amount = 0) => authorizers(permissions, employees, action, amount),
+    [permissions, employees],
+  );
+
+  const finishAuthorization = useCallback((id: string | null) => {
+    setDialog(null);
+    const resolve = pendingAuth.current;
+    pendingAuth.current = null;
+    resolve?.(id);
+  }, []);
+
+  const authorizeWithPin = useCallback(
+    async (employeeId: string, pin: string): Promise<PinResult> => {
+      if (!activeBusinessId || dialog?.mode !== 'authorize' || !dialog.action) {
+        return { ok: false, error: 'No hay nada que autorizar', lockedSeconds: 0 };
+      }
+      const { data, error } = await rpc('authorize_action', {
+        _business_id: activeBusinessId,
+        _employee_id: employeeId,
+        _pin: pin,
+        _action: dialog.action,
+        // El tope autorizado se redondea hacia arriba para cubrir el % que calcula el servidor.
+        _amount: dialog.action === 'discount' ? Math.ceil((dialog.amount ?? 0) * 100) / 100 : null,
+      });
+      if (error) return { ok: false, error: error.message, lockedSeconds: 0 };
+      const row = firstRow<{ ok: boolean; error: string | null; locked_seconds: number; authorization_id: string }>(data);
+      if (!row?.ok) return { ok: false, error: row?.error ?? 'PIN incorrecto', lockedSeconds: row?.locked_seconds ?? 0 };
+      finishAuthorization(row.authorization_id);
+      return { ok: true, error: null, lockedSeconds: 0 };
+    },
+    [activeBusinessId, dialog, finishAuthorization],
+  );
+
   const resolveDialog = useCallback((seller: StoredSeller | null) => {
+    // Cerrar el diálogo de autorización la cancela.
+    if (pendingAuth.current) {
+      finishAuthorization(null);
+      return;
+    }
     setDialog(null);
     const resolve = pending.current;
     pending.current = null;
     resolve?.({ seller, cancelled: seller === null });
-  }, []);
+  }, [finishAuthorization]);
 
   const chooseSeller = useCallback(
     (purpose = 'la venta'): Promise<SellerPick> => {
@@ -256,6 +345,12 @@ export function SellerSessionProvider({ children }: { children: ReactNode }) {
       sellers,
       requiresSeller,
       dialog,
+      permissions,
+      permissionsOf,
+      can,
+      authorize,
+      authorizersFor,
+      authorizeWithPin,
       chooseSeller,
       resolveDialog,
       setDialogMode: (mode) => setDialog((d) => (d ? { ...d, mode } : { mode, purpose: '' })),
@@ -269,7 +364,7 @@ export function SellerSessionProvider({ children }: { children: ReactNode }) {
       refreshEmployees,
       clock,
     }),
-    [employees, isLoadingEmployees, sellers, requiresSeller, dialog, chooseSeller, resolveDialog, login, changePin, disconnect, disconnectAll, dropSession, refreshEmployees, clock],
+    [employees, isLoadingEmployees, sellers, requiresSeller, dialog, permissions, permissionsOf, can, authorize, authorizersFor, authorizeWithPin, chooseSeller, resolveDialog, login, changePin, disconnect, disconnectAll, dropSession, refreshEmployees, clock],
   );
 
   return <SellerSessionContext.Provider value={value}>{children}</SellerSessionContext.Provider>;

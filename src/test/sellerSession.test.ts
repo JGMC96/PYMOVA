@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   activeSellers,
+  authorizers,
+  discountPct,
+  hasPermission,
+  isAuthorizationError,
+  type PosPermission,
   isSellerSessionError,
   isValidPin,
   lockedMessage,
@@ -95,5 +100,48 @@ describe('mensajes', () => {
     expect(isSellerSessionError('Falta la sesión de vendedor: identifícate con tu PIN en el TPV')).toBe(true);
     expect(isSellerSessionError('Abre la caja')).toBe(false);
     expect(isSellerSessionError(null)).toBe(false);
+  });
+});
+
+describe('permisos por persona', () => {
+  const perm = (p: Partial<PosPermission>): PosPermission => ({
+    employee_id: 'e1',
+    name: 'Ana',
+    is_owner: false,
+    has_account: false,
+    customized: false,
+    max_discount_pct: 10,
+    can_return: false,
+    can_close_register: false,
+    ...p,
+  });
+
+  it('calcula el % de descuento como el servidor', () => {
+    expect(discountPct(20, 80)).toBe(20);
+    expect(discountPct(10, 89.5)).toBe(10.05);
+    expect(discountPct(0, 100)).toBe(0);
+    expect(discountPct(5, 0)).toBe(100);
+  });
+
+  it('sin permiso o por encima del tope, hace falta autorización', () => {
+    expect(hasPermission(perm({}), 'discount', 10)).toBe(true);
+    expect(hasPermission(perm({}), 'discount', 10.01)).toBe(false);
+    expect(hasPermission(perm({}), 'return')).toBe(false);
+    expect(hasPermission(perm({ can_close_register: true }), 'close_register')).toBe(true);
+    expect(hasPermission(null, 'discount', 0)).toBe(false);
+  });
+
+  it('autoriza quien tiene PIN y el permiso suficiente', () => {
+    const permisos = [
+      perm({ employee_id: 'ana' }),
+      perm({ employee_id: 'luis', max_discount_pct: 30, can_return: true }),
+      perm({ employee_id: 'sinpin', max_discount_pct: 100, can_return: true }),
+    ];
+    const empleados = [emp({ id: 'ana' }), emp({ id: 'luis', name: 'Luis' }), emp({ id: 'sinpin', has_pin: false })];
+    expect(authorizers(permisos, empleados, 'discount', 20).map((e) => e.id)).toEqual(['luis']);
+    expect(authorizers(permisos, empleados, 'discount', 40)).toEqual([]);
+    expect(authorizers(permisos, empleados, 'return').map((e) => e.id)).toEqual(['luis']);
+    expect(isAuthorizationError('Necesita autorización: esta persona no puede hacer devoluciones')).toBe(true);
+    expect(isAuthorizationError('PIN incorrecto')).toBe(false);
   });
 });

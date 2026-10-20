@@ -11,6 +11,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { useCashRegister } from '@/hooks/useCashRegister';
+import { useSellerSession } from '@/contexts/SellerSessionContext';
 import { PAYMENT_LABELS } from '@/lib/storeProfiles';
 import { cn } from '@/lib/utils';
 
@@ -19,18 +20,19 @@ const fmtDate = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' }) : '—';
 
 export function CashRegisterPanel() {
+  const { sellers, chooseSeller, can, authorize, dropSession } = useSellerSession();
   const {
-    openSession, history, summary, expectedCash, cashRefunds, isLoading, isWorking,
+    openSession, history, summary, expectedCash, cashRefunds, isBlind, isLoading, isWorking,
     openRegister, closeRegister, refresh,
-  } = useCashRegister();
+  } = useCashRegister(sellers.map((s) => s.sessionId));
 
   const [openingAmount, setOpeningAmount] = useState('');
   const [countedAmount, setCountedAmount] = useState('');
   const [notes, setNotes] = useState('');
 
   const counted = parseFloat(countedAmount);
-  const difference = !isNaN(counted) ? counted - expectedCash : null;
-  const salesTotal = summary.reduce((s, r) => s + Number(r.total_amount), 0);
+  const difference = !isNaN(counted) && !isBlind ? counted - expectedCash : null;
+  const salesTotal = summary.reduce((s, r) => s + Number(r.total_amount ?? 0), 0);
   const salesCount = summary.reduce((s, r) => s + Number(r.sales_count), 0);
 
   const handleOpen = async () => {
@@ -40,7 +42,19 @@ export function CashRegisterPanel() {
 
   const handleClose = async () => {
     if (isNaN(counted)) return;
-    const ok = await closeRegister(counted, notes);
+    // Cierra una persona identificada; sin permiso, lo autoriza un encargado (0030).
+    const pick = await chooseSeller('el cierre de caja');
+    if (pick.cancelled) return;
+    let authorizationId: string | null = null;
+    if (!can(pick.seller, 'close_register')) {
+      authorizationId = await authorize('close_register', 'el cierre de caja');
+      if (!authorizationId) return;
+    }
+    const ok = await closeRegister(counted, notes, {
+      sellerSessionId: pick.seller?.sessionId ?? null,
+      authorizationId,
+    });
+    if (!ok && pick.seller) dropSession(pick.seller.sessionId);
     if (ok) {
       setCountedAmount('');
       setNotes('');
@@ -105,20 +119,28 @@ export function CashRegisterPanel() {
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Ventas del turno</span>
                     <span>
-                      {salesCount} · {fmt(salesTotal)}
+                      {salesCount}
+                      {isBlind ? '' : ` · ${fmt(salesTotal)}`}
                     </span>
                   </div>
-                  {cashRefunds > 0 && (
+                  {!isBlind && cashRefunds > 0 && (
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Devoluciones en efectivo</span>
                       <span className="text-destructive">−{fmt(cashRefunds)}</span>
                     </div>
                   )}
                   <Separator />
-                  <div className="flex justify-between font-semibold">
-                    <span>Efectivo esperado</span>
-                    <span className="text-primary">{fmt(expectedCash)}</span>
-                  </div>
+                  {isBlind ? (
+                    <p className="text-muted-foreground">
+                      Arqueo a ciegas: cuenta el efectivo y ciérrala. El esperado y la diferencia se ven al cerrar, o
+                      si se conecta alguien que puede cerrar la caja.
+                    </p>
+                  ) : (
+                    <div className="flex justify-between font-semibold">
+                      <span>Efectivo esperado</span>
+                      <span className="text-primary">{fmt(expectedCash)}</span>
+                    </div>
+                  )}
                 </div>
 
                 <Separator />
@@ -204,7 +226,7 @@ export function CashRegisterPanel() {
                       </TableCell>
                       <TableCell className="text-center">{row.sales_count}</TableCell>
                       <TableCell className="text-right font-medium">
-                        {fmt(Number(row.total_amount))}
+                        {row.total_amount === null ? '—' : fmt(Number(row.total_amount))}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -212,7 +234,7 @@ export function CashRegisterPanel() {
                     <TableCell className="font-semibold">Total</TableCell>
                     <TableCell className="text-center font-semibold">{salesCount}</TableCell>
                     <TableCell className="text-right font-semibold text-primary">
-                      {fmt(salesTotal)}
+                      {isBlind ? '—' : fmt(salesTotal)}
                     </TableCell>
                   </TableRow>
                 </TableBody>

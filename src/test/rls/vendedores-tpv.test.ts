@@ -219,6 +219,8 @@ describe.skipIf(!RLS_DB_URL)('RLS · vendedores en el TPV', () => {
   it('la devolución y el fichaje con sesión quedan a nombre de la dependienta', async () => {
     const sesion = (await empezar(staff, ana, '1234')).session_id!;
     const venta = await vender(staff, sesion);
+    // Desde la 0030 las devoluciones necesitan permiso: el propietario se lo da a Ana.
+    await asUser(sql, owner, (tx) => tx`SELECT public.set_employee_permissions(${negocio}, ${ana}, 10, true, false)`);
     const [item] = await sql`SELECT id FROM sale_items WHERE sale_id = ${venta}`;
     const [dev] = await asUser(sql, staff, (tx) => tx<{ return_id: string }[]>`
       SELECT * FROM public.create_sale_return(${negocio}, ${venta}, ${sql.json([{ sale_item_id: item.id, quantity: 1 }])}::jsonb,

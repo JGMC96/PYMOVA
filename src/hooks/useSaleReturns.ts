@@ -69,6 +69,7 @@ export function useSaleReturns() {
       refundMethod?: string;
       restock?: boolean;
       sellerSessionId?: string | null;
+      authorizationId?: string | null;
     }): Promise<string | null> => {
       if (!activeBusiness?.id) {
         toast.error('No hay negocio activo');
@@ -91,6 +92,7 @@ export function useSaleReturns() {
         _restock: params.restock ?? true,
         // Parámetro nuevo de la 0027: `as never` hasta que se regenere types.ts.
         _seller_session_id: params.sellerSessionId ?? null,
+        _authorization_id: params.authorizationId ?? null,
       } as never);
       setIsSubmitting(false);
 

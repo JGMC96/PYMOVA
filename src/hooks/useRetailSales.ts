@@ -60,6 +60,8 @@ export interface CreateSaleData {
   register_session_id?: string | null;
   /** Sesión de vendedor abierta con el PIN; el servidor resuelve el vendedor. */
   seller_session_id?: string | null;
+  /** Autorización de un encargado para un descuento por encima del tope (0030). */
+  authorization_id?: string | null;
 }
 
 
@@ -138,6 +140,7 @@ export function useRetailSales() {
         _register_session_id: data.register_session_id ?? null,
         // Parámetro nuevo de la 0027: `as never` hasta que se regenere types.ts.
         _seller_session_id: data.seller_session_id ?? null,
+        _authorization_id: data.authorization_id ?? null,
       } as never);
 
       if (error) throw error;

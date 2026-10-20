@@ -25,7 +25,7 @@ import { PAYMENT_LABELS } from '@/lib/storeProfiles';
 import { SaleTicketDialog, TicketData } from './SaleTicketDialog';
 import { SellerBar } from './SellerBar';
 import { useSellerSession } from '@/contexts/SellerSessionContext';
-import { isSellerSessionError } from '@/lib/sellerSession';
+import { discountPct, isSellerSessionError } from '@/lib/sellerSession';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { DEFAULT_TAX_RATE, taxBreakdown } from '@/lib/tax';
@@ -228,6 +228,13 @@ export function POSPanel() {
     const pick = await sellerSession.chooseSeller('la venta');
     if (pick.cancelled) return;
     const seller = pick.seller;
+    // Descuento por encima del máximo de quien vende: lo autoriza un encargado con su PIN.
+    const pct = discountPct(discountValue, total);
+    let authorizationId: string | null = null;
+    if (pct > 0 && !sellerSession.can(seller, 'discount', pct)) {
+      authorizationId = await sellerSession.authorize('discount', 'la venta', pct);
+      if (!authorizationId) return;
+    }
     setSelectedPayment(method);
 
     const snapshot = cart.map((item) => {
@@ -250,6 +257,7 @@ export function POSPanel() {
       change_given: change !== null && change >= 0 ? change : null,
       register_session_id: openSession?.id ?? null,
       seller_session_id: seller?.sessionId ?? null,
+      authorization_id: authorizationId,
     }, { onError: (m) => { failure = m; } });
 
     if (!result && seller && isSellerSessionError(failure)) {
