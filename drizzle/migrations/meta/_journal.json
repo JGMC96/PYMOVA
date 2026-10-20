@@ -148,6 +148,13 @@
       "when": 1792488829661,
       "tag": "0020_fichajes_solo_rpc",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1792489705481,
+      "tag": "0021_caja_arqueo",
+      "breakpoints": true
     }
   ]
 }

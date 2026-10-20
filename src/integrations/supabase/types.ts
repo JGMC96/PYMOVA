@@ -2088,6 +2088,7 @@ export type Database = {
           id: string
           reason: string | null
           refund_method: string | null
+          register_session_id: string | null
           restock: boolean
           return_number: string
           sale_id: string
@@ -2104,6 +2105,7 @@ export type Database = {
           id?: string
           reason?: string | null
           refund_method?: string | null
+          register_session_id?: string | null
           restock?: boolean
           return_number: string
           sale_id: string
@@ -2120,6 +2122,7 @@ export type Database = {
           id?: string
           reason?: string | null
           refund_method?: string | null
+          register_session_id?: string | null
           restock?: boolean
           return_number?: string
           sale_id?: string
@@ -2135,6 +2138,13 @@ export type Database = {
             columns: ["business_id"]
             isOneToOne: false
             referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sale_returns_register_session_id_fkey"
+            columns: ["register_session_id"]
+            isOneToOne: false
+            referencedRelation: "cash_register_sessions"
             referencedColumns: ["id"]
           },
           {
@@ -2946,6 +2956,8 @@ export type Database = {
         Args: { _session_id: string }
         Returns: {
           payment_method: string
+          refunds_amount: number
+          refunds_count: number
           sales_count: number
           total_amount: number
         }[]
