@@ -29,6 +29,8 @@ const ShopifyIntegration = () => {
     verify: verifyConnection,
     claim: claimShop,
     processWebhooks,
+    refreshStock,
+    isRefreshingStock,
   } = useShopifyConnection();
 
   const {
@@ -80,7 +82,8 @@ const ShopifyIntegration = () => {
   const toggle = (id: string) => {
     setSelected((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   };
@@ -162,6 +165,19 @@ const ShopifyIntegration = () => {
               <Store className="w-4 h-4 mr-1.5" />
             )}
             Comprobar conexión
+          </Button>
+          <Button
+            variant="outline"
+            onClick={refreshStock}
+            disabled={isRefreshingStock || isSyncing || isImporting}
+            title="Trae el stock de la tienda (ubicación por defecto) desde Shopify"
+          >
+            {isRefreshingStock ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <RefreshCw className="w-4 h-4 mr-2" />
+            )}
+            Actualizar stock desde Shopify
           </Button>
           <Button
             variant="outline"

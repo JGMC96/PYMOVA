@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { useBusiness } from '@/contexts/BusinessContext';
-import { invokeShopifySync } from '@/lib/shopify';
+import { invokeShopifySync, refreshShopifyStock } from '@/lib/shopify';
 
 export interface ShopifyConnectionStatus {
   shop_domain: string;
@@ -41,6 +41,7 @@ export function useShopifyConnection() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isClaiming, setIsClaiming] = useState(false);
+  const [isRefreshingStock, setIsRefreshingStock] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
 
@@ -149,6 +150,24 @@ export function useShopifyConnection() {
     }
   }, [activeBusinessId, refresh]);
 
+  /** Pone el stock de Pymova al día con Shopify (solo la ubicación de la tienda). */
+  const refreshStock = useCallback(async () => {
+    if (!activeBusinessId) return;
+    setIsRefreshingStock(true);
+    try {
+      const result = await refreshShopifyStock(activeBusinessId);
+      toast.success('Stock actualizado desde Shopify', {
+        description: `${result.items} artículos revisados (${result.applied} niveles aplicados).`,
+      });
+    } catch (err) {
+      toast.error('No se pudo actualizar el stock desde Shopify', {
+        description: err instanceof Error ? err.message : undefined,
+      });
+    } finally {
+      setIsRefreshingStock(false);
+    }
+  }, [activeBusinessId]);
+
   /** Procesa los webhooks pendientes en cola. */
   const processWebhooks = useCallback(async () => {
     if (!activeBusinessId) return;
@@ -178,6 +197,8 @@ export function useShopifyConnection() {
     sync,
     claim,
     processWebhooks,
+    refreshStock,
+    isRefreshingStock,
   };
 }
 

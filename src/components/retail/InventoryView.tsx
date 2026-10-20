@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Package, RefreshCw, Edit2, Check, X, Layers } from 'lucide-react';
+import { Package, RefreshCw, Edit2, Check, X, Layers, History } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,12 +15,14 @@ import {
 } from '@/components/ui/table';
 import { useInventory, type ProductWithStock } from '@/hooks/useInventory';
 import { VariantsDialog } from './VariantsDialog';
+import { StockMovementsDialog } from './StockMovementsDialog';
 
 export function InventoryView() {
   const { products, isLoading, isUpdating, updateStock, toggleTracking, refreshProducts } = useInventory();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>('');
   const [variantProduct, setVariantProduct] = useState<ProductWithStock | null>(null);
+  const [historyProduct, setHistoryProduct] = useState<ProductWithStock | null>(null);
 
 
   const startEditing = (productId: string, currentStock: number) => {
@@ -80,6 +82,7 @@ export function InventoryView() {
                 <TableHead className="text-center">Stock</TableHead>
                 <TableHead className="text-center">Seguimiento</TableHead>
                 <TableHead className="text-center">Variantes</TableHead>
+                <TableHead className="text-center">Movimientos</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -168,6 +171,16 @@ export function InventoryView() {
                       {product.variants.length}
                     </Button>
                   </TableCell>
+                  <TableCell className="text-center">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setHistoryProduct(product)}
+                      title="Ver movimientos de stock"
+                    >
+                      <History className="w-4 h-4" />
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -185,6 +198,8 @@ export function InventoryView() {
           onChanged={refreshProducts}
         />
       )}
+
+      <StockMovementsDialog product={historyProduct} onClose={() => setHistoryProduct(null)} />
     </Card>
   );
 

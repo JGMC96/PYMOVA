@@ -2,7 +2,24 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { toast } from 'sonner';
-import { fetchShopifyProducts, fetchAllShopifyProducts, type ShopifyProduct } from '@/lib/shopify';
+import {
+  fetchShopifyProducts,
+  fetchAllShopifyProducts,
+  refreshShopifyStock,
+  type ShopifyProduct,
+} from '@/lib/shopify';
+
+/**
+ * Tras importar, el stock se pone al día desde Shopify (solo la tienda). No bloquea:
+ * si falla (por ejemplo, sin permisos de admin), se queda el stock que hubiera.
+ */
+async function refreshStockAfterImport(businessId: string) {
+  try {
+    await refreshShopifyStock(businessId);
+  } catch (error) {
+    console.warn('No se pudo actualizar el stock desde Shopify', error);
+  }
+}
 import { buildVariantIndex, matchVariant, type LocalVariant } from '@/lib/variantMapping';
 
 export interface SyncRun {
@@ -161,9 +178,9 @@ export function useShopifyImport() {
         category: product.productType || null,
         sku: firstVariant?.sku || null,
         barcode: firstVariant?.barcode || null,
-        ...(tracksStock
-          ? { track_inventory: true, stock_quantity: productStock }
-          : {}),
+        // El stock de un producto que ya existe no se pisa: la API da la suma de todas
+        // las ubicaciones y en Pymova manda la tienda (refreshShopifyStock).
+        ...(tracksStock ? { track_inventory: true } : {}),
         is_active: true,
         external_id: product.id,
         external_source: 'shopify',
@@ -203,7 +220,11 @@ export function useShopifyImport() {
       } else {
         const { data: inserted, error: insertError } = await supabase
           .from('products')
-          .insert({ ...payload, created_by: user?.id ?? null })
+          .insert({
+            ...payload,
+            ...(tracksStock ? { stock_quantity: productStock } : {}),
+            created_by: user?.id ?? null,
+          })
           .select('id')
           .single();
         if (insertError) throw new Error(insertError.message);
@@ -233,9 +254,6 @@ export function useShopifyImport() {
             barcode: variant.barcode || null,
             price: Number(variant.price.amount) || null,
             is_active: variant.availableForSale,
-            ...(typeof variant.quantityAvailable === 'number'
-              ? { stock_quantity: variant.quantityAvailable }
-              : {}),
             external_id: variant.id,
             external_source: 'shopify',
           };
@@ -254,7 +272,13 @@ export function useShopifyImport() {
                 .eq('business_id', businessId)
             : await supabase
                 .from('product_variants')
-                .insert({ ...variantPayload, created_by: user?.id ?? null });
+                .insert({
+                  ...variantPayload,
+                  ...(typeof variant.quantityAvailable === 'number'
+                    ? { stock_quantity: variant.quantityAvailable }
+                    : {}),
+                  created_by: user?.id ?? null,
+                });
 
           if (variantError) {
             onIssue({
@@ -304,6 +328,7 @@ export function useShopifyImport() {
         }
 
         setLastSummary(summary);
+        await refreshStockAfterImport(activeBusinessId);
         if (summary.failed > 0) {
           toast.warning(
             `Importación parcial: ${summary.created} creados, ${summary.updated} actualizados, ${summary.failed} con error.`,
@@ -498,6 +523,7 @@ export function useShopifyImport() {
 
         setLastSummary(summary);
         setQueue((prev) => ({ ...prev, phase: 'done' }));
+        await refreshStockAfterImport(activeBusinessId);
 
         if (run) {
           if (pendingIssues.length > 0) {

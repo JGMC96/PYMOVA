@@ -3,6 +3,7 @@
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
 import {
   isCatalogTopic,
+  levelFromInventoryWebhook,
   ORDER_TOPICS,
   orderGidFromPayload,
   retryDelaySeconds,
@@ -83,6 +84,30 @@ export async function processEvent(
       await syncFulfillmentsForOrder(admin, event.business_id, row.order_id, data.order);
     }
     return { status: 'processed', message: `${topic} · ${data.order.name}` };
+  }
+
+  // Stock: Shopify manda en la ubicación de la tienda; se aplica al momento.
+  if (topic === 'inventory_levels/update') {
+    const level = levelFromInventoryWebhook(payload);
+    if (!level) {
+      return { status: 'ignored', message: 'Webhook de inventario sin artículo, ubicación o cantidad' };
+    }
+    const { data, error } = await admin.rpc('apply_shopify_inventory_levels', {
+      _business_id: event.business_id,
+      _levels: [level],
+      _source: 'shopify',
+    });
+    if (error) throw error;
+    const row = (Array.isArray(data) ? data[0] : data) as
+      | { applied: number; stale: number; unknown: number }
+      | null;
+    if (row?.applied) {
+      return { status: 'processed', message: `Stock actualizado: ${level.available} uds. en ${level.location_gid}` };
+    }
+    if (row?.stale) {
+      return { status: 'ignored', message: 'Cambio de inventario más antiguo que el último aplicado' };
+    }
+    return { status: 'ignored', message: 'Artículo de Shopify no emparejado con Pymova' };
   }
 
   if (isCatalogTopic(topic)) {
