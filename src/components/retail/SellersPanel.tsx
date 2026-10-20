@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useSellers, type SellerReportRow } from '@/hooks/useSellers';
+import { PermissionsPanel } from './PermissionsPanel';
 import { useRoleAccess } from '@/hooks/useRoleAccess';
 import { isValidPin, SELLER_SESSION_HOURS, type PosEmployee } from '@/lib/sellerSession';
 
@@ -111,6 +112,8 @@ export function SellersPanel() {
           )}
         </CardContent>
       </Card>
+
+      {isOwner && <PermissionsPanel />}
 
       {isOwner && (
       <Card>

@@ -21,13 +21,19 @@ export interface RegisterSession {
 export interface RegisterSummaryRow {
   payment_method: string;
   sales_count: number;
-  total_amount: number;
+  /** null con la caja abierta si nadie conectado puede cerrarla (arqueo a ciegas, 0030). */
+  total_amount: number | null;
   refunds_count: number;
-  refunds_amount: number;
+  refunds_amount: number | null;
 }
 
-export function useCashRegister() {
+/**
+ * Caja del negocio. `sellerSessionIds`: personas conectadas al TPV; si alguna puede cerrar
+ * caja, el resumen trae importes (si no, arqueo a ciegas).
+ */
+export function useCashRegister(sellerSessionIds: string[] = []) {
   const { activeBusiness } = useBusiness();
+  const sessionsKey = sellerSessionIds.join(',');
   const [openSession, setOpenSession] = useState<RegisterSession | null>(null);
   const [history, setHistory] = useState<RegisterSession[]>([]);
   const [summary, setSummary] = useState<RegisterSummaryRow[]>([]);
@@ -58,16 +64,18 @@ export function useCashRegister() {
     setHistory(sessions.filter((s) => s.status === 'closed'));
 
     if (current) {
+      // Parámetro nuevo de la 0030: `as never` hasta que se regenere types.ts.
       const { data: sum } = await supabase.rpc('get_register_summary', {
         _session_id: current.id,
-      });
+        _seller_session_ids: sessionsKey ? sessionsKey.split(',') : [],
+      } as never);
       setSummary((sum ?? []) as RegisterSummaryRow[]);
     } else {
       setSummary([]);
     }
 
     setIsLoading(false);
-  }, [activeBusiness?.id]);
+  }, [activeBusiness?.id, sessionsKey]);
 
   useEffect(() => {
     fetchSessions();
@@ -92,14 +100,20 @@ export function useCashRegister() {
     return true;
   };
 
-  const closeRegister = async (countedAmount: number, notes?: string): Promise<boolean> => {
+  const closeRegister = async (
+    countedAmount: number,
+    notes?: string,
+    opts: { sellerSessionId?: string | null; authorizationId?: string | null } = {},
+  ): Promise<boolean> => {
     if (!openSession) return false;
     setIsWorking(true);
     const { error } = await supabase.rpc('close_register_session', {
       _session_id: openSession.id,
       _counted_amount: countedAmount,
       _notes: notes || null,
-    });
+      _seller_session_id: opts.sellerSessionId ?? null,
+      _authorization_id: opts.authorizationId ?? null,
+    } as never);
     setIsWorking(false);
 
     if (error) {
@@ -112,6 +126,8 @@ export function useCashRegister() {
     return true;
   };
 
+  // Arqueo a ciegas: el servidor no da importes a quien no puede cerrar caja.
+  const isBlind = !!openSession && summary.some((s) => s.total_amount === null);
   // Misma fórmula que close_register_session: fondo + ventas en efectivo − devoluciones en efectivo.
   const cashRow = summary.find((s) => s.payment_method === 'cash');
   const cashRefunds = Number(cashRow?.refunds_amount ?? 0);
@@ -126,6 +142,7 @@ export function useCashRegister() {
     summary,
     expectedCash,
     cashRefunds,
+    isBlind,
     isLoading,
     isWorking,
     openRegister,

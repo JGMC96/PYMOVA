@@ -20,7 +20,7 @@ const rpc = (name: string, args: Record<string, unknown>) => supabase.rpc(name a
 
 export function useSellers() {
   const { activeBusinessId, user } = useBusiness();
-  const { employees, isLoadingEmployees, refreshEmployees } = useSellerSession();
+  const { employees, permissions, isLoadingEmployees, refreshEmployees } = useSellerSession();
   const [isSaving, setIsSaving] = useState(false);
 
   const run = useCallback(
@@ -78,6 +78,19 @@ export function useSellers() {
     [activeBusinessId],
   );
 
+  /** Solo el propietario (0030): descuento máximo, devoluciones y cierre de caja. */
+  const savePermissions = (id: string, maxDiscountPct: number, canReturn: boolean, canCloseRegister: boolean) =>
+    run(
+      'set_employee_permissions',
+      {
+        _employee_id: id,
+        _max_discount_pct: maxDiscountPct,
+        _can_return: canReturn,
+        _can_close_register: canCloseRegister,
+      },
+      'Permisos guardados',
+    );
+
   const reassignSale = useCallback(
     async (saleId: string, employeeId: string | null, reason: string): Promise<boolean> => {
       setIsSaving(true);
@@ -105,6 +118,8 @@ export function useSellers() {
     ensureMyEmployee,
     salesBySeller,
     reassignSale,
+    permissions,
+    savePermissions,
     refresh: refreshEmployees,
   };
 }

@@ -100,3 +100,53 @@ export function lockedMessage(lockedSeconds: number): string {
 export function isSellerSessionError(message: string | null | undefined): boolean {
   return /sesi[oó]n de vendedor/i.test(message ?? '');
 }
+
+// ---------------------------------------------------------------------------
+// Permisos por persona (0030)
+// ---------------------------------------------------------------------------
+
+export type PosAction = 'discount' | 'return' | 'close_register';
+
+export interface PosPermission {
+  employee_id: string;
+  name: string;
+  is_owner: boolean;
+  has_account: boolean;
+  customized: boolean;
+  max_discount_pct: number;
+  can_return: boolean;
+  can_close_register: boolean;
+}
+
+/** Descuento de la venta en %, igual que el servidor: descuento / (cobrado + descuento). */
+export function discountPct(discount: number, charged: number): number {
+  const gross = charged + discount;
+  if (discount <= 0 || gross <= 0) return 0;
+  return Math.round((discount / gross) * 10000) / 100;
+}
+
+/** ¿Esta persona puede hacerlo sin autorización? (sin datos, se pide autorización) */
+export function hasPermission(p: PosPermission | null | undefined, action: PosAction, amount = 0): boolean {
+  if (!p) return false;
+  if (action === 'discount') return Number(p.max_discount_pct) >= amount;
+  if (action === 'return') return p.can_return;
+  return p.can_close_register;
+}
+
+/** Quién puede autorizar: personas con PIN y con el permiso (o tope) suficiente. */
+export function authorizers(
+  permissions: PosPermission[],
+  employees: PosEmployee[],
+  action: PosAction,
+  amount = 0,
+): PosEmployee[] {
+  const withPin = new Map(sellableEmployees(employees).map((e) => [e.id, e]));
+  return permissions
+    .filter((p) => withPin.has(p.employee_id) && hasPermission(p, action, amount))
+    .map((p) => withPin.get(p.employee_id)!);
+}
+
+/** ¿El servidor pide autorización? */
+export function isAuthorizationError(message: string | null | undefined): boolean {
+  return /necesita autorizaci[oó]n/i.test(message ?? '');
+}

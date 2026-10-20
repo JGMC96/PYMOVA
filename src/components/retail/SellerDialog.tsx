@@ -1,11 +1,18 @@
 import { useEffect, useState } from 'react';
-import { Delete, UserRound, UserRoundPlus } from 'lucide-react';
+import { Delete, ShieldCheck, UserRound, UserRoundPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useSellerSession } from '@/contexts/SellerSessionContext';
-import { isValidPin, lockedMessage, SELLER_SESSION_HOURS, sellableEmployees, type PosEmployee } from '@/lib/sellerSession';
+import {
+  isValidPin,
+  lockedMessage,
+  SELLER_SESSION_HOURS,
+  sellableEmployees,
+  type PosAction,
+  type PosEmployee,
+} from '@/lib/sellerSession';
 import { cn } from '@/lib/utils';
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'borrar', '0', 'ok'] as const;
@@ -14,10 +21,12 @@ const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'borrar', '0', 'ok'] 
  * Diálogo único de las personas del TPV (lo abre SellerSessionContext):
  * - «¿Quién ha hecho la venta?» con los conectados (sin PIN) y «Otra persona»;
  * - nombre y PIN para conectarse SELLER_SESSION_HOURS;
- * - cambiar el PIN con el actual.
+ * - cambiar el PIN con el actual;
+ * - «Necesita autorización»: el PIN de alguien con el permiso (0030).
  */
 export function SellerDialog() {
-  const { dialog, sellers, employees, resolveDialog, setDialogMode, login, changePin } = useSellerSession();
+  const { dialog, sellers, employees, resolveDialog, setDialogMode, login, changePin, authorizersFor, authorizeWithPin } =
+    useSellerSession();
   const open = !!dialog;
   const purpose = dialog?.purpose || 'la venta';
 
@@ -65,6 +74,15 @@ export function SellerDialog() {
               if (r.ok) resolveDialog(r.seller);
               return r;
             }}
+          />
+        )}
+        {dialog?.mode === 'authorize' && dialog.action && (
+          <AuthorizeStep
+            action={dialog.action}
+            amount={dialog.amount ?? 0}
+            purpose={purpose}
+            options={authorizersFor(dialog.action, dialog.amount ?? 0)}
+            onAuthorize={authorizeWithPin}
           />
         )}
         {dialog?.mode === 'change-pin' && (
@@ -364,6 +382,92 @@ function ChangePinStep({
           <Button type="button" className="w-full" onClick={() => void submit()} disabled={busy || !isValidPin(newPin) || newPin !== repeat}>
             Guardar PIN nuevo
           </Button>
+        </div>
+      )}
+    </>
+  );
+}
+
+const ACTION_TEXT: Record<PosAction, (amount: number) => string> = {
+  discount: (amount) =>
+    `El descuento es del ${amount.toFixed(2).replace('.', ',')} %, por encima del máximo de quien vende. Lo autoriza alguien con un máximo igual o mayor.`,
+  return: () => 'Quien hace la devolución no tiene ese permiso. La autoriza alguien que pueda hacer devoluciones.',
+  close_register: () => 'Quien cierra no tiene ese permiso. Lo autoriza alguien que pueda cerrar la caja.',
+};
+
+function AuthorizeStep({
+  action,
+  amount,
+  purpose,
+  options,
+  onAuthorize,
+}: {
+  action: PosAction;
+  amount: number;
+  purpose: string;
+  options: PosEmployee[];
+  onAuthorize: (employeeId: string, pin: string) => Promise<PinAnswer>;
+}) {
+  const [employeeId, setEmployeeId] = useState<string | null>(options.length === 1 ? options[0].id : null);
+  const [pin, setPin] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const selected = options.find((e) => e.id === employeeId) ?? null;
+
+  const submit = async () => {
+    if (!employeeId || !isValidPin(pin) || busy) return;
+    setBusy(true);
+    const r = await onAuthorize(employeeId, pin);
+    setBusy(false);
+    if (!r.ok) {
+      setError(errorText(r));
+      setPin('');
+    }
+  };
+
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle className="flex items-center gap-2">
+          <ShieldCheck className="w-5 h-5 text-primary" />
+          Necesita autorización
+        </DialogTitle>
+        <DialogDescription>
+          {purpose ? `${purpose.charAt(0).toUpperCase()}${purpose.slice(1)}. ` : ''}
+          {ACTION_TEXT[action](amount)}
+        </DialogDescription>
+      </DialogHeader>
+      {options.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          Nadie con PIN puede autorizarlo. El propietario puede dar el permiso en <strong>Vendedores › Permisos</strong>.
+        </p>
+      ) : !selected ? (
+        <NamePicker options={options} onPick={setEmployeeId} />
+      ) : (
+        <div className="space-y-3">
+          <p className="text-sm">
+            Autoriza: <strong>{selected.name}</strong>
+          </p>
+          <PinPad
+            value={pin}
+            onChange={(v) => {
+              setError(null);
+              setPin(v);
+            }}
+            onSubmit={() => void submit()}
+            busy={busy}
+            submitLabel="Autorizar"
+          />
+          {error && (
+            <p className="text-sm text-destructive text-center" role="alert">
+              {error}
+            </p>
+          )}
+          {options.length > 1 && (
+            <Button type="button" variant="ghost" size="sm" className="w-full" onClick={() => setEmployeeId(null)}>
+              Elegir a otra persona
+            </Button>
+          )}
         </div>
       )}
     </>

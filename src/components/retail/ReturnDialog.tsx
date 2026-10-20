@@ -43,7 +43,7 @@ interface ReturnDialogProps {
 
 export function ReturnDialog({ open, onOpenChange, saleId, saleNumber, onCompleted }: ReturnDialogProps) {
   const { fetchSaleDetail, createReturn, isLoading, isSubmitting } = useSaleReturns();
-  const { chooseSeller, dropSession } = useSellerSession();
+  const { chooseSeller, dropSession, can, authorize } = useSellerSession();
   const { openSession } = useCashRegister();
   const [lines, setLines] = useState<SaleDetailLine[]>([]);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
@@ -76,8 +76,16 @@ export function ReturnDialog({ open, onOpenChange, saleId, saleNumber, onComplet
     // Igual que al vender: la devolución va a nombre de quien la hace.
     const pick = await chooseSeller('la devolución');
     if (pick.cancelled) return;
+    // Sin permiso de devoluciones, la autoriza alguien que lo tenga.
+    let authorizationId: string | null = null;
+    if (!can(pick.seller, 'return')) {
+      authorizationId = await authorize('return', 'la devolución');
+      if (!authorizationId) return;
+    }
     const result = await createReturn({
-      saleId, items, reason, refundMethod, restock, sellerSessionId: pick.seller?.sessionId ?? null,
+      saleId, items, reason, refundMethod, restock,
+      sellerSessionId: pick.seller?.sessionId ?? null,
+      authorizationId,
     });
     if (!result && pick.seller) dropSession(pick.seller.sessionId);
     if (result) {
