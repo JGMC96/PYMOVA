@@ -608,38 +608,73 @@ export type Database = {
           },
         ]
       }
+      hr_employee_pins: {
+        Row: {
+          employee_id: string
+          failed_attempts: number
+          locked_until: string | null
+          pin_hash: string
+          updated_at: string
+        }
+        Insert: {
+          employee_id: string
+          failed_attempts?: number
+          locked_until?: string | null
+          pin_hash: string
+          updated_at?: string
+        }
+        Update: {
+          employee_id?: string
+          failed_attempts?: number
+          locked_until?: string | null
+          pin_hash?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_employee_pins_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "hr_employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hr_employees: {
         Row: {
           annual_vacation_days: number
           business_id: string
           created_at: string
+          display_name: string | null
           hire_date: string | null
           id: string
           is_active: boolean
           updated_at: string
-          user_id: string
+          user_id: string | null
           weekly_hours: number
         }
         Insert: {
           annual_vacation_days?: number
           business_id: string
           created_at?: string
+          display_name?: string | null
           hire_date?: string | null
           id?: string
           is_active?: boolean
           updated_at?: string
-          user_id: string
+          user_id?: string | null
           weekly_hours?: number
         }
         Update: {
           annual_vacation_days?: number
           business_id?: string
           created_at?: string
+          display_name?: string | null
           hire_date?: string | null
           id?: string
           is_active?: boolean
           updated_at?: string
-          user_id?: string
+          user_id?: string | null
           weekly_hours?: number
         }
         Relationships: [
@@ -1787,6 +1822,51 @@ export type Database = {
         }
         Relationships: []
       }
+      pos_seller_sessions: {
+        Row: {
+          business_id: string
+          created_at: string
+          employee_id: string
+          expires_at: string
+          id: string
+          last_used_at: string
+          opened_by: string
+        }
+        Insert: {
+          business_id: string
+          created_at?: string
+          employee_id: string
+          expires_at?: string
+          id?: string
+          last_used_at?: string
+          opened_by: string
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          employee_id?: string
+          expires_at?: string
+          id?: string
+          last_used_at?: string
+          opened_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pos_seller_sessions_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pos_seller_sessions_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "hr_employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_variants: {
         Row: {
           attributes: Json
@@ -2092,6 +2172,7 @@ export type Database = {
           restock: boolean
           return_number: string
           sale_id: string
+          seller_employee_id: string | null
           shopify_refund_attempts: number
           shopify_refund_error: string | null
           shopify_refund_gid: string | null
@@ -2109,6 +2190,7 @@ export type Database = {
           restock?: boolean
           return_number: string
           sale_id: string
+          seller_employee_id?: string | null
           shopify_refund_attempts?: number
           shopify_refund_error?: string | null
           shopify_refund_gid?: string | null
@@ -2126,6 +2208,7 @@ export type Database = {
           restock?: boolean
           return_number?: string
           sale_id?: string
+          seller_employee_id?: string | null
           shopify_refund_attempts?: number
           shopify_refund_error?: string | null
           shopify_refund_gid?: string | null
@@ -2154,6 +2237,75 @@ export type Database = {
             referencedRelation: "sales"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "sale_returns_seller_employee_id_fkey"
+            columns: ["seller_employee_id"]
+            isOneToOne: false
+            referencedRelation: "hr_employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sale_seller_changes: {
+        Row: {
+          business_id: string
+          changed_by: string
+          created_at: string
+          from_employee_id: string | null
+          id: string
+          reason: string
+          sale_id: string
+          to_employee_id: string | null
+        }
+        Insert: {
+          business_id: string
+          changed_by: string
+          created_at?: string
+          from_employee_id?: string | null
+          id?: string
+          reason: string
+          sale_id: string
+          to_employee_id?: string | null
+        }
+        Update: {
+          business_id?: string
+          changed_by?: string
+          created_at?: string
+          from_employee_id?: string | null
+          id?: string
+          reason?: string
+          sale_id?: string
+          to_employee_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sale_seller_changes_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sale_seller_changes_from_employee_id_fkey"
+            columns: ["from_employee_id"]
+            isOneToOne: false
+            referencedRelation: "hr_employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sale_seller_changes_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sale_seller_changes_to_employee_id_fkey"
+            columns: ["to_employee_id"]
+            isOneToOne: false
+            referencedRelation: "hr_employees"
+            referencedColumns: ["id"]
+          },
         ]
       }
       sales: {
@@ -2170,6 +2322,7 @@ export type Database = {
           payment_method: string | null
           register_session_id: string | null
           sale_number: string
+          seller_employee_id: string | null
           shopify_order_attempts: number
           shopify_order_error: string | null
           shopify_order_gid: string | null
@@ -2193,6 +2346,7 @@ export type Database = {
           payment_method?: string | null
           register_session_id?: string | null
           sale_number: string
+          seller_employee_id?: string | null
           shopify_order_attempts?: number
           shopify_order_error?: string | null
           shopify_order_gid?: string | null
@@ -2216,6 +2370,7 @@ export type Database = {
           payment_method?: string | null
           register_session_id?: string | null
           sale_number?: string
+          seller_employee_id?: string | null
           shopify_order_attempts?: number
           shopify_order_error?: string | null
           shopify_order_gid?: string | null
@@ -2246,6 +2401,13 @@ export type Database = {
             columns: ["register_session_id"]
             isOneToOne: false
             referencedRelation: "cash_register_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_seller_employee_id_fkey"
+            columns: ["seller_employee_id"]
+            isOneToOne: false
+            referencedRelation: "hr_employees"
             referencedColumns: ["id"]
           },
         ]
@@ -2830,6 +2992,7 @@ export type Database = {
           _latitude?: number
           _longitude?: number
           _notes?: string
+          _seller_session_id?: string
         }
         Returns: string
       }
@@ -2923,6 +3086,7 @@ export type Database = {
           _refund_method?: string
           _restock?: boolean
           _sale_id: string
+          _seller_session_id?: string
         }
         Returns: {
           return_id: string
@@ -2940,6 +3104,7 @@ export type Database = {
           _notes?: string
           _payment_method?: string
           _register_session_id?: string
+          _seller_session_id?: string
           _subtotal?: number
           _tax?: number
           _tip?: number
@@ -2950,11 +3115,17 @@ export type Database = {
           sale_number: string
         }[]
       }
+      default_seller_employee: {
+        Args: { _business_id: string }
+        Returns: string
+      }
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
       }
       email_queue_dispatch: { Args: never; Returns: undefined }
+      employee_display_name: { Args: { _employee_id: string }; Returns: string }
+      end_seller_session: { Args: { _session_id: string }; Returns: undefined }
       enqueue_email: {
         Args: { payload: Json; queue_name: string }
         Returns: number
@@ -3059,6 +3230,17 @@ export type Database = {
           table_name: string
         }[]
       }
+      get_pos_employees: {
+        Args: { _business_id: string }
+        Returns: {
+          has_account: boolean
+          has_pin: boolean
+          id: string
+          is_active: boolean
+          name: string
+          user_id: string
+        }[]
+      }
       get_recent_activity: {
         Args: { _business_id: string; _limit?: number }
         Returns: {
@@ -3091,6 +3273,18 @@ export type Database = {
           total: number
           unit_price: number
           variant_id: string
+        }[]
+      }
+      get_sales_by_seller: {
+        Args: { _business_id: string; _from: string; _to: string }
+        Returns: {
+          employee_id: string
+          name: string
+          net_total: number
+          returns_count: number
+          returns_total: number
+          sales_count: number
+          sales_total: number
         }[]
       }
       get_security_audit_log: {
@@ -3164,6 +3358,10 @@ export type Database = {
           read_ct: number
         }[]
       }
+      reassign_sale_seller: {
+        Args: { _employee_id: string; _reason: string; _sale_id: string }
+        Returns: undefined
+      }
       recompute_local_stock: {
         Args: {
           _business_id: string
@@ -3204,7 +3402,15 @@ export type Database = {
         Args: { _approve: boolean; _notes?: string; _permission_id: string }
         Returns: undefined
       }
+      seller_from_session: {
+        Args: { _business_id: string; _session_id: string }
+        Returns: string
+      }
       set_active_business: { Args: { _business_id: string }; Returns: boolean }
+      set_employee_pin: {
+        Args: { _business_id: string; _employee_id: string; _pin: string }
+        Returns: undefined
+      }
       set_online_order_status: {
         Args: {
           _order_id: string
@@ -3222,6 +3428,17 @@ export type Database = {
       }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      start_seller_session: {
+        Args: { _business_id: string; _employee_id: string; _pin: string }
+        Returns: {
+          employee_id: string
+          error: string
+          locked_seconds: number
+          name: string
+          ok: boolean
+          session_id: string
+        }[]
+      }
       upsert_external_order: {
         Args: {
           _business_id: string
@@ -3249,6 +3466,15 @@ export type Database = {
           order_id: string
           was_created: boolean
         }[]
+      }
+      upsert_pos_employee: {
+        Args: {
+          _business_id: string
+          _display_name: string
+          _employee_id: string
+          _is_active?: boolean
+        }
+        Returns: string
       }
     }
     Enums: {
