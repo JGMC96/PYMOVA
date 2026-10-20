@@ -23,6 +23,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import type { Product } from '@/types/database';
 import type { ProductFormData } from '@/hooks/useProducts';
+import { useMoney } from '@/hooks/useMoney';
 
 const productSchema = z.object({
   name: z.string()
@@ -54,6 +55,7 @@ export function ProductFormDialog({
   onSubmit,
   isSubmitting,
 }: ProductFormDialogProps) {
+  const { format: formatPrice } = useMoney();
   const isEditing = !!product;
 
   const form = useForm<ProductFormValues>({
@@ -198,7 +200,7 @@ export function ProductFormDialog({
                   </FormControl>
                   <p className="text-xs text-muted-foreground">
                     {marginPercent !== null
-                      ? `Margen: ${marginAmount.toFixed(2)} € por unidad (${marginPercent.toFixed(1)} %)`
+                      ? `Margen: ${formatPrice(marginAmount)} por unidad (${marginPercent.toFixed(1)} %)`
                       : 'Necesario para saber el beneficio real de cada venta.'}
                   </p>
                   <FormMessage />

@@ -37,6 +37,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import type { InvoiceForPayment, CreatePaymentData } from '@/types/database';
+import { useMoney } from '@/hooks/useMoney';
 
 const paymentSchema = z.object({
   invoice_id: z.string().min(1, 'Selecciona una factura'),
@@ -55,13 +56,6 @@ const PAYMENT_METHODS = [
   { value: 'other', label: 'Otro' },
 ];
 
-function formatPrice(amount: number): string {
-  return new Intl.NumberFormat('es-MX', {
-    style: 'currency',
-    currency: 'MXN',
-  }).format(amount);
-}
-
 interface PaymentFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -79,6 +73,7 @@ export function PaymentFormDialog({
   invoices,
   isLoadingInvoices,
 }: PaymentFormDialogProps) {
+  const { format: formatPrice } = useMoney();
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceForPayment | null>(null);
   const [showOverpayConfirm, setShowOverpayConfirm] = useState(false);
   const [pendingSubmit, setPendingSubmit] = useState<FormValues | null>(null);

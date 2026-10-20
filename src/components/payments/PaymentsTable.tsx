@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { PaymentWithInvoice } from '@/types/database';
+import { useMoney } from '@/hooks/useMoney';
 
 interface PaymentsTableProps {
   payments: PaymentWithInvoice[];
@@ -26,13 +27,6 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
   bank: 'Transferencia',
   other: 'Otro',
 };
-
-function formatPrice(amount: number): string {
-  return new Intl.NumberFormat('es-MX', {
-    style: 'currency',
-    currency: 'MXN',
-  }).format(amount);
-}
 
 function LoadingSkeleton() {
   return (
@@ -74,6 +68,7 @@ export function PaymentsTable({
   isLoading,
   onNewPayment,
 }: PaymentsTableProps) {
+  const { format: formatPrice } = useMoney();
   return (
     <div className="rounded-md border">
       <Table>

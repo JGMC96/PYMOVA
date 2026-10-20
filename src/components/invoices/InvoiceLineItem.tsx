@@ -16,6 +16,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import type { Product } from '@/types/database';
+import { useMoney } from '@/hooks/useMoney';
 
 interface InvoiceFormValues {
   client_id: string;
@@ -45,13 +46,6 @@ interface InvoiceLineItemProps {
   canRemove: boolean;
 }
 
-const formatPrice = (amount: number): string => {
-  return new Intl.NumberFormat('es-MX', {
-    style: 'currency',
-    currency: 'MXN',
-  }).format(amount);
-};
-
 export function InvoiceLineItem({
   index,
   control,
@@ -59,6 +53,7 @@ export function InvoiceLineItem({
   onRemove,
   canRemove,
 }: InvoiceLineItemProps) {
+  const { format: formatPrice } = useMoney();
   const { setValue } = useFormContext<InvoiceFormValues>();
   
   // Watch quantity and unit_price for this line

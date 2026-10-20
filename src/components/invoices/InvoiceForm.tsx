@@ -36,6 +36,7 @@ import { InvoiceLineItem } from './InvoiceLineItem';
 import type { Client, Product } from '@/types/database';
 import type { InvoiceItemInput } from '@/hooks/useInvoices';
 import { cn } from '@/lib/utils';
+import { useMoney } from '@/hooks/useMoney';
 
 const invoiceSchema = z.object({
   client_id: z.string().min(1, 'Selecciona un cliente'),
@@ -70,13 +71,6 @@ interface InvoiceFormProps {
   onCancel: () => void;
 }
 
-const formatPrice = (amount: number): string => {
-  return new Intl.NumberFormat('es-MX', {
-    style: 'currency',
-    currency: 'MXN',
-  }).format(amount);
-};
-
 export function InvoiceForm({
   invoiceNumber,
   clients,
@@ -86,6 +80,7 @@ export function InvoiceForm({
   onSubmit,
   onCancel,
 }: InvoiceFormProps) {
+  const { format: formatPrice } = useMoney();
   const form = useForm<InvoiceFormValues>({
     resolver: zodResolver(invoiceSchema),
     defaultValues: {

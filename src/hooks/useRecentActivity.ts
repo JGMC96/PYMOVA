@@ -39,7 +39,7 @@ export function formatRelativeTime(dateString: string): string {
   if (diffDays === 1) return 'Ayer';
   if (diffDays < 7) return `Hace ${diffDays} días`;
   
-  return new Intl.DateTimeFormat('es-MX', { 
+  return new Intl.DateTimeFormat('es-ES', { 
     day: 'numeric', 
     month: 'short' 
   }).format(past);
