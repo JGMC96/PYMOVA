@@ -3,6 +3,8 @@
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
 import { shopifyGraphql } from './shopify-client.ts';
 import {
+  PRODUCTS_STATUS_QUERY,
+  productsGoneFromShopify,
   fetchAllInventoryLevels,
   fetchAllVariants,
   type GraphqlRunner,
@@ -260,4 +262,49 @@ export async function upsertShopifyProduct(
   }
 
   return { productId, created, issues };
+}
+
+/**
+ * Tras recorrer todo el catálogo: los productos de Shopify que siguen activos en Pymova
+ * pero que esta sincronización no ha tocado (`updated_at` anterior a `since`) se comprueban
+ * uno a uno en Shopify; los borrados o no activos se desactivan (no se borran: pueden tener
+ * ventas). Devuelve sus nombres.
+ */
+export async function deactivateProductsGoneFromShopify(
+  admin: SupabaseClient,
+  businessId: string,
+  since: string,
+): Promise<string[]> {
+  const { data: candidates, error } = await admin
+    .from('products')
+    .select('id, name, external_id')
+    .eq('business_id', businessId)
+    .eq('external_source', 'shopify')
+    .eq('is_active', true)
+    .lt('updated_at', since)
+    .not('external_id', 'is', null)
+    .limit(500);
+  if (error) throw error;
+  const rows = (candidates ?? []) as Array<{ id: string; name: string; external_id: string }>;
+
+  const gone: Array<{ id: string; name: string }> = [];
+  for (let i = 0; i < rows.length; i += 50) {
+    const batch = rows.slice(i, i + 50);
+    const data = await shopifyGraphql<{ nodes: Array<{ id?: string; status?: string } | null> }>(
+      PRODUCTS_STATUS_QUERY,
+      { ids: batch.map((r) => r.external_id) },
+      { requiredScopes: ['read_products'] },
+    );
+    const goneIds = new Set(productsGoneFromShopify(batch.map((r) => r.external_id), data.nodes ?? []));
+    gone.push(...batch.filter((r) => goneIds.has(r.external_id)));
+  }
+
+  if (gone.length > 0) {
+    const { error: updateError } = await admin
+      .from('products')
+      .update({ is_active: false, updated_at: new Date().toISOString() })
+      .in('id', gone.map((g) => g.id));
+    if (updateError) throw updateError;
+  }
+  return gone.map((g) => g.name);
 }
