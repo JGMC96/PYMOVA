@@ -17,6 +17,8 @@ import {
 import { useShopifyOrdersSync } from '@/hooks/useShopifyOrdersSync';
 import { OnlineOrderDialog } from './OnlineOrderDialog';
 import { OnlineOrderReturnDialog } from './OnlineOrderReturnDialog';
+import { OnlineRevenueCard } from './OnlineRevenueCard';
+import { useRoleAccess } from '@/hooks/useRoleAccess';
 
 const STATUS_STYLES: Record<OnlineOrderStatus, string> = {
   pending: 'bg-amber-500/15 text-amber-500 hover:bg-amber-500/15',
@@ -44,6 +46,9 @@ export function EcommercePanel() {
     createOrder, setStatus, createReturn, fetchOrders,
   } = useOnlineOrders();
 
+  // La facturación online solo la ve el propietario.
+  const { isOwner } = useRoleAccess('staff');
+
   const { isSyncing: isShopifySyncing, syncOrders: runShopifySync, diagnose: diagnoseShopify } =
     useShopifyOrdersSync();
 
@@ -60,15 +65,12 @@ export function EcommercePanel() {
   const stats = useMemo(() => {
     const pending = orders.filter((o) => o.status === 'pending').length;
     const inProgress = orders.filter((o) => ['accepted', 'preparing', 'shipped'].includes(o.status)).length;
-    const revenue = orders
-      .filter((o) => !['cancelled', 'returned'].includes(o.status))
-      .reduce((sum, o) => sum + Number(o.total), 0);
-    return { pending, inProgress, revenue };
+    return { pending, inProgress };
   }, [orders]);
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className={`grid gap-4 ${isOwner ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
         <Card>
           <CardContent className="py-4">
             <p className="text-sm text-muted-foreground">Pedidos por aceptar</p>
@@ -81,12 +83,7 @@ export function EcommercePanel() {
             <p className="text-2xl font-bold">{stats.inProgress}</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="py-4">
-            <p className="text-sm text-muted-foreground">Facturación online</p>
-            <p className="text-2xl font-bold">{currency(stats.revenue)}</p>
-          </CardContent>
-        </Card>
+        {isOwner && <OnlineRevenueCard refreshKey={orders} />}
       </div>
 
       <Card>
