@@ -27,8 +27,8 @@ export function ShopifyProblemsPanel() {
             Envíos a Shopify
           </CardTitle>
           <CardDescription>
-            Ventas, devoluciones y cambios de stock de Pymova que Shopify no ha aceptado, y avisos de Shopify
-            que no se han podido procesar. Se reintentan solos cada 5 minutos hasta 5 veces; después quedan aquí.
+            Ventas, devoluciones y cambios de stock de Pymova que Shopify (o Stockagile) no ha aceptado, y avisos
+            de Shopify que no se han podido procesar. Se reintentan solos cada 5 minutos hasta 5 veces; después quedan aquí.
           </CardDescription>
         </div>
         <div className="flex gap-2 shrink-0">

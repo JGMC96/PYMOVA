@@ -60,11 +60,17 @@ export function createStockagileClient(
   const base = opts.base ?? STOCKAGILE_API_BASE;
   const sleep = opts.sleep ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)));
 
-  const request = async <T>(url: string): Promise<T> => {
+  // Un 429 no aplica la petición, así que reintentarlo es seguro también en los POST.
+  const request = async <T>(url: string, body?: unknown): Promise<T> => {
     for (let attempt = 0; ; attempt++) {
       const res = await fetcher(url, {
-        method: 'GET',
-        headers: { Authorization: `Token ${token}`, Accept: 'application/json' },
+        method: body === undefined ? 'GET' : 'POST',
+        headers: {
+          Authorization: `Token ${token}`,
+          Accept: 'application/json',
+          ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+        },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       });
       if (res.status === 429 && attempt < 3) {
         const wait = Math.min(Number(res.headers.get('Retry-After') ?? '1') || 1, 5);
@@ -93,6 +99,8 @@ export function createStockagileClient(
     /** Una página. */
     get: <T>(path: string, params?: Record<string, string | number | boolean | undefined>) =>
       request<Page<T>>(url(path, params)),
+    /** Escritura. */
+    post: <T>(path: string, body: unknown) => request<T>(url(path), body),
     /** Todas las páginas (hasta `maxPages`), o hasta que `stop` diga que ya basta. */
     async getAll<T>(
       path: string,
@@ -180,4 +188,54 @@ export function pickVariantBySize(variants: StockagileVariant[], sizeLabels: (st
 export function sizeLabelsOf(variant: { name?: string | null; attributes?: Record<string, unknown> | null }) {
   const attrs = Object.values(variant.attributes ?? {}).map((v) => (v == null ? '' : String(v)));
   return [...new Set([variant.name ?? '', ...attrs].filter((s) => s.trim() !== ''))];
+}
+
+/** Variante de PYMOVA que hay que encontrar en Stockagile. */
+export interface LocalVariant {
+  barcode?: string | null;
+  name?: string | null;
+  attributes?: Record<string, unknown> | null;
+  /** gid del producto de Shopify («gid://shopify/Product/…»). */
+  shopifyProductGid?: string | null;
+}
+
+export interface VariantMatch {
+  variant: StockagileVariant | null;
+  matchedBy: 'barcode' | 'shopify-product' | null;
+  note: string | null;
+}
+
+/**
+ * Busca la variante en Stockagile: por código de barras (lo tienen casi todas, porque lo
+ * pone Stockagile) y, si no, por el producto de Shopify y la talla. `loadSiteProducts` se
+ * pasa para cargar los productos de la tienda una sola vez por ejecución.
+ */
+export async function findStockagileVariant(
+  client: StockagileClient,
+  local: LocalVariant,
+  loadSiteProducts: () => Promise<StockagileSiteProduct[]>,
+): Promise<VariantMatch> {
+  let note: string | null = null;
+  if (local.barcode) {
+    const page = await client.get<StockagileVariant>('/product-variants', { barcode: local.barcode });
+    const hits = page.results.filter((r) => !r.archived);
+    if (hits.length === 1) return { variant: hits[0], matchedBy: 'barcode', note: null };
+    if (hits.length > 1) note = `${hits.length} variantes con el mismo código de barras`;
+  }
+  const sp = pickSiteProduct(await loadSiteProducts(), local.shopifyProductGid);
+  if (!sp) return { variant: null, matchedBy: null, note: note ?? 'El producto de Shopify no está en Stockagile' };
+  const page = await client.get<StockagileVariant>('/product-variants', { product_id: sp.product_id, page_size: 100 });
+  const variant = pickVariantBySize(page.results, sizeLabelsOf(local));
+  return variant
+    ? { variant, matchedBy: 'shopify-product', note: null }
+    : { variant: null, matchedBy: null, note: note ?? 'Producto encontrado, pero no la talla' };
+}
+
+/**
+ * Qué hacer con un movimiento cuyo envío ha fallado. Un 4xx (incluido un 429 tras los
+ * reintentos) es un rechazo: no se ha aplicado y se puede reintentar. Cualquier otra cosa
+ * (5xx, red, tiempo agotado) puede haberse aplicado: se deja para revisar a mano.
+ */
+export function failedMoveStatus(error: unknown): 'failed' | 'review' {
+  return error instanceof StockagileError && error.status >= 400 && error.status < 500 ? 'failed' : 'review';
 }
