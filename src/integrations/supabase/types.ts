@@ -2981,6 +2981,97 @@ export type Database = {
           },
         ]
       }
+      stockagile_connections: {
+        Row: {
+          business_id: string
+          created_at: string
+          enabled: boolean
+        }
+        Insert: {
+          business_id: string
+          created_at?: string
+          enabled?: boolean
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          enabled?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stockagile_connections_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: true
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stockagile_stock_moves: {
+        Row: {
+          attempts: number
+          business_id: string
+          claimed_at: string | null
+          created_at: string
+          id: string
+          last_error: string | null
+          local_product_id: string | null
+          local_variant_id: string | null
+          processed_at: string | null
+          quantity: number
+          reason: string
+          source_id: string
+          source_table: string
+          status: string
+          stockagile_variant_id: number | null
+          warehouse_id: number | null
+        }
+        Insert: {
+          attempts?: number
+          business_id: string
+          claimed_at?: string | null
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          local_product_id?: string | null
+          local_variant_id?: string | null
+          processed_at?: string | null
+          quantity: number
+          reason: string
+          source_id: string
+          source_table: string
+          status?: string
+          stockagile_variant_id?: number | null
+          warehouse_id?: number | null
+        }
+        Update: {
+          attempts?: number
+          business_id?: string
+          claimed_at?: string | null
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          local_product_id?: string | null
+          local_variant_id?: string | null
+          processed_at?: string | null
+          quantity?: number
+          reason?: string
+          source_id?: string
+          source_table?: string
+          status?: string
+          stockagile_variant_id?: number | null
+          warehouse_id?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stockagile_stock_moves_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subscriptions: {
         Row: {
           business_id: string
@@ -3187,6 +3278,33 @@ export type Database = {
           to: "shopify_connections"
           isOneToOne: true
           isSetofReturn: false
+        }
+      }
+      claim_stockagile_moves: {
+        Args: { _business_id: string; _limit?: number }
+        Returns: {
+          attempts: number
+          business_id: string
+          claimed_at: string | null
+          created_at: string
+          id: string
+          last_error: string | null
+          local_product_id: string | null
+          local_variant_id: string | null
+          processed_at: string | null
+          quantity: number
+          reason: string
+          source_id: string
+          source_table: string
+          status: string
+          stockagile_variant_id: number | null
+          warehouse_id: number | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "stockagile_stock_moves"
+          isOneToOne: false
+          isSetofReturn: true
         }
       }
       clock_action: {
@@ -3825,6 +3943,7 @@ export type Database = {
           session_id: string
         }[]
       }
+      stockagile_pending_work: { Args: never; Returns: boolean }
       transfer_ownership: {
         Args: {
           _business_id: string
