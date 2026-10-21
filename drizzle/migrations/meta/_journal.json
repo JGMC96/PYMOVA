@@ -260,6 +260,13 @@
       "when": 1792581912428,
       "tag": "0036_conectados_tpv",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1792590384454,
+      "tag": "0037_stockagile_devoluciones",
+      "breakpoints": true
     }
   ]
 }
