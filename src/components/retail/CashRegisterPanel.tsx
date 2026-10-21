@@ -14,6 +14,7 @@ import { useCashRegister } from '@/hooks/useCashRegister';
 import { useSellerSession } from '@/contexts/SellerSessionContext';
 import { PAYMENT_LABELS } from '@/lib/storeProfiles';
 import { cn } from '@/lib/utils';
+import { CashRegisterStaleBanner } from './CashRegisterStaleBanner';
 
 const fmt = (n: number | null | undefined) => `${(n ?? 0).toFixed(2)} €`;
 const fmtDate = (iso: string | null) =>
@@ -79,6 +80,7 @@ export function CashRegisterPanel() {
 
   return (
     <div className="space-y-6">
+      {openSession && <CashRegisterStaleBanner openedAt={openSession.opened_at} />}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-start justify-between">
