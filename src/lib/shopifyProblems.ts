@@ -1,6 +1,6 @@
 // Envíos a Shopify que no han salido (get_shopify_problems): textos y recuentos para la UI.
 
-export type ShopifyProblemKind = 'venta' | 'devolucion' | 'stock' | 'aviso';
+export type ShopifyProblemKind = 'venta' | 'devolucion' | 'stock' | 'aviso' | 'stockagile';
 export type ShopifyProblemState = 'failed' | 'retrying' | 'waiting';
 
 export interface ShopifyProblem {
@@ -18,6 +18,7 @@ export const KIND_LABEL: Record<ShopifyProblemKind, string> = {
   devolucion: 'Devolución',
   stock: 'Stock',
   aviso: 'Aviso de Shopify',
+  stockagile: 'Stock en Stockagile',
 };
 
 export const STATE_LABEL: Record<ShopifyProblemState, string> = {
@@ -44,6 +45,13 @@ export function problemsSummary(problems: ShopifyProblem[]): string | null {
   ]
     .filter(([n]) => (n as number) > 0)
     .map(([n, one, many]) => `${n} ${(n as number) === 1 ? one : many}`);
-  const text = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} y ${parts[parts.length - 1]}` : parts[0];
-  return `${text} ${failed.length === 1 ? 'no se ha procesado' : 'no se han procesado'} en Shopify`;
+  const inShopify = failed.length - count('stockagile');
+  const shopify = parts.length
+    ? `${parts.length > 1 ? `${parts.slice(0, -1).join(', ')} y ${parts[parts.length - 1]}` : parts[0]} ${
+        inShopify === 1 ? 'no se ha procesado' : 'no se han procesado'
+      } en Shopify`
+    : null;
+  const s = count('stockagile');
+  const stockagile = s ? `${s} ${s === 1 ? 'devolución' : 'devoluciones'} sin sumar en Stockagile` : null;
+  return [shopify, stockagile].filter(Boolean).join('; ');
 }

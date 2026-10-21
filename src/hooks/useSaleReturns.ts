@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { toast } from 'sonner';
-import { pushShopifyStock, pushShopifyPosRefunds } from '@/lib/shopifyStockPush';
+import { pushShopifyStock, pushShopifyPosRefunds, pushStockagileReturns } from '@/lib/shopifyStockPush';
 import type { TicketDoc } from '@/lib/ticket';
 
 export interface SaleDetailLine {
@@ -140,6 +140,7 @@ export function useSaleReturns() {
       void ((params.restock ?? true) ? pushShopifyStock(bizId) : Promise.resolve()).then(() =>
         pushShopifyPosRefunds(bizId)
       );
+      if (params.restock ?? true) void pushStockagileReturns(bizId);
       toast.success(`Devolución ${row?.return_number} registrada`);
       return row?.return_id ? { id: row.return_id as string, number: row.return_number as string } : null;
     },

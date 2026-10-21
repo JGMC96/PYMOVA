@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   createStockagileClient,
+  failedMoveStatus,
+  findStockagileVariant,
   normalizeStockagileToken,
   pickSiteProduct,
   pickVariantBySize,
@@ -99,5 +101,55 @@ describe('emparejamiento con Stockagile', () => {
     expect(pickVariantBySize(vs, ['46'])).toBeNull();
     expect(pickVariantBySize([{ id: 9, product_id: 1 }], ['Única'])?.id).toBe(9);
     expect(pickVariantBySize([...vs, { id: 4, product_id: 10, size_variant: { name: '35-38' } }], ['35-38'])).toBeNull();
+  });
+});
+
+describe('envío de movimientos a Stockagile', () => {
+  it('manda el POST con el cuerpo en JSON', async () => {
+    const fetcher = vi.fn().mockResolvedValue(res(200, { id: 1, stock: 85 }));
+    const client = createStockagileClient(fetcher, 't');
+    await client.post('/stock/move', { identifier_type: 'id', identifier: '7', quantity: 1, warehouse_id: 3278 });
+    const [url, init] = fetcher.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://api.stockagile.com/public/api/v2/stock/move');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body as string)).toEqual({ identifier_type: 'id', identifier: '7', quantity: 1, warehouse_id: 3278 });
+    expect(init.headers).toMatchObject({ 'Content-Type': 'application/json', Authorization: 'Token t' });
+  });
+
+  it('un rechazo 4xx se puede reintentar; lo demás puede haberse aplicado y se revisa', () => {
+    expect(failedMoveStatus(new StockagileError('x', 400))).toBe('failed');
+    expect(failedMoveStatus(new StockagileError('x', 429))).toBe('failed');
+    expect(failedMoveStatus(new StockagileError('x', 502))).toBe('review');
+    expect(failedMoveStatus(new TypeError('fetch failed'))).toBe('review');
+  });
+
+  it('empareja por código de barras y, si no, por producto de Shopify y talla', async () => {
+    const fetcher = vi.fn(async (url: string) => {
+      if (url.includes('barcode=2000')) return res(200, { next: null, results: [{ id: 11, product_id: 5 }] });
+      if (url.includes('barcode=')) return res(200, { next: null, results: [] });
+      if (url.includes('product_id=5')) {
+        return res(200, { next: null, results: [
+          { id: 21, product_id: 5, size_variant: { name: '35-38' } },
+          { id: 22, product_id: 5, size_variant: { name: '39-44' } },
+        ] });
+      }
+      return res(200, { next: null, results: [] });
+    });
+    const client = createStockagileClient(fetcher, 't');
+    const sites = vi.fn().mockResolvedValue([{ id: 1, product_id: 5, external_id: '999' }]);
+
+    const porCodigo = await findStockagileVariant(client, { barcode: '2000' }, sites);
+    expect(porCodigo).toMatchObject({ matchedBy: 'barcode', variant: { id: 11 } });
+    expect(sites).not.toHaveBeenCalled();
+
+    const porTalla = await findStockagileVariant(
+      client,
+      { barcode: null, name: '39-44', shopifyProductGid: 'gid://shopify/Product/999' },
+      sites,
+    );
+    expect(porTalla).toMatchObject({ matchedBy: 'shopify-product', variant: { id: 22 } });
+
+    const sinProducto = await findStockagileVariant(client, { barcode: '1', shopifyProductGid: 'gid://shopify/Product/1' }, sites);
+    expect(sinProducto).toEqual({ variant: null, matchedBy: null, note: 'El producto de Shopify no está en Stockagile' });
   });
 });

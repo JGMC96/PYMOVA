@@ -27,4 +27,11 @@ describe('problemsSummary', () => {
       '1 venta, 2 cambios de stock y 1 aviso de Shopify no se han procesado en Shopify',
     );
   });
+
+  it('las devoluciones sin sumar en Stockagile se cuentan aparte', () => {
+    expect(problemsSummary([p('stockagile')])).toBe('1 devolución sin sumar en Stockagile');
+    expect(problemsSummary([p('stockagile'), p('stockagile'), p('venta')])).toBe(
+      '1 venta no se ha procesado en Shopify; 2 devoluciones sin sumar en Stockagile',
+    );
+  });
 });
