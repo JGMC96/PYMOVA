@@ -36,3 +36,7 @@ verify_jwt = false
 
 [functions.shopify-pos-refund]
 verify_jwt = false
+
+# Stockagile (piloto TUILUS): solo usuarios, con auth.getUser().
+[functions.stockagile]
+verify_jwt = false
