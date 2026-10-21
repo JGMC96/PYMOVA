@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import {
   Search, Plus, Minus, Trash2, CreditCard, Banknote,
   ScanLine, ArrowRightLeft, Layers, LayoutGrid, ChevronRight, ChevronDown,
-  MoreVertical, X,
+  MoreVertical, X, PenLine,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -33,6 +33,7 @@ import { cn } from '@/lib/utils';
 import { DEFAULT_TAX_RATE, taxBreakdown } from '@/lib/tax';
 import { cashChange, parseCash, quickCashAmounts } from '@/lib/cobro';
 import { CashRegisterStaleBanner } from './CashRegisterStaleBanner';
+import { VariosDialog } from './VariosDialog';
 
 const PAYMENT_ICONS: Record<string, typeof Banknote> = {
   cash: Banknote,
@@ -61,6 +62,7 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
   const [client, setClient] = useState<PosClient | null>(null);
   const [breakdownOpen, setBreakdownOpen] = useState(false);
   const [variantProduct, setVariantProduct] = useState<ProductWithStock | null>(null);
+  const [variosOpen, setVariosOpen] = useState(false);
   const [ticket, setTicket] = useState<TicketData | null>(null);
   const [ticketOpen, setTicketOpen] = useState(false);
   const barcodeRef = useRef<HTMLInputElement>(null);
@@ -372,6 +374,16 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
             autoFocus
           />
         </form>
+
+        <Button
+          type="button"
+          variant="outline"
+          className="h-11 shrink-0 gap-2"
+          onClick={() => setVariosOpen(true)}
+        >
+          <PenLine className="w-4 h-4" />
+          Varios
+        </Button>
 
         <Button
           type="button"
@@ -737,6 +749,15 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
       </div>
 
       {/* Variant picker */}
+      <VariosDialog
+        open={variosOpen}
+        onOpenChange={(o) => {
+          setVariosOpen(o);
+          if (!o) barcodeRef.current?.focus();
+        }}
+        onAdd={(item) => setCart((prev) => [...prev, item])}
+      />
+
       <Dialog open={!!variantProduct} onOpenChange={(o) => !o && setVariantProduct(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>

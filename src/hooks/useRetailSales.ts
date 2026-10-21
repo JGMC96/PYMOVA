@@ -38,6 +38,8 @@ export interface SaleWithClient extends Sale {
 export interface CartItem {
   product_id: string;
   variant_id?: string | null;
+  /** Línea libre «Varios»: sin producto del catálogo ni stock (product_id es solo su clave local). */
+  custom?: boolean;
   product_name: string;
   quantity: number;
   unit_price: number;
@@ -119,8 +121,9 @@ export function useRetailSales() {
       const { data: result, error } = await supabase.rpc('create_sale_with_items', {
         _business_id: activeBusiness.id,
         _items: data.items.map((item) => ({
-          product_id: item.product_id || null,
-          variant_id: item.variant_id ?? null,
+          product_id: item.custom ? null : item.product_id || null,
+          variant_id: item.custom ? null : item.variant_id ?? null,
+          custom: item.custom ?? false,
           product_name: item.product_name,
           quantity: item.quantity,
           unit_price: item.unit_price,
