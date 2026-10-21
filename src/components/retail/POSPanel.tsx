@@ -31,6 +31,8 @@ import { discountPct, isSellerSessionError } from '@/lib/sellerSession';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { DEFAULT_TAX_RATE, taxBreakdown } from '@/lib/tax';
+import { cashChange, parseCash, quickCashAmounts } from '@/lib/cobro';
+import { CashRegisterStaleBanner } from './CashRegisterStaleBanner';
 
 const PAYMENT_ICONS: Record<string, typeof Banknote> = {
   cash: Banknote,
@@ -38,7 +40,7 @@ const PAYMENT_ICONS: Record<string, typeof Banknote> = {
   transfer: ArrowRightLeft,
 };
 
-export function POSPanel() {
+export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {}) {
   const { products, isLoading: productsLoading, refreshProducts } = useInventory();
   const { createSale, isCreating } = useRetailSales();
   const { settings } = useBusinessSettings();
@@ -64,6 +66,8 @@ export function POSPanel() {
   const barcodeRef = useRef<HTMLInputElement>(null);
 
   const taxRate = settings?.tax_rate ?? DEFAULT_TAX_RATE;
+  // Método con el que empieza cada venta (el primero del perfil: efectivo).
+  const defaultPayment = profile.paymentMethods[0] ?? 'cash';
 
   const categories = useMemo(() => {
     const fromProducts = products.map((p) => p.category).filter(Boolean) as string[];
@@ -211,20 +215,24 @@ export function POSPanel() {
   const { base: subtotal, tax } = taxBreakdown(total, taxRate);
   const tip = profile.tipEnabled ? Math.max(round2(parseFloat(tipInput) || 0), 0) : 0;
   const dueTotal = round2(total + tip);
-  const cashReceived = parseFloat(cashInput);
-  const change =
-    selectedPayment === 'cash' && !isNaN(cashReceived) ? round2(cashReceived - dueTotal) : null;
+  const isCash = selectedPayment === 'cash';
+  // Sin importe entregado se entiende que paga el importe exacto.
+  const cashReceived = isCash ? parseCash(cashInput) : null;
+  const change = isCash ? cashChange(cashInput, dueTotal) : null;
+  const cashShortfall = change !== null && change < 0;
   const itemCount = cart.reduce((sum, i) => sum + i.quantity, 0);
+  const PayIcon = PAYMENT_ICONS[selectedPayment] ?? Banknote;
 
-  const handleCheckout = async (method: string = selectedPayment) => {
-    if (cart.length === 0) return;
+  const handleCheckout = async () => {
+    if (cart.length === 0 || isCreating) return;
+    const method = selectedPayment;
     const usesCash = method === 'cash';
     if (usesCash && !openSession) {
       toast.error('Abre la caja para cobrar en efectivo');
       return;
     }
-    if (usesCash && !isNaN(cashReceived) && cashReceived < dueTotal) {
-      toast.error('El efectivo recibido es menor que el total');
+    if (usesCash && cashShortfall) {
+      toast.error('El efectivo entregado es menor que el total');
       return;
     }
     // Con dependientes con PIN, la venta va a nombre de quien la hace: si hay una persona
@@ -239,8 +247,6 @@ export function POSPanel() {
       authorizationId = await sellerSession.authorize('discount', 'la venta', pct);
       if (!authorizationId) return;
     }
-    setSelectedPayment(method);
-
     const snapshot = cart.map((item) => {
       const key = item.variant_id ?? item.product_id;
       const disc = lineDiscountValue(key, item.total);
@@ -258,7 +264,7 @@ export function POSPanel() {
       total,
       discount: discountValue,
       tip,
-      cash_received: usesCash && !isNaN(cashReceived) ? cashReceived : null,
+      cash_received: usesCash ? cashReceived : null,
       change_given: change !== null && change >= 0 ? change : null,
       register_session_id: openSession?.id ?? null,
       seller_session_id: seller?.sessionId ?? null,
@@ -283,7 +289,7 @@ export function POSPanel() {
         createdAt: new Date(),
         originalTotals: Object.fromEntries(cart.map((i) => [i.variant_id ?? i.product_id, i.total])),
         tip,
-        cashReceived: usesCash && !isNaN(cashReceived) ? cashReceived : null,
+        cashReceived: usesCash ? cashReceived : null,
         change: change !== null && change >= 0 ? change : null,
         notes: notes.trim() || null,
         cashier: seller?.name ?? null,
@@ -296,6 +302,7 @@ export function POSPanel() {
         toast.success(`Cambio a devolver: ${change.toFixed(2)} €`);
       }
       clearCart();
+      setSelectedPayment(defaultPayment);
       refreshProducts();
       refreshRegister();
       barcodeRef.current?.focus();
@@ -305,10 +312,12 @@ export function POSPanel() {
   return (
     <>
       <SellerBar />
-      {!openSession && (
+      {!openSession ? (
         <div className="mb-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-600 dark:text-amber-400">
           No hay caja abierta. Para cobrar en efectivo, ábrela en la pestaña <strong>Caja</strong>. Con tarjeta o transferencia puedes vender igualmente.
         </div>
+      ) : (
+        <CashRegisterStaleBanner openedAt={openSession.opened_at} onGoToRegister={onGoToRegister} />
       )}
 
       {/* Top search bar */}
@@ -617,83 +626,114 @@ export function POSPanel() {
               <span>Total</span>
               <span>{dueTotal.toFixed(2)} €</span>
             </div>
-            <div className="flex justify-between text-sm text-muted-foreground mt-1">
-              <span>Cambio</span>
-              <span>{change !== null && change > 0 ? change.toFixed(2) : '0.00'} €</span>
+            {/* Método de pago: se elige antes de cobrar. */}
+            <div
+              className="mt-3 grid gap-2"
+              style={{ gridTemplateColumns: `repeat(${profile.paymentMethods.length || 1}, minmax(0, 1fr))` }}
+              role="radiogroup"
+              aria-label="Método de pago"
+            >
+              {profile.paymentMethods.map((method) => {
+                const Icon = PAYMENT_ICONS[method] ?? Banknote;
+                const active = method === selectedPayment;
+                const blocked = method === 'cash' && !openSession;
+                return (
+                  <Button
+                    key={method}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    variant={active ? 'default' : 'outline'}
+                    className="h-11"
+                    disabled={blocked}
+                    title={blocked ? 'Abre la caja para cobrar en efectivo' : undefined}
+                    onClick={() => setSelectedPayment(method)}
+                  >
+                    <Icon className="w-4 h-4 mr-1.5" />
+                    {PAYMENT_LABELS[method] ?? method}
+                  </Button>
+                );
+              })}
             </div>
 
-            {(selectedPayment === 'cash' || profile.tipEnabled) && (
-              <div className="grid grid-cols-2 gap-2 mt-3">
-                {selectedPayment === 'cash' && (
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Efectivo recibido</Label>
-                    <Input
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      placeholder="0.00"
-                      value={cashInput}
-                      onChange={(e) => setCashInput(e.target.value)}
-                      className="h-9"
-                    />
+            {isCash && (
+              <div className="mt-3 space-y-2">
+                <Label htmlFor="pos-cash" className="text-xs text-muted-foreground">Entregado</Label>
+                <Input
+                  id="pos-cash"
+                  inputMode="decimal"
+                  placeholder={`${dueTotal.toFixed(2)} (exacto)`}
+                  value={cashInput}
+                  onChange={(e) => setCashInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      void handleCheckout();
+                    }
+                  }}
+                  className="h-11 text-lg"
+                />
+                {dueTotal > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {quickCashAmounts(dueTotal).map((amount, i) => (
+                      <Button
+                        key={amount}
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => setCashInput(amount.toFixed(2))}
+                      >
+                        {i === 0 ? 'Exacto' : `${amount} €`}
+                      </Button>
+                    ))}
                   </div>
                 )}
-                {profile.tipEnabled && (
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Propina</Label>
-                    <Input
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      placeholder="0.00"
-                      value={tipInput}
-                      onChange={(e) => setTipInput(e.target.value)}
-                      className="h-9"
-                    />
-                  </div>
-                )}
+                <div
+                  className={cn(
+                    'flex items-baseline justify-between rounded-lg px-3 py-2',
+                    cashShortfall ? 'bg-destructive/10 text-destructive' : 'bg-primary/10',
+                  )}
+                  aria-live="polite"
+                >
+                  <span className="text-sm font-medium">{cashShortfall ? 'Faltan' : 'Cambio'}</span>
+                  <span className="text-2xl font-bold">
+                    {change === null ? '0.00' : Math.abs(change).toFixed(2)} €
+                  </span>
+                </div>
               </div>
             )}
 
-            {change !== null && change < 0 && (
-              <p className="mt-2 text-xs text-destructive">
-                Faltan {Math.abs(change).toFixed(2)} € para cubrir el total.
-              </p>
+            {profile.tipEnabled && (
+              <div className="mt-3">
+                <Label className="text-xs text-muted-foreground">Propina</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  placeholder="0.00"
+                  value={tipInput}
+                  onChange={(e) => setTipInput(e.target.value)}
+                  className="h-9"
+                />
+              </div>
             )}
           </Card>
         </div>
       </div>
 
-      {/* Payment bar */}
-      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      {/* Cobro: un solo botón con el método elegido. */}
+      <div className="mt-4">
         <Button
           size="lg"
-          className="h-14 text-base"
-          disabled={cart.length === 0 || isCreating || (selectedPayment === 'cash' && !openSession)}
-          onClick={() => handleCheckout()}
+          className="h-14 w-full text-base"
+          disabled={cart.length === 0 || isCreating || (isCash && (!openSession || cashShortfall))}
+          onClick={() => void handleCheckout()}
         >
-          {isCreating ? 'Procesando...' : `Pagar ${dueTotal.toFixed(2)} €`}
+          <PayIcon className="w-5 h-5 mr-2" />
+          {isCreating
+            ? 'Procesando...'
+            : `Cobrar ${dueTotal.toFixed(2)} € · ${PAYMENT_LABELS[selectedPayment] ?? selectedPayment}`}
         </Button>
-
-        {profile.paymentMethods
-          .filter((m) => m !== selectedPayment)
-          .slice(0, 2)
-          .map((method) => {
-            const Icon = PAYMENT_ICONS[method] ?? Banknote;
-            return (
-              <Button
-                key={method}
-                size="lg"
-                variant="secondary"
-                className="h-14 text-base"
-                disabled={cart.length === 0 || isCreating || (method === 'cash' && !openSession)}
-                onClick={() => handleCheckout(method)}
-              >
-                <Icon className="w-5 h-5 mr-2" />
-                Pagar con {(PAYMENT_LABELS[method] ?? method).toLowerCase()}
-              </Button>
-            );
-          })}
       </div>
 
       {/* Variant picker */}

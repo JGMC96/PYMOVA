@@ -253,6 +253,13 @@
       "when": 1792530668151,
       "tag": "0035_equipo_gestion",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1792581912428,
+      "tag": "0036_conectados_tpv",
+      "breakpoints": true
     }
   ]
 }
