@@ -3,8 +3,10 @@
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { serviceClient, shopifyGraphql, ShopifyError } from '../_shared/shopify-client.ts';
-import { refundAmountForReturn, shopifyTag } from '../_shared/shopify-core.ts';
+import { findRefundLine, refundAmountForReturn, shopifyTag } from '../_shared/shopify-core.ts';
 import { consumeTicket, hasTicket } from '../_shared/scheduled-ticket.ts';
+import { loadLevelsFor } from '../_shared/shopify-levels.ts';
+import { levelPages } from '../_shared/shopify-levels-db.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
@@ -73,13 +75,20 @@ async function processBusiness(admin: SupabaseClient, businessId: string): Promi
   const returns = (returnsData ?? []) as unknown as ReturnRow[];
   if (returns.length === 0) return { status: 'ok', created: 0, failed: 0 };
 
-  const { data: levels } = await admin
-    .from('shopify_inventory_levels')
-    .select('variant_external_id, local_variant_id, local_product_id')
-    .eq('business_id', businessId);
+  // Solo los emparejamientos de los artículos devueltos (la tabla entera pasa de las 1.000 filas).
+  const items = returns.flatMap((r) => r.sale_return_items);
+  const levels = await loadLevelsFor<{
+    id: string;
+    variant_external_id: string | null;
+    local_variant_id: string | null;
+    local_product_id: string | null;
+  }>(levelPages(admin, businessId, 'variant_external_id, local_variant_id, local_product_id'), {
+    variantIds: items.map((i) => i.variant_id),
+    productIds: items.map((i) => i.product_id),
+  });
   const byVariant = new Map<string, string>();
   const byProduct = new Map<string, string>();
-  for (const l of levels ?? []) {
+  for (const l of levels) {
     if (!l.variant_external_id) continue;
     const gid = l.variant_external_id.startsWith('gid://') ? l.variant_external_id : `gid://shopify/ProductVariant/${l.variant_external_id}`;
     if (l.local_variant_id) byVariant.set(l.local_variant_id, gid);
@@ -104,8 +113,7 @@ async function processBusiness(admin: SupabaseClient, businessId: string): Promi
       const refundLineItems: { lineItemId: string; quantity: number; restockType: string }[] = [];
       for (const item of ret.sale_return_items as { product_id: string | null; variant_id: string | null; product_name: string; quantity: number }[]) {
         const variantGid = (item.variant_id && byVariant.get(item.variant_id)) || (item.product_id && byProduct.get(item.product_id));
-        const line = data.order.lineItems.nodes.find((n) =>
-          (available.get(n.id) ?? 0) > 0 && (variantGid ? n.variant?.id === variantGid : n.title === item.product_name));
+        const line = findRefundLine(data.order.lineItems.nodes, available, { variantGid, productName: item.product_name });
         if (!line) continue;
         const qty = Math.min(Number(item.quantity), available.get(line.id) ?? 0);
         available.set(line.id, (available.get(line.id) ?? 0) - qty);

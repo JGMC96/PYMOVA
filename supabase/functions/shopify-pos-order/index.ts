@@ -10,6 +10,8 @@ import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { serviceClient, shopifyGraphql, ShopifyError } from '../_shared/shopify-client.ts';
 import { posOrderAttributes, posTicketTags, posOrderSearchQuery } from '../_shared/shopify-core.ts';
 import { consumeTicket, hasTicket } from '../_shared/scheduled-ticket.ts';
+import { loadLevelsFor } from '../_shared/shopify-levels.ts';
+import { levelPages } from '../_shared/shopify-levels-db.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
@@ -104,13 +106,21 @@ async function processBusiness(admin: SupabaseClient, businessId: string): Promi
   if (salesError) throw salesError;
   const sales = (salesData ?? []) as unknown as SaleRow[];
 
-  const { data: levels } = await admin
-    .from('shopify_inventory_levels')
-    .select('variant_external_id, local_variant_id, local_product_id')
-    .eq('business_id', businessId);
+  // Solo los emparejamientos de los artículos de estas ventas (la tabla entera pasa de
+  // las 1.000 filas y los que quedaban fuera salían como líneas sueltas sin variante).
+  const items = sales.flatMap((s) => s.sale_items);
+  const levels = await loadLevelsFor<{
+    id: string;
+    variant_external_id: string | null;
+    local_variant_id: string | null;
+    local_product_id: string | null;
+  }>(levelPages(admin, businessId, 'variant_external_id, local_variant_id, local_product_id'), {
+    variantIds: items.map((i) => i.variant_id),
+    productIds: items.map((i) => i.product_id),
+  });
   const byVariant = new Map<string, string>();
   const byProduct = new Map<string, string>();
-  for (const l of levels ?? []) {
+  for (const l of levels) {
     if (!l.variant_external_id) continue;
     if (l.local_variant_id) byVariant.set(l.local_variant_id, l.variant_external_id);
     else if (l.local_product_id) byProduct.set(l.local_product_id, l.variant_external_id);

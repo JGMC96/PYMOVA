@@ -4,6 +4,8 @@ import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { serviceClient, shopifyGraphql, ShopifyError } from '../_shared/shopify-client.ts';
 import { consumeTicket, hasTicket } from '../_shared/scheduled-ticket.ts';
+import { loadLevelsFor } from '../_shared/shopify-levels.ts';
+import { levelPages } from '../_shared/shopify-levels-db.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
@@ -37,6 +39,7 @@ interface PushRow {
 }
 
 interface LevelRow {
+  id: string;
   inventory_item_gid: string;
   location_gid: string;
   available: number;
@@ -91,11 +94,14 @@ async function pushForBusiness(admin: SupabaseClient, businessId: string): Promi
   const rows = (pending ?? []) as PushRow[];
   if (rows.length === 0) return { status: 'ok', pushed: 0, failed: 0, skipped: 0 };
 
-  const { data: levelData } = await admin
-    .from('shopify_inventory_levels')
-    .select('inventory_item_gid, location_gid, available, local_variant_id, local_product_id')
-    .eq('business_id', businessId);
-  const levels = (levelData ?? []) as LevelRow[];
+  // Solo los emparejamientos de este lote (la tabla entera pasa de las 1.000 filas).
+  const levels = await loadLevelsFor<LevelRow>(
+    levelPages(admin, businessId, 'inventory_item_gid, location_gid, available, local_variant_id, local_product_id'),
+    {
+      variantIds: rows.map((r) => r.local_variant_id),
+      productIds: rows.filter((r) => !r.local_variant_id).map((r) => r.local_product_id),
+    },
+  );
 
   const preferred = (connection as { default_location_gid?: string | null }).default_location_gid ?? null;
 

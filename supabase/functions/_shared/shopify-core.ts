@@ -736,6 +736,24 @@ export function refundAmountForReturn(
   return Math.max(0, Math.min(lines, pending));
 }
 
+/**
+ * Línea del pedido de Shopify que corresponde a un artículo devuelto y aún tiene
+ * unidades por reembolsar. Primero por variante; si no, por nombre: los pedidos creados
+ * antes de que el artículo estuviera emparejado llevan una línea suelta sin variante.
+ */
+export function findRefundLine<L extends { id: string; title: string; variant: { id: string } | null }>(
+  lines: L[],
+  remaining: Map<string, number>,
+  item: { variantGid: string | null | undefined; productName: string },
+): L | undefined {
+  const open = lines.filter((n) => (remaining.get(n.id) ?? 0) > 0);
+  return (
+    (item.variantGid ? open.find((n) => n.variant?.id === item.variantGid) : undefined) ??
+    open.find((n) => !n.variant && n.title === item.productName) ??
+    (item.variantGid ? undefined : open.find((n) => n.title === item.productName))
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Inventario desde Shopify (webhooks inventory_levels/update y refresco de stock)
 // ---------------------------------------------------------------------------
