@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { ShoppingCart, Receipt, Package, Wallet, Globe, Printer, Users } from 'lucide-react';
 import { TicketSettingsPanel } from '@/components/retail/TicketSettingsPanel';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -21,6 +22,7 @@ import { STORE_PROFILE_LIST, type StoreProfile } from '@/lib/storeProfiles';
 const Retail = () => {
   const { profileKey, profile, updateProfile, isSaving } = useStoreProfile();
   const { isAdmin } = useRoleAccess('admin');
+  const [tab, setTab] = useState('pos');
 
   return (
     <RequireModule module="retail">
@@ -56,7 +58,7 @@ const Retail = () => {
           </div>
         </div>
 
-        <Tabs defaultValue="pos" className="w-full">
+        <Tabs value={tab} onValueChange={setTab} className="w-full">
           <TabsList>
             <TabsTrigger value="pos" className="flex items-center gap-2">
               <ShoppingCart className="w-4 h-4" />
@@ -91,7 +93,7 @@ const Retail = () => {
           </TabsList>
 
           <TabsContent value="pos" className="mt-6">
-            <POSPanel />
+            <POSPanel onGoToRegister={() => setTab('register')} />
           </TabsContent>
 
           <TabsContent value="register" className="mt-6">
