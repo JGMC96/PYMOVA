@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   createStockagileClient,
+  normalizeStockagileToken,
   pickSiteProduct,
   pickVariantBySize,
   pickWarehouse,
@@ -46,6 +47,28 @@ describe('cliente de la API de Stockagile', () => {
     expect(sleep).toHaveBeenCalledWith(2000);
     await expect(client.get('/warehouses')).rejects.toBeInstanceOf(StockagileError);
     await expect(client.get('/warehouses')).rejects.toThrow();
+  });
+});
+
+describe('token y errores de Stockagile', () => {
+  it('limpia el token pegado con espacios, comillas, saltos de línea o el prefijo', () => {
+    expect(normalizeStockagileToken('  abc123\n')).toBe('abc123');
+    expect(normalizeStockagileToken('Token abc123')).toBe('abc123');
+    expect(normalizeStockagileToken('"token  abc123"')).toBe('abc123');
+    expect(normalizeStockagileToken('Bearer abc123')).toBe('abc123');
+    expect(normalizeStockagileToken(undefined)).toBe('');
+  });
+
+  it('el aviso dice el código y el motivo que da Stockagile', async () => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(res(403, { detail: 'Invalid token.' }))
+      .mockResolvedValueOnce(res(401, { error: 'ERROR_1', message: 'Company is not active' }))
+      .mockResolvedValueOnce(new Response('<html>Bad Gateway</html>', { status: 502 }));
+    const client = createStockagileClient(fetcher, 't');
+    await expect(client.get('/warehouses')).rejects.toThrow('Stockagile no acepta el token (403: Invalid token.)');
+    await expect(client.get('/warehouses')).rejects.toThrow('(401: Company is not active)');
+    await expect(client.get('/warehouses')).rejects.toThrow('Stockagile respondió 502');
   });
 });
 

@@ -21,6 +21,30 @@ export class StockagileError extends Error {
 
 export type Fetcher = (url: string, init: RequestInit) => Promise<Response>;
 
+/**
+ * Token tal como lo espera la cabecera: sin espacios, comillas ni saltos de línea alrededor,
+ * y sin el prefijo «Token» o «Bearer» si se pegó con él.
+ */
+export function normalizeStockagileToken(raw: string | null | undefined): string {
+  return (raw ?? '')
+    .trim()
+    .replace(/^["']+|["']+$/g, '')
+    .trim()
+    .replace(/^(token|bearer)\s+/i, '')
+    .trim();
+}
+
+/** Motivo que da Stockagile en el cuerpo de un error (`message`, `detail` o `error`), recortado. */
+async function errorReason(res: Response): Promise<string | null> {
+  try {
+    const body = await res.clone().json();
+    const reason = body?.message ?? body?.detail ?? body?.error ?? body?.oauth_error_description;
+    return typeof reason === 'string' && reason.trim() ? reason.trim().slice(0, 200) : null;
+  } catch {
+    return null;
+  }
+}
+
 interface Page<T> {
   count?: number;
   next: string | null;
@@ -47,10 +71,14 @@ export function createStockagileClient(
         await sleep(wait * 1000);
         continue;
       }
-      if (res.status === 401 || res.status === 403) {
-        throw new StockagileError('Stockagile no acepta el token (revisa STOCKAGILE_API_TOKEN)', res.status);
+      if (!res.ok) {
+        const reason = await errorReason(res);
+        const detail = `${res.status}${reason ? `: ${reason}` : ''}`;
+        if (res.status === 401 || res.status === 403) {
+          throw new StockagileError(`Stockagile no acepta el token (${detail}). Revisa STOCKAGILE_API_TOKEN`, res.status);
+        }
+        throw new StockagileError(`Stockagile respondió ${detail}`, res.status);
       }
-      if (!res.ok) throw new StockagileError(`Stockagile respondió ${res.status}`, res.status);
       return (await res.json()) as T;
     }
   };
