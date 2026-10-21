@@ -267,6 +267,13 @@
       "when": 1792590384454,
       "tag": "0037_stockagile_devoluciones",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1792613562302,
+      "tag": "0038_tpv_varios",
+      "breakpoints": true
     }
   ]
 }
