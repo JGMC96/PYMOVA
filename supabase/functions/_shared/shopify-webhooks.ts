@@ -13,6 +13,8 @@ import {
   type ShopifyProductNode,
 } from '../_shared/shopify-core.ts';
 import { upsertShopifyProduct } from '../_shared/shopify-catalog.ts';
+import { customerFromWebhook } from '../_shared/shopify-customers.ts';
+import { retireShopifyCustomer, upsertShopifyCustomers } from '../_shared/shopify-customers-db.ts';
 import { shopifyGraphql } from '../_shared/shopify-client.ts';
 import {
   buildUpsertArgs,
@@ -95,7 +97,44 @@ export async function processEvent(
       await admin.from('online_orders').update({ stock_applied: true }).eq('id', row.order_id);
       await syncFulfillmentsForOrder(admin, event.business_id, row.order_id, data.order);
     }
-    return { status: 'processed', message: `${topic} · ${data.order.name}` };
+    // Quien compra en la web entra (o se pone al día) en los clientes de PYMOVA.
+    // Un fallo aquí no debe repetir el pedido: se anota en el mensaje.
+    let customerNote = '';
+    const c = data.order.customer;
+    if (c?.id && (topic === 'orders/create' || topic === 'orders/updated' || topic === 'orders/paid')) {
+      try {
+        const res = await upsertShopifyCustomers(
+          admin,
+          event.business_id,
+          [{ id: c.id, firstName: c.firstName, lastName: c.lastName, email: c.email, phone: c.phone }],
+          { allowInsert: true },
+        );
+        if (res.errors.length) customerNote = ` · cliente no guardado: ${res.errors[0].message}`;
+        else if (res.created) customerNote = ' · cliente nuevo';
+      } catch (err) {
+        customerNote = ` · cliente no guardado: ${err instanceof Error ? err.message : 'error'}`;
+      }
+    }
+    return { status: 'processed', message: `${topic} · ${data.order.name}${customerNote}` };
+  }
+
+  // Clientes: los cambios en Shopify se aplican a los que ya están en PYMOVA (los que han
+  // comprado); un cliente borrado se desactiva y se le quitan el correo y el teléfono.
+  if (topic === 'customers/update') {
+    const customer = customerFromWebhook(payload);
+    if (!customer) return { status: 'ignored', message: 'Aviso de cliente sin identificador' };
+    const res = await upsertShopifyCustomers(admin, event.business_id, [customer], { allowInsert: false });
+    if (res.errors.length) throw new Error(res.errors[0].message);
+    return {
+      status: res.updated ? 'processed' : 'ignored',
+      message: res.updated ? 'Cliente actualizado' : 'Cliente sin cambios o que aún no ha comprado',
+    };
+  }
+  if (topic === 'customers/delete') {
+    const customer = customerFromWebhook(payload);
+    if (!customer) return { status: 'ignored', message: 'Aviso de cliente sin identificador' };
+    const n = await retireShopifyCustomer(admin, event.business_id, customer.id);
+    return { status: n ? 'processed' : 'ignored', message: n ? 'Cliente borrado en Shopify: desactivado' : 'Cliente que no estaba en PYMOVA' };
   }
 
   // Stock: Shopify manda en la ubicación de la tienda; se aplica al momento.

@@ -9,11 +9,9 @@ import {
   verifyConnection,
 } from '../_shared/shopify-client.ts';
 import {
-  CUSTOMERS_QUERY,
   LOCATIONS_QUERY,
   PRODUCTS_QUERY,
   missingScopes,
-  resolveClientMatch,
   availableAtLocation,
   INVENTORY_ITEMS_BATCH,
   INVENTORY_ITEMS_LEVELS_QUERY,
@@ -24,6 +22,8 @@ import {
 import { drainWebhookQueue, syncFulfillmentsForOrder } from '../_shared/shopify-webhooks.ts';
 import { ORDERS_QUERY, buildUpsertArgs, type ShopifyAdminOrder } from '../_shared/shopify-admin.ts';
 import { consumeTicket, hasTicket } from '../_shared/scheduled-ticket.ts';
+import { CUSTOMERS_WITH_ORDERS_QUERY, fromQueryNode, type CustomerQueryNode } from '../_shared/shopify-customers.ts';
+import { upsertShopifyCustomers } from '../_shared/shopify-customers-db.ts';
 import {
   applyLevels,
   deactivateProductsGoneFromShopify,
@@ -404,11 +404,14 @@ Deno.serve(async (req) => {
       const scopeOption = String(body.scope ?? 'all');
       const days = Number(body.days ?? 60);
 
-      // El catálogo va por lotes: cada llamada procesa como mucho `max_pages` páginas de 10
+      // El catálogo y los clientes van por lotes: cada llamada procesa como mucho `max_pages` páginas de 10
       // productos y devuelve `next_cursor` para seguir en la siguiente (una edge function no
       // puede estar minutos seguidos). `run_id` continúa el mismo registro de sincronización.
       const batchCursor = typeof body.after === 'string' && body.after ? body.after : null;
-      const maxPages = scopeOption === 'catalog' ? Math.min(Math.max(Number(body.max_pages ?? 3), 1), 10) : 50;
+      const maxPages =
+        scopeOption === 'catalog' || scopeOption === 'customers'
+          ? Math.min(Math.max(Number(body.max_pages ?? 3), 1), 10)
+          : 50;
       const continueRunId = typeof body.run_id === 'string' && body.run_id ? body.run_id : null;
 
       type SyncRunRow = { id: string; created_count: number; updated_count: number; failed_count: number; started_at: string };
@@ -531,6 +534,30 @@ Deno.serve(async (req) => {
           }
         }
 
+        // --- Clientes que han comprado, por lotes (100 por página) ---
+        if (scopeOption === 'customers') {
+          let cursor: string | null = batchCursor;
+          for (let page = 0; page < maxPages; page++) {
+            const data: {
+              customers: {
+                pageInfo: { hasNextPage: boolean; endCursor: string | null };
+                nodes: CustomerQueryNode[];
+              };
+            } = await run(CUSTOMERS_WITH_ORDERS_QUERY, { first: 100, after: cursor }, ['read_customers']);
+            const res = await upsertShopifyCustomers(admin, businessId, data.customers.nodes.map(fromQueryNode), {
+              allowInsert: true,
+              createdBy: userData.user.id,
+            });
+            created += res.created;
+            updated += res.updated;
+            for (const e of res.errors) await logIssue('customer', null, e.gid, e.message);
+
+            if (!data.customers.pageInfo.hasNextPage || !data.customers.pageInfo.endCursor) break;
+            cursor = data.customers.pageInfo.endCursor;
+            if (page === maxPages - 1) nextCursor = cursor;
+          }
+        }
+
         // Lote intermedio: se guarda el avance y el cliente sigue con `next_cursor`.
         if (nextCursor && syncRun) {
           await admin
@@ -597,73 +624,6 @@ Deno.serve(async (req) => {
         }
 
         // --- Clientes (identificados por GID, nunca fusionados por email) ---
-        if (scopeOption === 'all' || scopeOption === 'customers') {
-          let cursor: string | null = null;
-          for (let page = 0; page < 20; page++) {
-            const data: {
-              customers: {
-                pageInfo: { hasNextPage: boolean; endCursor: string | null };
-                edges: Array<{
-                  node: {
-                    id: string;
-                    firstName: string | null;
-                    lastName: string | null;
-                    email: string | null;
-                    phone: string | null;
-                    note: string | null;
-                  };
-                }>;
-              };
-            } = await run(CUSTOMERS_QUERY, { first: 50, after: cursor }, ['read_customers']);
-
-            for (const { node } of data.customers.edges) {
-              const name =
-                [node.firstName, node.lastName].filter(Boolean).join(' ').trim() ||
-                node.email ||
-                'Cliente Shopify';
-              try {
-                const filters = [`external_id.eq.${node.id}`];
-                if (node.email) filters.push(`email.ilike.${node.email.replace(/[,;()]/g, '')}`);
-                const { data: candidates } = await admin
-                  .from('clients')
-                  .select('id, external_id, email')
-                  .eq('business_id', businessId)
-                  .or(filters.join(','))
-                  .limit(20);
-
-                const match = resolveClientMatch(node.id, node.email, candidates ?? []);
-                const payload = {
-                  name,
-                  email: node.email,
-                  phone: node.phone,
-                  external_id: node.id,
-                  external_source: 'shopify',
-                  updated_at: new Date().toISOString(),
-                };
-
-                if (match.action === 'update') {
-                  await admin.from('clients').update(payload).eq('id', match.id);
-                  updated += 1;
-                } else {
-                  const { error } = await admin.from('clients').insert({
-                    business_id: businessId,
-                    notes: node.note,
-                    created_by: userData.user.id,
-                    ...payload,
-                  });
-                  if (error) throw error;
-                  created += 1;
-                }
-              } catch (err) {
-                await logIssue('customer', name, node.id, errorText(err));
-              }
-            }
-
-            if (!data.customers.pageInfo.hasNextPage || !data.customers.pageInfo.endCursor) break;
-            cursor = data.customers.pageInfo.endCursor;
-          }
-        }
-
         const status = failed > 0 ? 'partial' : 'success';
         const summaryMessage = [
           `${created} nuevos · ${updated} actualizados`,
