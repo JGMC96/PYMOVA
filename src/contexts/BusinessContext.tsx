@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { User } from '@supabase/supabase-js';
@@ -49,6 +49,12 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
 
   // Derived state
   const userRole = activeBusiness?.role ?? null;
+  const userId = user?.id ?? null;
+  // Usuario para el que ya se cargaron los negocios. Al refrescarse la sesión (cada hora o al
+  // volver a la pestaña) Supabase entrega un objeto de usuario nuevo con el mismo id: si se
+  // volvieran a cargar, RequireBusiness enseñaría el cargando y desmontaría el panel, y se
+  // perdería lo que no estuviera guardado (por ejemplo, el carrito del TPV).
+  const loadedUserIdRef = useRef<string | null>(null);
 
   // Fetch user's businesses with memberships
   const fetchUserBusinesses = useCallback(async (userId: string): Promise<BusinessWithMembership[]> => {
@@ -235,16 +241,19 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Fetch businesses when user changes
+  // Fetch businesses when the signed-in user changes (not on every session refresh)
   useEffect(() => {
-    if (!user) {
+    if (!userId) {
+      loadedUserIdRef.current = null;
       if (!isAuthLoading) setIsBusinessesLoading(false);
       return;
     }
+    if (loadedUserIdRef.current === userId) return;
+    loadedUserIdRef.current = userId;
 
     const loadBusinesses = async () => {
       setIsBusinessesLoading(true);
-      const businesses = await fetchUserBusinesses(user.id);
+      const businesses = await fetchUserBusinesses(userId);
       setUserBusinesses(businesses);
 
       // Try to restore active business: 1) from DB profile, 2) from localStorage, 3) auto-select if only one
@@ -282,7 +291,7 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
     };
 
     loadBusinesses();
-  }, [user, isAuthLoading, fetchUserBusinesses, fetchBusinessModules, fetchActiveBusinessFromProfile]);
+  }, [userId, isAuthLoading, fetchUserBusinesses, fetchBusinessModules, fetchActiveBusinessFromProfile]);
 
   const value: BusinessContextType = {
     user,
