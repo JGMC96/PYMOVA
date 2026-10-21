@@ -14,6 +14,16 @@ const AcceptInvitation = () => {
   const [status, setStatus] = useState<'idle' | 'working' | 'done' | 'error'>('idle');
   const [message, setMessage] = useState('');
   const attemptedRef = useRef<string | null>(null);
+  // Solo se descarta la respuesta si la página se cierra. Un repintado mientras se espera
+  // (p. ej. la sesión se refresca justo después de entrar) no debe perderla: como la
+  // aceptación no se repite, la página se quedaría para siempre en «Validando invitación…».
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (isAuthLoading || !token) return;
@@ -28,14 +38,11 @@ const AcceptInvitation = () => {
     if (attemptedRef.current === `${token}:${user.id}`) return;
     attemptedRef.current = `${token}:${user.id}`;
 
-    let cancelled = false;
-
     const accept = async () => {
       setStatus('working');
       const { data, error } = await supabase.rpc('accept_business_invitation', { _token: token });
 
-      if (cancelled) return;
-
+      if (!mountedRef.current) return;
 
       if (error) {
         clearPendingInvite();
@@ -53,10 +60,7 @@ const AcceptInvitation = () => {
     };
 
 
-    accept();
-    return () => {
-      cancelled = true;
-    };
+    void accept();
   }, [token, user, isAuthLoading, navigate, refreshBusinesses, setActiveBusiness]);
 
   return (
