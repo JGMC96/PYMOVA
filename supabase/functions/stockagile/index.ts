@@ -6,6 +6,7 @@ import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import {
   createStockagileClient,
+  normalizeStockagileToken,
   pickSiteProduct,
   pickVariantBySize,
   pickWarehouse,
@@ -189,7 +190,7 @@ Deno.serve(async (req) => {
     const { data: isAdmin } = await userClient.rpc('has_min_role', { _business_id: businessId, _min_role: 'admin' });
     if (!isAdmin) return json({ error: 'Necesitas permisos de administrador' }, 403);
 
-    const token = Deno.env.get('STOCKAGILE_API_TOKEN');
+    const token = normalizeStockagileToken(Deno.env.get('STOCKAGILE_API_TOKEN'));
     if (!token) return json({ error: 'Falta el secreto STOCKAGILE_API_TOKEN' }, 500);
 
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
