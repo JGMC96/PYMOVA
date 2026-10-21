@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   activeSellers,
+  connectedElsewhere,
   authorizers,
   discountPct,
   hasPermission,
@@ -146,5 +147,25 @@ describe('permisos por persona', () => {
     expect(authorizers(permisos, empleados, 'return').map((e) => e.id)).toEqual(['luis']);
     expect(isAuthorizationError('Necesita autorización: esta persona no puede hacer devoluciones')).toBe(true);
     expect(isAuthorizationError('PIN incorrecto')).toBe(false);
+  });
+});
+
+describe('conectados en otros dispositivos', () => {
+  const ahora = Date.UTC(2026, 9, 21, 10, 0);
+  const servidor = [
+    { employee_id: 'luis', name: 'Luis', expires_at: '2026-10-21T12:00:00Z' },
+    { employee_id: 'ana', name: 'Ana', expires_at: '2026-10-21T12:30:00Z' },
+    { employee_id: 'marta', name: 'Marta', expires_at: '2026-10-21T09:00:00Z' },
+    { employee_id: 'Álvaro', name: 'Álvaro', expires_at: '2026-10-21T11:00:00Z' },
+  ];
+
+  it('quita a quien está conectado en este TPV y a quien ya caducó', () => {
+    const r = connectedElsewhere(servidor, [{ employeeId: 'ana' }], ahora);
+    expect(r.map((s) => s.name)).toEqual(['Álvaro', 'Luis']);
+    expect(r[1]).toEqual({ employeeId: 'luis', name: 'Luis', expiresAt: Date.UTC(2026, 9, 21, 12, 0) });
+  });
+
+  it('sin nadie en el servidor no hay nadie fuera', () => {
+    expect(connectedElsewhere([], [{ employeeId: 'ana' }], ahora)).toEqual([]);
   });
 });

@@ -10,7 +10,7 @@ const remaining = (min: number) => (min >= 60 ? `${Math.floor(min / 60)} h ${min
 
 /** Franja del TPV con las personas conectadas, alta con PIN, cambio de PIN y fichaje. */
 export function SellerBar() {
-  const { sellers, requiresSeller, employees, openLogin, openChangePin, disconnect, disconnectAll, clock } = useSellerSession();
+  const { sellers, elsewhere, requiresSeller, employees, openLogin, openChangePin, disconnect, disconnectAll, clock } = useSellerSession();
   const [clocking, setClocking] = useState(false);
   const [now, setNow] = useState(() => Date.now());
 
@@ -37,12 +37,12 @@ export function SellerBar() {
       {sellers.length === 0 ? (
         <span className={requiresSeller ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}>
           {requiresSeller
-            ? `Nadie conectado: al cobrar se pedirá el PIN (vale ${SELLER_SESSION_HOURS} horas).`
+            ? `Nadie conectado en este TPV: al cobrar se pedirá el PIN (vale ${SELLER_SESSION_HOURS} horas).`
             : 'Sin dependientes con PIN.'}
         </span>
       ) : (
         <>
-          <span className="text-muted-foreground">Conectados:</span>
+          <span className="text-muted-foreground">En este TPV:</span>
           {sellers.map((s) => (
             <Badge key={s.sessionId} variant="secondary" className="gap-1 py-1 pl-2.5 pr-1 text-sm font-normal">
               <span title={`Le quedan ${remaining(minutesLeft(s, now))}`}>{s.name}</span>
@@ -58,6 +58,16 @@ export function SellerBar() {
             </Badge>
           ))}
         </>
+      )}
+      {elsewhere.length > 0 && (
+        <span className="flex flex-wrap items-center gap-1.5" title="Conectados en otro dispositivo. Para vender a su nombre aquí, tienen que meter su PIN en este TPV.">
+          <span className="text-muted-foreground">En otros dispositivos:</span>
+          {elsewhere.map((s) => (
+            <Badge key={s.employeeId} variant="outline" className="py-1 text-sm font-normal">
+              {s.name}
+            </Badge>
+          ))}
+        </span>
       )}
       <span className="flex-1" />
       {requiresSeller && (

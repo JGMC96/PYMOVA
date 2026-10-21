@@ -9,6 +9,7 @@ import { useBusiness } from '@/contexts/BusinessContext';
 import {
   activeSellers,
   authorizers,
+  connectedElsewhere,
   hasPermission,
   parseStoredSellers,
   requiresSeller as computeRequiresSeller,
@@ -19,6 +20,7 @@ import {
   type PosAction,
   type PosEmployee,
   type PosPermission,
+  type RemoteSeller,
   type StoredSeller,
 } from '@/lib/sellerSession';
 
@@ -53,8 +55,10 @@ export interface SellerDialogState {
 interface SellerSessionValue {
   employees: PosEmployee[];
   isLoadingEmployees: boolean;
-  /** Conectados que no han caducado. */
+  /** Conectados en este TPV que no han caducado. */
   sellers: StoredSeller[];
+  /** Conectados en otros dispositivos (solo para verlo: para vender a su nombre hace falta su PIN). */
+  elsewhere: RemoteSeller[];
   /** Hay dependientes con PIN: no se vende ni se devuelve sin identificarse. */
   requiresSeller: boolean;
   dialog: SellerDialogState | null;
@@ -104,6 +108,7 @@ export function SellerSessionProvider({ children }: { children: ReactNode }) {
   const [now, setNow] = useState(() => Date.now());
   const [dialog, setDialog] = useState<SellerDialogState | null>(null);
   const [permissions, setPermissions] = useState<PosPermission[]>([]);
+  const [serverConnected, setServerConnected] = useState<Array<{ employee_id: string; name: string; expires_at: string }>>([]);
   const pending = useRef<((pick: SellerPick) => void) | null>(null);
   const pendingAuth = useRef<((id: string | null) => void) | null>(null);
 
@@ -171,6 +176,35 @@ export function SellerSessionProvider({ children }: { children: ReactNode }) {
   );
 
   const sellers = useMemo(() => activeSellers(stored, now), [stored, now]);
+
+  // Conectados en cualquier dispositivo (0036). Se pide al cargar, cada minuto y cuando
+  // cambia la lista de este TPV.
+  const sessionsKey = sellers.map((s) => s.sessionId).join(',');
+  useEffect(() => {
+    if (!activeBusinessId) {
+      setServerConnected([]);
+      return;
+    }
+    let cancelled = false;
+    void rpc('get_connected_sellers', { _business_id: activeBusinessId }).then(({ data, error }) => {
+      if (cancelled) return;
+      if (error) {
+        // Sin la migración aplicada, o sin permiso: simplemente no se muestran.
+        console.error('get_connected_sellers', error);
+        setServerConnected([]);
+        return;
+      }
+      setServerConnected((data ?? []) as Array<{ employee_id: string; name: string; expires_at: string }>);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeBusinessId, now, sessionsKey]);
+
+  const elsewhere = useMemo(
+    () => connectedElsewhere(serverConnected, sellers, now),
+    [serverConnected, sellers, now],
+  );
   const requiresSeller = computeRequiresSeller(employees);
 
   const permissionsOf = useCallback(
@@ -343,6 +377,7 @@ export function SellerSessionProvider({ children }: { children: ReactNode }) {
       employees,
       isLoadingEmployees,
       sellers,
+      elsewhere,
       requiresSeller,
       dialog,
       permissions,
@@ -364,7 +399,7 @@ export function SellerSessionProvider({ children }: { children: ReactNode }) {
       refreshEmployees,
       clock,
     }),
-    [employees, isLoadingEmployees, sellers, requiresSeller, dialog, permissions, permissionsOf, can, authorize, authorizersFor, authorizeWithPin, chooseSeller, resolveDialog, login, changePin, disconnect, disconnectAll, dropSession, refreshEmployees, clock],
+    [employees, isLoadingEmployees, sellers, elsewhere, requiresSeller, dialog, permissions, permissionsOf, can, authorize, authorizersFor, authorizeWithPin, chooseSeller, resolveDialog, login, changePin, disconnect, disconnectAll, dropSession, refreshEmployees, clock],
   );
 
   return <SellerSessionContext.Provider value={value}>{children}</SellerSessionContext.Provider>;

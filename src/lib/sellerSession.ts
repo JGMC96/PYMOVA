@@ -154,3 +154,26 @@ export function authorizers(
 export function isAuthorizationError(message: string | null | undefined): boolean {
   return /necesita autorizaci[oó]n/i.test(message ?? '');
 }
+
+/** Persona conectada al TPV en otro dispositivo (0036: get_connected_sellers). */
+export interface RemoteSeller {
+  employeeId: string;
+  name: string;
+  expiresAt: number;
+}
+
+/**
+ * Quién está conectado en otros dispositivos: las sesiones vigentes del negocio menos las
+ * personas conectadas en este TPV. Ordenadas por nombre.
+ */
+export function connectedElsewhere(
+  server: Array<{ employee_id: string; name: string; expires_at: string }>,
+  local: Array<{ employeeId: string }>,
+  now: number,
+): RemoteSeller[] {
+  const here = new Set(local.map((s) => s.employeeId));
+  return server
+    .map((r) => ({ employeeId: r.employee_id, name: r.name, expiresAt: new Date(r.expires_at).getTime() }))
+    .filter((r) => !here.has(r.employeeId) && r.expiresAt > now)
+    .sort((a, b) => a.name.localeCompare(b.name, 'es'));
+}
