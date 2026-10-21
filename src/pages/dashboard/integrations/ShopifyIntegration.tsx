@@ -20,6 +20,7 @@ import { useShopifyOrdersSync } from '@/hooks/useShopifyOrdersSync';
 import { useShopifyConnection } from '@/hooks/useShopifyConnection';
 import { SyncQueuePanel } from '@/components/integrations/SyncQueuePanel';
 import { ShopifyProblemsPanel } from '@/components/integrations/ShopifyProblemsPanel';
+import { StockagileCheckPanel } from '@/components/integrations/StockagileCheckPanel';
 import { VariantMappingReport } from '@/components/integrations/VariantMappingReport';
 import { useRoleAccess } from '@/hooks/useRoleAccess';
 
@@ -268,6 +269,7 @@ const ShopifyIntegrationAdmin = () => {
       )}
 
       {connectionStatus?.claimed && <ShopifyProblemsPanel />}
+      {connectionStatus?.claimed && <StockagileCheckPanel />}
 
       {connectionStatus?.claimed && connectionStatus.pending_webhooks > 0 && (
         <Card className="border-accent/30 bg-accent/5">
