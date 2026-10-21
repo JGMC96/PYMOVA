@@ -28,7 +28,7 @@ const ORDER_FIELDS = `
   phone
   displayFinancialStatus
   displayFulfillmentStatus
-  customer { firstName lastName email phone }
+  customer { id firstName lastName email phone }
   shippingAddress { name address1 address2 city zip province country }
   currentSubtotalPriceSet { shopMoney { amount } }
   totalShippingPriceSet { shopMoney { amount } }
@@ -78,7 +78,7 @@ export interface ShopifyAdminOrder {
   phone: string | null;
   displayFinancialStatus: string | null;
   displayFulfillmentStatus: string | null;
-  customer: { firstName: string | null; lastName: string | null; email: string | null; phone: string | null } | null;
+  customer: { id?: string | null; firstName: string | null; lastName: string | null; email: string | null; phone: string | null } | null;
   shippingAddress: Record<string, string | null> | null;
   currentSubtotalPriceSet: { shopMoney: { amount: string } } | null;
   totalShippingPriceSet: { shopMoney: { amount: string } } | null;
