@@ -47,7 +47,8 @@ function sanitizeSearchTerm(term: string): string {
     .trim();
 }
 
-export function useClients(): UseClientsReturn {
+/** `fetchList: false`: solo crear y editar (la página de Clientes lista con useClientList). */
+export function useClients({ fetchList = true }: { fetchList?: boolean } = {}): UseClientsReturn {
   const { activeBusinessId, user } = useBusiness();
   const { toast } = useToast();
   
@@ -62,6 +63,10 @@ export function useClients(): UseClientsReturn {
 
   // Single unified fetch function with race condition protection
   const runFetch = useCallback(async (requestId: number) => {
+    if (!fetchList) {
+      if (requestId === requestIdRef.current) setIsLoading(false);
+      return;
+    }
     if (!activeBusinessId) {
       // Only update state if this is still the current request
       if (requestId === requestIdRef.current) {
@@ -118,7 +123,7 @@ export function useClients(): UseClientsReturn {
         setIsLoading(false);
       }
     }
-  }, [activeBusinessId, searchTerm, showInactive]);
+  }, [activeBusinessId, searchTerm, showInactive, fetchList]);
 
   // Public fetch function that increments request ID
   const fetchClients = useCallback(async () => {
