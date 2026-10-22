@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   ArrowLeft,
   Download,
+  History,
   Loader2,
   RefreshCw,
   Search,
@@ -15,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Progress } from '@/components/ui/progress';
 import { useShopifyImport } from '@/hooks/useShopifyImport';
 import { useShopifyOrdersSync } from '@/hooks/useShopifyOrdersSync';
 import { useShopifyConnection } from '@/hooks/useShopifyConnection';
@@ -96,6 +98,9 @@ const ShopifyIntegrationAdmin = () => {
     isRegistering,
     lastSummary: ordersSummary,
     syncOrders,
+    history,
+    importHistory,
+    stopHistory,
     registerWebhooks,
   } = useShopifyOrdersSync();
 
@@ -375,8 +380,14 @@ const ShopifyIntegrationAdmin = () => {
               )}
               Sincronizar pedidos (30 días)
             </Button>
-            <Button variant="outline" onClick={() => syncOrders(365)} disabled={isOrdersSyncing}>
-              Último año
+            <Button
+              variant="outline"
+              onClick={importHistory}
+              disabled={isOrdersSyncing || history?.running}
+              title="Trae todos los pedidos de la web desde el primero, con su fecha y su clienta. No mueve stock y no duplica."
+            >
+              {history?.running ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <History className="w-4 h-4 mr-2" />}
+              Importar historial completo
             </Button>
             <Button variant="outline" onClick={registerWebhooks} disabled={isRegistering}>
               {isRegistering ? (
@@ -405,6 +416,37 @@ const ShopifyIntegrationAdmin = () => {
                 ? new Date(connection.last_orders_sync_at).toLocaleString('es-ES')
                 : 'nunca'}
             </p>
+            <p>
+              Historial completo:{' '}
+              {connection?.orders_history_imported_at
+                ? `importado el ${new Date(connection.orders_history_imported_at).toLocaleString('es-ES')}`
+                : 'sin importar'}
+            </p>
+            {history && (
+              <div className="space-y-2 rounded-md border p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span>
+                    {history.running ? 'Importando historial…' : 'Importación del historial'}{' '}
+                    <span className="tabular-nums">
+                      {history.processed.toLocaleString('es-ES')}
+                      {history.total ? ` de ${history.total.toLocaleString('es-ES')}` : ''} pedidos
+                    </span>
+                  </span>
+                  {history.running && (
+                    <Button variant="ghost" size="sm" onClick={stopHistory}>
+                      Detener
+                    </Button>
+                  )}
+                </div>
+                {history.total ? (
+                  <Progress value={Math.min(100, Math.round((history.processed / history.total) * 100))} />
+                ) : null}
+                <p className="text-xs">
+                  {history.created} nuevos · {history.updated} actualizados · {history.customersCreated} clientas nuevas
+                  {history.failed > 0 ? ` · ${history.failed} con error` : ''}
+                </p>
+              </div>
+            )}
             {ordersSummary && (
               <p>
                 Último resultado: {ordersSummary.created} nuevos · {ordersSummary.updated}{' '}

@@ -4,9 +4,12 @@ import {
   adminGraphql,
   buildUpsertArgs,
   getShopDomain,
+  ORDERS_HISTORY_QUERY,
   ORDERS_QUERY,
   type ShopifyAdminOrder,
 } from '../_shared/shopify-admin.ts';
+import { upsertShopifyCustomers } from '../_shared/shopify-customers-db.ts';
+import { historyBuyers } from '../_shared/shopify-history.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -260,6 +263,84 @@ Deno.serve(async (req) => {
         }
         return json({ error: message }, 500);
       }
+    }
+
+    if (action === 'import-history') {
+      // Historial completo de pedidos web, por tandas: cada llamada procesa unas páginas y
+      // devuelve dónde seguir. Guardar pedidos no mueve stock. Repetirla actualiza sin duplicar.
+      const HISTORY_FILTER = '-tag:pymova-tpv';
+      let cursor: string | null = typeof body.cursor === 'string' && body.cursor ? body.cursor : null;
+      const pages = Math.min(Math.max(Number(body.pages ?? 4) || 4, 1), 8);
+      let total: number | null = null;
+      if (!cursor) {
+        const c = await adminGraphql<{ ordersCount: { count: number } }>(
+          `query HistoryCount($q: String) { ordersCount(query: $q, limit: null) { count } }`,
+          { q: HISTORY_FILTER },
+        );
+        total = c.ordersCount.count;
+      }
+
+      let created = 0;
+      let updated = 0;
+      let failed = 0;
+      let customersCreated = 0;
+      let done = false;
+      for (let page = 0; page < pages; page++) {
+        const data: {
+          orders: {
+            pageInfo: { hasNextPage: boolean; endCursor: string | null };
+            edges: Array<{ node: ShopifyAdminOrder }>;
+          };
+        } = await adminGraphql(ORDERS_HISTORY_QUERY, { first: 50, after: cursor, query: HISTORY_FILTER });
+        const nodes = data.orders.edges.map((e) => e.node);
+
+        // Primero quien compró (como en los avisos de Shopify), para que el pedido se una a ella.
+        const buyers = historyBuyers(nodes);
+        if (buyers.length) {
+          const res = await upsertShopifyCustomers(admin, businessId, buyers, {
+            allowInsert: true,
+            createdBy: userData.user.id,
+          });
+          customersCreated += res.created;
+        }
+
+        const saved: string[] = [];
+        for (const node of nodes) {
+          try {
+            const { data: result, error } = await admin.rpc(
+              'upsert_external_order',
+              buildUpsertArgs(businessId, node) as never,
+            );
+            if (error) throw error;
+            const row = Array.isArray(result) ? result[0] : result;
+            if (row?.was_created) created += 1;
+            else updated += 1;
+            if (row?.order_id) saved.push(row.order_id);
+          } catch (err) {
+            console.error('Error al importar pedido', node.name, err);
+            failed += 1;
+          }
+        }
+        if (saved.length) {
+          await admin.from('online_orders').update({ stock_applied: true }).in('id', saved);
+        }
+
+        if (!data.orders.pageInfo.hasNextPage || !data.orders.pageInfo.endCursor) {
+          done = true;
+          cursor = null;
+          break;
+        }
+        cursor = data.orders.pageInfo.endCursor;
+      }
+
+      if (done) {
+        await admin
+          .from('shopify_connections')
+          .update({ orders_history_imported_at: new Date().toISOString() })
+          .eq('business_id', businessId)
+          .eq('shop_domain', shop);
+      }
+      return json({ ok: true, total, created, updated, failed, customers_created: customersCreated, cursor, done });
     }
 
     if (action === 'push-status') {

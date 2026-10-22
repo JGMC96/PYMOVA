@@ -4,6 +4,7 @@ import {
   getShopDomain,
   shopifyGraphql,
 } from './shopify-client.ts';
+import { lineItemName } from './shopify-history.ts';
 
 export { SHOPIFY_API_VERSION, getShopDomain };
 
@@ -41,6 +42,7 @@ const ORDER_FIELDS = `
       node {
         id
         title
+        variantTitle
         quantity
         sku
         variant { id sku barcode }
@@ -54,6 +56,16 @@ const ORDER_FIELDS = `
 export const ORDERS_QUERY = `
   query SyncOrders($first: Int!, $after: String, $query: String) {
     orders(first: $first, after: $after, query: $query, sortKey: UPDATED_AT, reverse: true) {
+      pageInfo { hasNextPage endCursor }
+      edges { node { ${ORDER_FIELDS} } }
+    }
+  }
+`;
+
+/** Historial completo, del más antiguo al más nuevo (importación inicial por tandas). */
+export const ORDERS_HISTORY_QUERY = `
+  query OrdersHistory($first: Int!, $after: String, $query: String) {
+    orders(first: $first, after: $after, query: $query, sortKey: CREATED_AT) {
       pageInfo { hasNextPage endCursor }
       edges { node { ${ORDER_FIELDS} } }
     }
@@ -91,6 +103,7 @@ export interface ShopifyAdminOrder {
       node: {
         id: string;
         title: string;
+        variantTitle?: string | null;
         quantity: number;
         sku: string | null;
         variant: { id: string; sku: string | null; barcode: string | null } | null;
@@ -160,7 +173,7 @@ export function buildUpsertArgs(businessId: string, order: ShopifyAdminOrder) {
   const items = order.lineItems.edges.map(({ node }) => ({
     product_id: null,
     variant_id: null,
-    product_name: node.title,
+    product_name: lineItemName(node.title, node.variantTitle),
     quantity: node.quantity,
     unit_price: num(node.originalUnitPriceSet),
     total: num(node.discountedTotalSet) || num(node.originalUnitPriceSet) * node.quantity,
@@ -190,5 +203,7 @@ export function buildUpsertArgs(businessId: string, order: ShopifyAdminOrder) {
     _notes: order.note,
     _items: items,
     _external_updated_at: order.updatedAt,
+    // Fecha real del pedido (0045); antes se guardaba la de la importación.
+    _placed_at: order.createdAt,
   };
 }
