@@ -1434,6 +1434,47 @@ export type Database = {
           },
         ]
       }
+      label_templates: {
+        Row: {
+          business_id: string
+          config: Json
+          created_at: string
+          created_by: string | null
+          id: string
+          is_default: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          business_id: string
+          config: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_default?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          business_id?: string
+          config?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_default?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "label_templates_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       marketing_posts: {
         Row: {
           assignee_id: string | null
@@ -2088,6 +2129,7 @@ export type Database = {
           barcode: string | null
           business_id: string
           category: string | null
+          color: string | null
           cost_price: number | null
           created_at: string
           created_by: string | null
@@ -2108,6 +2150,7 @@ export type Database = {
           barcode?: string | null
           business_id: string
           category?: string | null
+          color?: string | null
           cost_price?: number | null
           created_at?: string
           created_by?: string | null
@@ -2128,6 +2171,7 @@ export type Database = {
           barcode?: string | null
           business_id?: string
           category?: string | null
+          color?: string | null
           cost_price?: number | null
           created_at?: string
           created_by?: string | null
