@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { PackagePlus, Truck, Pencil, Ban, Send, Loader2 } from 'lucide-react';
+import { PackagePlus, Truck, Pencil, Ban, Send, Loader2, Tag } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -10,6 +10,9 @@ import { usePurchases, type PurchaseOrder } from '@/hooks/usePurchases';
 import { PURCHASE_STATUS_LABELS, purchaseTotals } from '@/lib/compras';
 import { PurchaseEditorDialog } from './PurchaseEditorDialog';
 import { ReceivePurchaseDialog } from './ReceivePurchaseDialog';
+import { LabelPrintDialog } from '@/components/labels/LabelPrintDialog';
+import { useInventory } from '@/hooks/useInventory';
+import { labelDataFor, type LabelData } from '@/lib/labels';
 
 const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'outline' | 'destructive'> = {
   draft: 'outline',
@@ -26,6 +29,22 @@ export function PurchasesPanel() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<PurchaseOrder | null | 'new'>(null);
   const [receiving, setReceiving] = useState<PurchaseOrder | null>(null);
+  const [labelsFor, setLabelsFor] = useState<PurchaseOrder | null>(null);
+  const { products } = useInventory();
+
+  // Etiquetas de una compra: una por par recibido, con los datos actuales del catálogo.
+  const labelItems = useMemo(() => {
+    if (!labelsFor) return [];
+    const items: { data: LabelData; quantity: number }[] = [];
+    for (const i of labelsFor.items) {
+      if (i.qty_received <= 0) continue;
+      const product = products.find((p) => p.id === i.product_id);
+      if (!product) continue;
+      const variant = i.variant_id ? product.variants.find((v) => v.id === i.variant_id) ?? null : null;
+      items.push({ data: labelDataFor(product, variant), quantity: i.qty_received });
+    }
+    return items;
+  }, [labelsFor, products]);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -104,6 +123,11 @@ export function PurchasesPanel() {
                             Recibir
                           </Button>
                         )}
+                        {t.received > 0 && (
+                          <Button size="sm" variant="outline" onClick={() => setLabelsFor(o)} title="Imprimir etiquetas de lo recibido">
+                            <Tag className="w-4 h-4" />
+                          </Button>
+                        )}
                         {editable && (
                           <Button size="sm" variant="outline" onClick={() => setEditing(o)} aria-label="Editar compra">
                             <Pencil className="w-4 h-4" />
@@ -156,6 +180,12 @@ export function PurchasesPanel() {
           setEditing(null);
           void reload();
         }}
+      />
+      <LabelPrintDialog
+        open={labelsFor !== null}
+        onOpenChange={(v) => !v && setLabelsFor(null)}
+        title={`Etiquetas de ${labelsFor?.number ?? ''}`}
+        items={labelItems}
       />
       <ReceivePurchaseDialog
         order={receiving}

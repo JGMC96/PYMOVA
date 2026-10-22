@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   catalogAction,
   levelRowsNeedingStock,
+  productColor,
   productGidFromPayload,
   variantsToDeactivate,
   type LevelPairing,
@@ -70,5 +71,14 @@ describe('levelRowsNeedingStock', () => {
 
   it('con un producto nuevo, todos sus artículos', () => {
     expect(levelRowsNeedingStock<Row>(rows, new Map(), expected)).toHaveLength(3);
+  });
+});
+
+describe('color del producto (custom.color)', () => {
+  it('limpia el valor, null si no hay y undefined si la consulta no lo trae', () => {
+    expect(productColor({ colorField: { value: '  Piel   Negro ' } })).toBe('Piel Negro');
+    expect(productColor({ colorField: { value: '' } })).toBeNull();
+    expect(productColor({ colorField: null })).toBeNull();
+    expect(productColor({})).toBeUndefined();
   });
 });

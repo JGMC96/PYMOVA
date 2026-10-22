@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ShoppingCart, Receipt, Package, Wallet, Globe, Printer, Users, Truck } from 'lucide-react';
+import { ShoppingCart, Receipt, Package, Wallet, Globe, Printer, Users, Truck, Tag } from 'lucide-react';
 import { TicketSettingsPanel } from '@/components/retail/TicketSettingsPanel';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -19,6 +19,7 @@ import { ShopifyProblemsBanner } from '@/components/integrations/ShopifyProblems
 import { useStoreProfile } from '@/hooks/useStoreProfile';
 import { useMyPermissions } from '@/hooks/useMyPermissions';
 import { PurchasesPanel } from '@/components/purchases/PurchasesPanel';
+import { LabelsPanel } from '@/components/labels/LabelsPanel';
 import { STORE_PROFILE_LIST, type StoreProfile } from '@/lib/storeProfiles';
 
 const Retail = () => {
@@ -90,6 +91,10 @@ const Retail = () => {
                 Compras
               </TabsTrigger>
             )}
+            <TabsTrigger value="labels" className="flex items-center gap-2">
+              <Tag className="w-4 h-4" />
+              Etiquetas
+            </TabsTrigger>
             <TabsTrigger value="tickets" className="flex items-center gap-2">
               <Printer className="w-4 h-4" />
               Tickets
@@ -127,6 +132,10 @@ const Retail = () => {
               <PurchasesPanel />
             </TabsContent>
           )}
+
+          <TabsContent value="labels" className="mt-6">
+            <LabelsPanel />
+          </TabsContent>
 
           <TabsContent value="tickets" className="mt-6">
             <TicketSettingsPanel />

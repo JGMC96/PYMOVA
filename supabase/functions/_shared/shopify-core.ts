@@ -353,6 +353,7 @@ export const PRODUCTS_QUERY = `
           updatedAt
           featuredImage { url altText }
           priceRangeV2 { minVariantPrice { amount currencyCode } }
+          colorField: metafield(namespace: "custom", key: "color") { value }
           variants(first: 25) {
             pageInfo { hasNextPage endCursor }
             edges { node { ${VARIANT_FIELDS} } }
@@ -377,6 +378,7 @@ export const PRODUCT_BY_ID_QUERY = `
       updatedAt
       featuredImage { url altText }
       priceRangeV2 { minVariantPrice { amount currencyCode } }
+      colorField: metafield(namespace: "custom", key: "color") { value }
       variants(first: 25) {
         pageInfo { hasNextPage endCursor }
         edges { node { ${VARIANT_FIELDS} } }
@@ -494,6 +496,8 @@ export interface ShopifyProductNode {
   status: string;
   featuredImage: { url: string; altText: string | null } | null;
   priceRangeV2: { minVariantPrice: { amount: string; currencyCode: string } };
+  /** Metacampo custom.color (p. ej. «Piel Negro»), si la consulta lo pide. */
+  colorField?: { value: string | null } | null;
   variants: {
     pageInfo: { hasNextPage: boolean; endCursor: string | null };
     edges: Array<{ node: ShopifyVariantNode }>;
@@ -1060,4 +1064,14 @@ export function pickPushLevel<L extends PushLevel>(
     if (atPreferred) return atPreferred;
   }
   return [...matches].sort((a, b) => b.available - a.available)[0];
+}
+
+/**
+ * Color del producto para Pymova (metacampo custom.color de Shopify). `undefined` si la
+ * consulta no lo trajo (no se toca lo guardado); null si el producto no lo tiene.
+ */
+export function productColor(node: Pick<ShopifyProductNode, 'colorField'>): string | null | undefined {
+  if (!('colorField' in node)) return undefined;
+  const value = node.colorField?.value?.replace(/\s+/g, ' ').trim();
+  return value ? value.slice(0, 120) : null;
 }

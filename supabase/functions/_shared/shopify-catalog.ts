@@ -9,6 +9,7 @@ import {
   fetchAllVariants,
   type GraphqlRunner,
   levelRowsNeedingStock,
+  productColor,
   variantsToDeactivate,
   variantUnitCost,
   type InventoryLevelRow,
@@ -88,6 +89,7 @@ export async function upsertShopifyProduct(
 
   const first = variants[0];
   const firstCost = first ? variantUnitCost(first as ShopifyVariantNode) : null;
+  const color = productColor(node);
 
   const { data: existing } = await admin
     .from('products')
@@ -107,6 +109,8 @@ export async function upsertShopifyProduct(
     barcode: first?.barcode ?? null,
     // Solo sobrescribe el coste si Shopify lo informa (no borra el coste manual).
     ...(firstCost !== null ? { cost_price: firstCost } : {}),
+    // Color del metacampo custom.color (para las etiquetas).
+    ...(color !== undefined ? { color } : {}),
     // El stock no se escribe aquí: lo pone applyLevels con la ubicación de la tienda.
     track_inventory: true,
     is_active: node.status === 'ACTIVE',
