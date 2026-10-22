@@ -30,6 +30,8 @@ export interface TicketData {
   clientName?: string | null;
   /** El cliente tiene correo y aceptó el ticket por correo. */
   clientCanEmail?: boolean;
+  /** Parte pagada con vale de tienda y saldo que le queda. */
+  voucherPaid?: { code: string; amount: number; balanceLeft: number } | null;
 }
 
 interface SaleTicketDialogProps {
@@ -53,6 +55,7 @@ export function toTicketDoc(t: TicketData): TicketDoc {
     notes: t.notes,
     cashier: t.cashier ?? null,
     clientName: t.clientName ?? null,
+    voucherPaid: t.voucherPaid ?? null,
     lines: t.items.map((i) => {
       const key = i.variant_id ?? i.product_id;
       const orig = t.originalTotals?.[key] ?? i.total;

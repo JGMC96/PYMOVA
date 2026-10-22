@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import {
   Search, Plus, Minus, Trash2, CreditCard, Banknote,
   ScanLine, ArrowRightLeft, Layers, LayoutGrid, ChevronRight, ChevronDown,
-  MoreVertical, X, PenLine,
+  MoreVertical, X, PenLine, Ticket,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -34,6 +34,8 @@ import { DEFAULT_TAX_RATE, taxBreakdown } from '@/lib/tax';
 import { cashChange, parseCash, quickCashAmounts } from '@/lib/cobro';
 import { CashRegisterStaleBanner } from './CashRegisterStaleBanner';
 import { VariosDialog } from './VariosDialog';
+import { VoucherDialog, type AppliedVoucher } from './VoucherDialog';
+import { voucherApplied } from '@/lib/vales';
 import { matchesVarios } from '@/lib/varios';
 
 const PAYMENT_ICONS: Record<string, typeof Banknote> = {
@@ -64,6 +66,8 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
   const [breakdownOpen, setBreakdownOpen] = useState(false);
   const [variantProduct, setVariantProduct] = useState<ProductWithStock | null>(null);
   const [variosOpen, setVariosOpen] = useState(false);
+  const [voucher, setVoucher] = useState<AppliedVoucher | null>(null);
+  const [voucherOpen, setVoucherOpen] = useState(false);
   const [ticket, setTicket] = useState<TicketData | null>(null);
   const [ticketOpen, setTicketOpen] = useState(false);
   const barcodeRef = useRef<HTMLInputElement>(null);
@@ -197,6 +201,7 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
     setCashInput('');
     setNotes('');
     setClient(null);
+    setVoucher(null);
   };
 
   const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -219,18 +224,22 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
   const total = round2(grossSubtotal - discountValue);
   const { base: subtotal, tax } = taxBreakdown(total, taxRate);
   const tip = profile.tipEnabled ? Math.max(round2(parseFloat(tipInput) || 0), 0) : 0;
-  const dueTotal = round2(total + tip);
-  const isCash = selectedPayment === 'cash';
+  // Vale de tienda: paga como mucho su saldo y el total (si el ticket baja, baja con él).
+  const voucherAmount = voucher ? voucherApplied(voucher.amount, voucher.balance, total) : 0;
+  const dueTotal = round2(total + tip - voucherAmount);
+  const paidByVoucher = voucherAmount > 0 && dueTotal === 0;
+  const paymentMethod = paidByVoucher ? 'store_credit' : selectedPayment;
+  const isCash = paymentMethod === 'cash';
   // Sin importe entregado se entiende que paga el importe exacto.
   const cashReceived = isCash ? parseCash(cashInput) : null;
   const change = isCash ? cashChange(cashInput, dueTotal) : null;
   const cashShortfall = change !== null && change < 0;
   const itemCount = cart.reduce((sum, i) => sum + i.quantity, 0);
-  const PayIcon = PAYMENT_ICONS[selectedPayment] ?? Banknote;
+  const PayIcon = paidByVoucher ? Ticket : PAYMENT_ICONS[selectedPayment] ?? Banknote;
 
   const handleCheckout = async () => {
     if (cart.length === 0 || isCreating) return;
-    const method = selectedPayment;
+    const method = paymentMethod;
     const usesCash = method === 'cash';
     if (usesCash && !openSession) {
       toast.error('Abre la caja para cobrar en efectivo');
@@ -274,6 +283,8 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
       register_session_id: openSession?.id ?? null,
       seller_session_id: seller?.sessionId ?? null,
       authorization_id: authorizationId,
+      voucher_code: voucherAmount > 0 ? voucher?.code ?? null : null,
+      voucher_amount: voucherAmount > 0 ? voucherAmount : null,
     }, { onError: (m) => { failure = m; } });
 
     if (!result && seller && isSellerSessionError(failure)) {
@@ -301,6 +312,9 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
         saleId: result.id,
         clientName: client?.name ?? null,
         clientCanEmail: canEmailReceipt(client),
+        voucherPaid: voucher && voucherAmount > 0
+          ? { code: voucher.code, amount: voucherAmount, balanceLeft: round2(voucher.balance - voucherAmount) }
+          : null,
       });
       setTicketOpen(true);
       if (change !== null && change > 0) {
@@ -654,11 +668,44 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
 
             <Separator className="my-3" />
 
+            {voucher && voucherAmount > 0 ? (
+              <div className="mb-2 flex items-center justify-between rounded-lg bg-primary/10 px-3 py-2 text-sm">
+                <span className="flex items-center gap-1.5">
+                  <Ticket className="w-4 h-4" />
+                  Vale {voucher.code}
+                </span>
+                <span className="flex items-center gap-2">
+                  <span className="font-semibold">-{voucherAmount.toFixed(2)} €</span>
+                  <button
+                    type="button"
+                    className="text-muted-foreground hover:text-destructive"
+                    aria-label="Quitar el vale"
+                    onClick={() => setVoucher(null)}
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </span>
+              </div>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mb-2 w-full"
+                disabled={total <= 0}
+                onClick={() => setVoucherOpen(true)}
+              >
+                <Ticket className="w-4 h-4 mr-1.5" />
+                Pagar con vale
+              </Button>
+            )}
+
             <div className="flex justify-between text-xl font-bold">
-              <span>Total</span>
+              <span>{voucherAmount > 0 ? 'Resto a pagar' : 'Total'}</span>
               <span>{dueTotal.toFixed(2)} €</span>
             </div>
-            {/* Método de pago: se elige antes de cobrar. */}
+            {/* Método de pago: se elige antes de cobrar (no hace falta si el vale lo paga todo). */}
+            {!paidByVoucher && (
             <div
               className="mt-3 grid gap-2"
               style={{ gridTemplateColumns: `repeat(${profile.paymentMethods.length || 1}, minmax(0, 1fr))` }}
@@ -687,6 +734,7 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
                 );
               })}
             </div>
+            )}
 
             {isCash && (
               <div className="mt-3 space-y-2">
@@ -764,9 +812,21 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
           <PayIcon className="w-5 h-5 mr-2" />
           {isCreating
             ? 'Procesando...'
-            : `Cobrar ${dueTotal.toFixed(2)} € · ${PAYMENT_LABELS[selectedPayment] ?? selectedPayment}`}
+            : paidByVoucher
+              ? `Cobrar con vale · ${voucherAmount.toFixed(2)} €`
+              : `Cobrar ${dueTotal.toFixed(2)} € · ${PAYMENT_LABELS[selectedPayment] ?? selectedPayment}`}
         </Button>
       </div>
+
+      <VoucherDialog
+        open={voucherOpen}
+        onOpenChange={(o) => {
+          setVoucherOpen(o);
+          if (!o) barcodeRef.current?.focus();
+        }}
+        total={total}
+        onApply={setVoucher}
+      />
 
       {/* Variant picker */}
       <VariosDialog
