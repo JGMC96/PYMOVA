@@ -1,3 +1,5 @@
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { MoreHorizontal, Pencil, UserX, UserCheck, Users } from 'lucide-react';
 import {
   Table,
@@ -17,12 +19,14 @@ import { Button } from '@/components/ui/button';
 import { useRoleAccess } from '@/hooks/useRoleAccess';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { Client } from '@/types/database';
+import type { ClientWithStats } from '@/hooks/useClientList';
+import { eur } from '@/lib/clientHistory';
 
 interface ClientsTableProps {
-  clients: Client[];
+  clients: ClientWithStats[];
   isLoading: boolean;
-  onEdit: (client: Client) => void;
+  onOpen: (client: ClientWithStats) => void;
+  onEdit: (client: ClientWithStats) => void;
   onToggleStatus: (id: string, currentStatus: boolean) => void;
   showInactive: boolean;
 }
@@ -35,7 +39,9 @@ function LoadingSkeleton() {
           <TableCell><Skeleton className="h-4 w-32" /></TableCell>
           <TableCell><Skeleton className="h-4 w-40" /></TableCell>
           <TableCell><Skeleton className="h-4 w-28" /></TableCell>
-          <TableCell><Skeleton className="h-4 w-36" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-10" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
           <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
           <TableCell><Skeleton className="h-8 w-8" /></TableCell>
         </TableRow>
@@ -47,13 +53,13 @@ function LoadingSkeleton() {
 function EmptyState({ showInactive }: { showInactive: boolean }) {
   return (
     <TableRow>
-      <TableCell colSpan={6} className="h-48">
+      <TableCell colSpan={8} className="h-48">
         <div className="flex flex-col items-center justify-center text-center">
           <Users className="h-12 w-12 text-muted-foreground/50 mb-4" />
           <h3 className="text-lg font-medium">No hay clientes</h3>
           <p className="text-sm text-muted-foreground mt-1">
-            {showInactive 
-              ? 'No tienes clientes registrados aún.' 
+            {showInactive
+              ? 'No tienes clientes registrados aún.'
               : 'No tienes clientes activos. Crea uno nuevo o muestra los inactivos.'}
           </p>
         </div>
@@ -65,6 +71,7 @@ function EmptyState({ showInactive }: { showInactive: boolean }) {
 export function ClientsTable({
   clients,
   isLoading,
+  onOpen,
   onEdit,
   onToggleStatus,
   showInactive,
@@ -78,7 +85,9 @@ export function ClientsTable({
             <TableHead>Nombre</TableHead>
             <TableHead>Email</TableHead>
             <TableHead>Teléfono</TableHead>
-            <TableHead>Empresa</TableHead>
+            <TableHead className="text-right">Compras</TableHead>
+            <TableHead className="text-right">Gastado</TableHead>
+            <TableHead>Última compra</TableHead>
             <TableHead>Estado</TableHead>
             <TableHead className="w-[50px]"></TableHead>
           </TableRow>
@@ -90,7 +99,12 @@ export function ClientsTable({
             <EmptyState showInactive={showInactive} />
           ) : (
             clients.map((client) => (
-              <TableRow key={client.id}>
+              <TableRow
+                key={client.id}
+                className="cursor-pointer"
+                onClick={() => onOpen(client)}
+                title="Ver ficha y compras"
+              >
                 <TableCell className="font-medium">{client.name}</TableCell>
                 <TableCell className="text-muted-foreground">
                   {client.email || '-'}
@@ -98,15 +112,19 @@ export function ClientsTable({
                 <TableCell className="text-muted-foreground">
                   {client.phone || '-'}
                 </TableCell>
+                <TableCell className="text-right tabular-nums">{client.purchases || '-'}</TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {client.spent > 0 ? eur(client.spent) : '-'}
+                </TableCell>
                 <TableCell className="text-muted-foreground">
-                  {client.company || '-'}
+                  {client.last_purchase_at ? format(new Date(client.last_purchase_at), 'd MMM yyyy', { locale: es }) : '-'}
                 </TableCell>
                 <TableCell>
                   <Badge variant={client.is_active ? 'default' : 'secondary'}>
                     {client.is_active ? 'Activo' : 'Inactivo'}
                   </Badge>
                 </TableCell>
-                <TableCell>
+                <TableCell onClick={(e) => e.stopPropagation()}>
                   {isAdmin && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -120,7 +138,7 @@ export function ClientsTable({
                         <Pencil className="mr-2 h-4 w-4" />
                         Editar
                       </DropdownMenuItem>
-                      <DropdownMenuItem 
+                      <DropdownMenuItem
                         onClick={() => onToggleStatus(client.id, client.is_active)}
                       >
                         {client.is_active ? (

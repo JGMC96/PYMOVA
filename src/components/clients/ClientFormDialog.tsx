@@ -42,7 +42,7 @@ type FormValues = z.infer<typeof clientSchema>;
 interface ClientFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  client?: Client | null;
+  client?: Pick<Client, 'name' | 'email' | 'phone' | 'company' | 'notes'> | null;
   onSubmit: (data: ClientFormData) => Promise<boolean>;
   isSubmitting: boolean;
 }
