@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Loader2, Plus, Search, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { matchesSearch } from '@/lib/search';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -113,8 +114,7 @@ export function PurchaseEditorDialog({
       .filter((p) => !blocks.some((b) => b.productId === p.id))
       .filter(
         (p) =>
-          p.name.toLowerCase().includes(q) ||
-          p.sku?.toLowerCase().includes(q) ||
+          matchesSearch(q, [p.name, p.sku]) ||
           p.barcode?.toLowerCase() === q ||
           p.variants.some((v) => v.barcode?.toLowerCase() === q || v.sku?.toLowerCase() === q),
       )
