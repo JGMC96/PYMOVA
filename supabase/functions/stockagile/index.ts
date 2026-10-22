@@ -156,6 +156,26 @@ interface MoveRow {
   local_variant_id: string | null;
   quantity: number;
   reason: string;
+  /** Ubicación de Shopify del movimiento (compras); sin ella, la de la tienda. */
+  location_gid: string | null;
+}
+
+/** Nombre de cada ubicación de Shopify, para buscar el almacén de Stockagile con el mismo. */
+async function locationNames(admin: SupabaseClient, businessId: string, gids: string[]) {
+  const names = new Map<string, string>();
+  for (const gid of [...new Set(gids)]) {
+    const { data } = await admin
+      .from('shopify_inventory_levels')
+      .select('location_name')
+      .eq('business_id', businessId)
+      .eq('location_gid', gid)
+      .not('location_name', 'is', null)
+      .limit(1)
+      .maybeSingle();
+    const name = (data as { location_name?: string | null } | null)?.location_name;
+    if (name) names.set(gid, name);
+  }
+  return names;
 }
 
 /** Envía a Stockagile los movimientos pendientes de un negocio. */
@@ -180,21 +200,21 @@ async function push(admin: SupabaseClient, stockagile: StockagileClient, busines
   let failed = 0;
   let review = 0;
 
-  // Sin almacén no se envía nada: los movimientos quedan como fallidos (no aplicados).
-  let warehouse: StockagileWarehouse | null = null;
+  // Almacén de cada movimiento: el de su ubicación (compras al almacén) o el de la tienda.
+  // Sin almacén no se envía: el movimiento queda como fallido (no aplicado).
+  let defaultWarehouse: StockagileWarehouse | null = null;
+  let warehouses: StockagileWarehouse[] = [];
+  let names = new Map<string, string>();
   try {
-    ({ warehouse } = await resolveWarehouse(admin, stockagile, businessId));
+    ({ warehouse: defaultWarehouse, warehouses } = await resolveWarehouse(admin, stockagile, businessId));
+    names = await locationNames(admin, businessId, moves.map((m) => m.location_gid).filter((g): g is string => !!g));
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Error desconocido';
     for (const m of moves) await finish(m.id, { status: 'failed', last_error: message });
     return { sent, failed: moves.length, review };
   }
-  if (!warehouse) {
-    for (const m of moves) {
-      await finish(m.id, { status: 'failed', last_error: 'No hay en Stockagile un almacén con el nombre de la tienda' });
-    }
-    return { sent, failed: moves.length, review };
-  }
+  const warehouseFor = (m: MoveRow) =>
+    m.location_gid ? pickWarehouse(warehouses, names.get(m.location_gid) ?? null) : defaultWarehouse;
 
   // Variantes locales; para un producto sin variante se usa el producto (una sola variante en Stockagile).
   const locals = await loadLocalVariants(admin, moves.map((m) => m.local_variant_id).filter((id): id is string => !!id));
@@ -206,6 +226,17 @@ async function push(admin: SupabaseClient, stockagile: StockagileClient, busines
   const loadSiteProducts = siteProductsLoader(stockagile);
 
   for (const m of moves) {
+    const warehouse = warehouseFor(m);
+    if (!warehouse) {
+      await finish(m.id, {
+        status: 'failed',
+        last_error: m.location_gid
+          ? `No hay en Stockagile un almacén llamado «${names.get(m.location_gid) ?? 'esa ubicación'}»`
+          : 'No hay en Stockagile un almacén con el nombre de la tienda',
+      });
+      failed++;
+      continue;
+    }
     const local = m.local_variant_id ? locals.get(m.local_variant_id) : null;
     let match;
     try {

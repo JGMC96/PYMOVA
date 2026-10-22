@@ -1028,3 +1028,36 @@ export function planRefundTransactions(
   }
   return plan;
 }
+
+/** Nivel de inventario (artículo de Shopify en una ubicación) para un envío de stock. */
+export interface PushLevel {
+  inventory_item_gid: string;
+  location_gid: string;
+  available: number;
+  local_variant_id: string | null;
+  local_product_id: string | null;
+}
+
+/**
+ * Elige la ubicación de Shopify a la que va un envío de stock. Si el envío lleva ubicación
+ * (p. ej. una compra para el almacén), solo vale esa: sin nivel allí no se envía a otra.
+ * Si no, la de la tienda; y si el artículo no está en ella, la que más stock tenga.
+ */
+export function pickPushLevel<L extends PushLevel>(
+  levels: L[],
+  row: { local_variant_id: string | null; local_product_id: string | null; location_gid?: string | null },
+  preferred: string | null,
+): L | null {
+  const matches = levels.filter((l) =>
+    row.local_variant_id
+      ? l.local_variant_id === row.local_variant_id
+      : !!row.local_product_id && l.local_product_id === row.local_product_id,
+  );
+  if (matches.length === 0) return null;
+  if (row.location_gid) return matches.find((l) => l.location_gid === row.location_gid) ?? null;
+  if (preferred) {
+    const atPreferred = matches.find((l) => l.location_gid === preferred);
+    if (atPreferred) return atPreferred;
+  }
+  return [...matches].sort((a, b) => b.available - a.available)[0];
+}
