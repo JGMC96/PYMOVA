@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { pickPushLevel } from '../../supabase/functions/_shared/shopify-core';
 import {
   LEVEL_IDS_PER_QUERY,
   LEVEL_PAGE_SIZE,
@@ -96,5 +97,23 @@ describe('línea del pedido a reembolsar', () => {
   it('salta las líneas ya reembolsadas', () => {
     const l = findRefundLine(lineas, quedan({ L1: 0, L2: 1 }), { variantGid: null, productName: 'Calcetines · 35-38' });
     expect(l).toBeUndefined();
+  });
+});
+
+describe('ubicación de cada envío de stock', () => {
+  const nivel = (location_gid: string, available: number, variant = 'v1') => ({
+    inventory_item_gid: `gid://shopify/InventoryItem/${variant}`, location_gid, available, local_variant_id: variant, local_product_id: 'p1',
+  });
+  const niveles = [nivel('TIENDA', 5), nivel('MADRID', 1), nivel('TIENDA', 3, 'v2')];
+
+  it('sin ubicación, la de la tienda; si no está, la de más stock', () => {
+    expect(pickPushLevel(niveles, { local_variant_id: 'v1', local_product_id: null }, 'TIENDA')?.location_gid).toBe('TIENDA');
+    expect(pickPushLevel([nivel('MADRID', 1), nivel('OTRA', 4)], { local_variant_id: 'v1', local_product_id: null }, 'TIENDA')?.location_gid).toBe('OTRA');
+    expect(pickPushLevel(niveles, { local_variant_id: 'v9', local_product_id: null }, 'TIENDA')).toBeNull();
+  });
+
+  it('con ubicación (compras), solo esa: sin nivel allí no se manda a otra', () => {
+    expect(pickPushLevel(niveles, { local_variant_id: 'v1', local_product_id: null, location_gid: 'MADRID' }, 'TIENDA')?.location_gid).toBe('MADRID');
+    expect(pickPushLevel(niveles, { local_variant_id: 'v2', local_product_id: null, location_gid: 'MADRID' }, 'TIENDA')).toBeNull();
   });
 });

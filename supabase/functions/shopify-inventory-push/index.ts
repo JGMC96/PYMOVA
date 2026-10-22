@@ -6,6 +6,7 @@ import { serviceClient, shopifyGraphql, ShopifyError } from '../_shared/shopify-
 import { consumeTicket, hasTicket } from '../_shared/scheduled-ticket.ts';
 import { loadLevelsFor } from '../_shared/shopify-levels.ts';
 import { levelPages } from '../_shared/shopify-levels-db.ts';
+import { pickPushLevel } from '../_shared/shopify-core.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
@@ -28,6 +29,15 @@ const ADJUST_MUTATION = `
   }
 `;
 
+const COST_MUTATION = `
+  mutation UpdateCost($id: ID!, $input: InventoryItemInput!) {
+    inventoryItemUpdate(id: $id, input: $input) {
+      inventoryItem { id }
+      userErrors { field message }
+    }
+  }
+`;
+
 interface PushRow {
   id: string;
   business_id: string;
@@ -36,6 +46,10 @@ interface PushRow {
   delta: number;
   reason: string;
   attempts: number;
+  /** Ubicación de destino (compras); sin ella, la de la tienda. */
+  location_gid: string | null;
+  /** Coste por unidad que se apunta en Shopify (compras). */
+  unit_cost: number | null;
 }
 
 interface LevelRow {
@@ -45,22 +59,6 @@ interface LevelRow {
   available: number;
   local_variant_id: string | null;
   local_product_id: string | null;
-}
-
-/** Elige la ubicación del negocio para la variante/producto indicado. */
-function pickLevel(levels: LevelRow[], row: PushRow, preferred: string | null): LevelRow | null {
-  const matches = levels.filter((l) =>
-    row.local_variant_id
-      ? l.local_variant_id === row.local_variant_id
-      : !!row.local_product_id && l.local_product_id === row.local_product_id,
-  );
-  if (matches.length === 0) return null;
-  if (preferred) {
-    const atPreferred = matches.find((l) => l.location_gid === preferred);
-    if (atPreferred) return atPreferred;
-  }
-  // Sin ubicación preferida: la que más stock tenga, para no dejar negativos.
-  return matches.sort((a, b) => b.available - a.available)[0];
 }
 
 type PushResult =
@@ -84,7 +82,7 @@ async function pushForBusiness(admin: SupabaseClient, businessId: string): Promi
 
   const { data: pending } = await admin
     .from('shopify_inventory_pushes')
-    .select('id, business_id, local_product_id, local_variant_id, delta, reason, attempts')
+    .select('id, business_id, local_product_id, local_variant_id, delta, reason, attempts, location_gid, unit_cost')
     .eq('business_id', businessId)
     .eq('status', 'pending')
     .lt('attempts', MAX_ATTEMPTS)
@@ -110,14 +108,16 @@ async function pushForBusiness(admin: SupabaseClient, businessId: string): Promi
   let skipped = 0;
 
   for (const row of rows) {
-    const level = pickLevel(levels, row, preferred);
+    const level = pickPushLevel(levels, row, preferred);
 
     if (!level) {
       await admin
         .from('shopify_inventory_pushes')
         .update({
           status: 'skipped',
-          last_error: 'El producto no está emparejado con ninguna variante de Shopify',
+          last_error: row.location_gid
+            ? 'El artículo no está en esa ubicación de Shopify: actívalo allí y vuelve a enviarlo'
+            : 'El producto no está emparejado con ninguna variante de Shopify',
           processed_at: new Date().toISOString(),
         })
         .eq('id', row.id);
@@ -174,6 +174,23 @@ async function pushForBusiness(admin: SupabaseClient, businessId: string): Promi
         .eq('inventory_item_gid', level.inventory_item_gid)
         .eq('location_gid', level.location_gid);
 
+      // Compras: el coste pasa a ser el de la última compra. Si falla, el stock ya está
+      // enviado; se apunta el aviso sin repetir el envío.
+      let costError: string | null = null;
+      if (row.unit_cost != null && Number(row.unit_cost) > 0) {
+        try {
+          const cost = await shopifyGraphql<{ inventoryItemUpdate: { userErrors: { message: string }[] } | null }>(
+            COST_MUTATION,
+            { id: level.inventory_item_gid, input: { cost: Number(row.unit_cost) } },
+            { requiredScopes: ['write_inventory'] },
+          );
+          const costErrors = cost.inventoryItemUpdate?.userErrors ?? [];
+          if (costErrors.length > 0) costError = costErrors.map((e) => e.message).join('; ');
+        } catch (e) {
+          costError = e instanceof Error ? e.message : 'Error desconocido';
+        }
+      }
+
       await admin
         .from('shopify_inventory_pushes')
         .update({
@@ -181,7 +198,7 @@ async function pushForBusiness(admin: SupabaseClient, businessId: string): Promi
           attempts: row.attempts + 1,
           inventory_item_gid: level.inventory_item_gid,
           location_gid: level.location_gid,
-          last_error: null,
+          last_error: costError ? `Stock enviado; el coste no se pudo apuntar: ${costError}` : null,
           processed_at: new Date().toISOString(),
         })
         .eq('id', row.id);

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ShoppingCart, Receipt, Package, Wallet, Globe, Printer, Users } from 'lucide-react';
+import { ShoppingCart, Receipt, Package, Wallet, Globe, Printer, Users, Truck } from 'lucide-react';
 import { TicketSettingsPanel } from '@/components/retail/TicketSettingsPanel';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -17,11 +17,15 @@ import { SellerDialog } from '@/components/retail/SellerDialog';
 import { useRoleAccess } from '@/hooks/useRoleAccess';
 import { ShopifyProblemsBanner } from '@/components/integrations/ShopifyProblemsBanner';
 import { useStoreProfile } from '@/hooks/useStoreProfile';
+import { useMyPermissions } from '@/hooks/useMyPermissions';
+import { PurchasesPanel } from '@/components/purchases/PurchasesPanel';
 import { STORE_PROFILE_LIST, type StoreProfile } from '@/lib/storeProfiles';
 
 const Retail = () => {
   const { profileKey, profile, updateProfile, isSaving } = useStoreProfile();
   const { isAdmin } = useRoleAccess('admin');
+  // Compras: quien puede ajustar stock (0040).
+  const { canAdjustStock } = useMyPermissions();
   const [tab, setTab] = useState('pos');
 
   return (
@@ -80,6 +84,12 @@ const Retail = () => {
               <Package className="w-4 h-4" />
               Inventario
             </TabsTrigger>
+            {canAdjustStock && (
+              <TabsTrigger value="purchases" className="flex items-center gap-2">
+                <Truck className="w-4 h-4" />
+                Compras
+              </TabsTrigger>
+            )}
             <TabsTrigger value="tickets" className="flex items-center gap-2">
               <Printer className="w-4 h-4" />
               Tickets
@@ -111,6 +121,12 @@ const Retail = () => {
           <TabsContent value="inventory" className="mt-6">
             <InventoryView />
           </TabsContent>
+
+          {canAdjustStock && (
+            <TabsContent value="purchases" className="mt-6">
+              <PurchasesPanel />
+            </TabsContent>
+          )}
 
           <TabsContent value="tickets" className="mt-6">
             <TicketSettingsPanel />
