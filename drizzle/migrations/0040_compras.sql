@@ -338,7 +338,7 @@ BEGIN
   IF _status = 'ordered' AND _current = 'draft' THEN
     UPDATE purchase_orders p SET status = 'ordered', ordered_at = now(), updated_at = now() WHERE p.id = _order_id;
   ELSIF _status = 'cancelled' AND _current IN ('draft', 'ordered') THEN
-    UPDATE purchase_orders p SET status = 'cancelled', updated_at = now() WHERE p.id = _order_id;
+    UPDATE purchase_orders p SET status = 'cancelled', updated_at = now(), updated_at = now() WHERE p.id = _order_id;
   ELSE
     RAISE EXCEPTION 'No se puede pasar una compra de % a %', _current, _status USING ERRCODE = '22023';
   END IF;
