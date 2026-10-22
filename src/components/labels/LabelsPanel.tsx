@@ -13,7 +13,8 @@ import { useMyPermissions } from '@/hooks/useMyPermissions';
 import { useLabelTemplates, BUILTIN_TEMPLATE, type LabelTemplate } from '@/hooks/useLabelTemplates';
 import { DEFAULT_TAX_RATE } from '@/lib/tax';
 import {
-  expandLabels, labelDataFor, labelSizeMm, printLabels, type LabelConfig, type LabelData,
+  expandLabels, labelDataFor, labelSizeMm, loadStartPosition, nextStartPosition, printLabels, saveStartPosition,
+  sortLabelRows, type LabelConfig, type LabelData, type LabelOrder,
 } from '@/lib/labels';
 import { LabelDesigner } from './LabelDesigner';
 import { LabelPreview } from './LabelPreview';
@@ -60,6 +61,12 @@ export function LabelsPanel() {
   const [query, setQuery] = useState('');
   const [scan, setScan] = useState('');
   const [startAt, setStartAt] = useState('1');
+  const [order, setOrder] = useState<LabelOrder>('added');
+
+  // En hoja A4 se sigue donde se quedó la última impresión con ese diseño en este ordenador.
+  useEffect(() => {
+    setStartAt(String(loadStartPosition(selectedId)));
+  }, [selectedId]);
 
   // Al cargar o cambiar de diseño, se edita una copia.
   useEffect(() => {
@@ -109,8 +116,9 @@ export function LabelsPanel() {
 
   const config: LabelConfig = draft.config;
   const start = draft.config.sheet.mode === 'sheet' ? Math.max(1, Math.floor(Number(startAt) || 1)) : 1;
-  const labels = expandLabels(rows.map((r) => ({ data: r.data, quantity: r.quantity })), start);
+  const labels = expandLabels(sortLabelRows(rows.map((r) => ({ data: r.data, quantity: r.quantity })), order), start);
   const count = labels.filter(Boolean).length;
+  const missing = rows.filter((r) => !r.data.barcode).reduce((s, r) => s + r.quantity, 0);
   const perPage = config.sheet.mode === 'roll' ? 1 : config.sheet.rows * config.sheet.cols;
   const pages = Math.ceil(labels.length / perPage);
   const size = labelSizeMm(config.sheet);
@@ -239,6 +247,7 @@ export function LabelsPanel() {
                   <p className="text-sm font-medium truncate">{r.productName}{r.sizeName ? ` · ${r.sizeName}` : ''}</p>
                   <p className="text-xs text-muted-foreground">
                     {[r.data.barcode, r.data.sku, `stock ${r.stock}`].filter(Boolean).join(' · ')}
+                    {!r.data.barcode && <span className="text-amber-600 dark:text-amber-400"> · sin código de barras</span>}
                   </p>
                 </div>
                 <div className="flex items-center gap-1">
@@ -270,14 +279,32 @@ export function LabelsPanel() {
                 <Input className="h-9 w-24" type="number" min={1} value={startAt} onChange={(e) => setStartAt(e.target.value)} />
               </div>
             )}
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Orden</Label>
+              <Select value={order} onValueChange={(v) => setOrder(v as LabelOrder)}>
+                <SelectTrigger className="h-9 w-40"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="added">Como en la lista</SelectItem>
+                  <SelectItem value="product">Producto y talla</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <p className="text-sm text-muted-foreground pb-2">
               {count} etiquetas · {pages} {pages === 1 ? 'página' : 'páginas'}
+              {missing > 0 && <span className="text-amber-600 dark:text-amber-400"> · {missing} sin código de barras</span>}
             </p>
             {rows.length > 0 && (
               <Button variant="ghost" size="sm" onClick={() => setRows([])}>Vaciar</Button>
             )}
           </div>
-          <Button disabled={count === 0} onClick={() => printLabels(config, labels, taxRate)}>
+          <Button
+            disabled={count === 0}
+            onClick={() => {
+              printLabels(config, labels, taxRate);
+              if (config.sheet.mode === 'sheet') saveStartPosition(selectedId, nextStartPosition(start, count, perPage));
+              setStartAt(String(loadStartPosition(selectedId)));
+            }}
+          >
             <Printer className="w-4 h-4 mr-2" />
             Imprimir o guardar en PDF
           </Button>
