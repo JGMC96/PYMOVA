@@ -8,7 +8,9 @@
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { serviceClient, shopifyGraphql, ShopifyError } from '../_shared/shopify-client.ts';
-import { posOrderAttributes, posTicketTags, posOrderSearchQuery } from '../_shared/shopify-core.ts';
+import {
+  posOrderAttributes, posOrderSearchQuery, posSaleTransactions, posTicketTags, VOUCHER_GATEWAY,
+} from '../_shared/shopify-core.ts';
 import { consumeTicket, hasTicket } from '../_shared/scheduled-ticket.ts';
 import { loadLevelsFor } from '../_shared/shopify-levels.ts';
 import { levelPages } from '../_shared/shopify-levels-db.ts';
@@ -45,6 +47,7 @@ const PAYMENT_LABEL: Record<string, string> = {
   card: 'Tarjeta',
   bizum: 'Bizum',
   transfer: 'Transferencia',
+  store_credit: VOUCHER_GATEWAY,
 };
 
 interface SaleRow {
@@ -52,6 +55,7 @@ interface SaleRow {
   sale_number: string;
   total: number;
   tip: number | null;
+  voucher_amount: number | null;
   payment_method: string | null;
   notes: string | null;
   created_at: string;
@@ -100,7 +104,7 @@ async function processBusiness(admin: SupabaseClient, businessId: string): Promi
 
   const { data: salesData, error: salesError } = await admin
     .from('sales')
-    .select('id, sale_number, total, tip, payment_method, notes, created_at, seller_employee_id, shopify_order_attempts, sale_items(product_id, variant_id, product_name, quantity, total)')
+    .select('id, sale_number, total, tip, voucher_amount, payment_method, notes, created_at, seller_employee_id, shopify_order_attempts, sale_items(product_id, variant_id, product_name, quantity, total)')
     .in('id', ids)
     .order('created_at', { ascending: true });
   if (salesError) throw salesError;
@@ -185,7 +189,9 @@ async function processBusiness(admin: SupabaseClient, businessId: string): Promi
           seller ? `Atendido por ${seller}` : null,
           sale.notes,
         ].filter(Boolean).join(' — '),
-        transactions: [{ kind: 'SALE', status: 'SUCCESS', gateway, amountSet: money(Number(sale.total)) }],
+        // Lo pagado con vale de tienda va como cobro aparte; el resto, con el método de la venta.
+        transactions: posSaleTransactions(Number(sale.total), Number(sale.voucher_amount ?? 0), gateway)
+          .map((t) => ({ kind: 'SALE', status: 'SUCCESS', gateway: t.gateway, amountSet: money(t.amount) })),
       };
       if (connection.default_location_gid) order.fulfillment = { locationId: connection.default_location_gid };
 

@@ -3,7 +3,9 @@
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { serviceClient, shopifyGraphql, ShopifyError } from '../_shared/shopify-client.ts';
-import { findRefundLine, refundAmountForReturn, shopifyTag } from '../_shared/shopify-core.ts';
+import {
+  findRefundLine, planRefundTransactions, refundAmountForReturn, shopifyTag, type ShopifyOrderTransaction,
+} from '../_shared/shopify-core.ts';
 import { consumeTicket, hasTicket } from '../_shared/scheduled-ticket.ts';
 import { loadLevelsFor } from '../_shared/shopify-levels.ts';
 import { levelPages } from '../_shared/shopify-levels-db.ts';
@@ -23,7 +25,7 @@ const ORDER_QUERY = `
     order(id: $id) {
       id
       lineItems(first: 100) { nodes { id title quantity variant { id } } }
-      transactions(first: 20) { id kind status gateway }
+      transactions(first: 50) { id kind status gateway amountSet { shopMoney { amount } } parentTransaction { id } }
     }
   }
 `;
@@ -104,7 +106,7 @@ async function processBusiness(admin: SupabaseClient, businessId: string): Promi
         order: {
           id: string;
           lineItems: { nodes: { id: string; title: string; quantity: number; variant: { id: string } | null }[] };
-          transactions: { id: string; kind: string; status: string; gateway: string }[];
+          transactions: ShopifyOrderTransaction[];
         } | null;
       }>(ORDER_QUERY, { id: orderGid }, { requiredScopes: ['read_orders'] });
       if (!data.order) throw new Error('El pedido ya no existe en Shopify');
@@ -140,7 +142,6 @@ async function processBusiness(admin: SupabaseClient, businessId: string): Promi
         ? ((await admin.rpc('employee_display_name', { _employee_id: ret.seller_employee_id })).data as string | null)
         : null;
 
-      const parent = data.order.transactions.find((t) => ['SALE', 'CAPTURE'].includes(t.kind) && t.status === 'SUCCESS');
       const input: Record<string, unknown> = {
         orderId: orderGid,
         note: [
@@ -151,11 +152,12 @@ async function processBusiness(admin: SupabaseClient, businessId: string): Promi
         notify: false,
         refundLineItems,
       };
-      if (parent && amount > 0) {
-        input.transactions = [{
-          orderId: orderGid, parentId: parent.id, kind: 'REFUND', gateway: parent.gateway,
-          amount: amount.toFixed(2),
-        }];
+      // Reparte el importe entre los cobros del pedido (p. ej. tarjeta y vale de tienda).
+      const plan = amount > 0 ? planRefundTransactions(data.order.transactions, amount) : [];
+      if (plan.length) {
+        input.transactions = plan.map((t) => ({
+          orderId: orderGid, parentId: t.parentId, kind: 'REFUND', gateway: t.gateway, amount: t.amount.toFixed(2),
+        }));
       }
 
       const result = await shopifyGraphql<{

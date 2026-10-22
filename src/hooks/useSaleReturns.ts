@@ -36,6 +36,8 @@ export function refundTicketDoc(
     created_at: string;
     sales: { sale_number: string } | null;
     sale_return_items: { product_name: string; quantity: number | string; unit_price: number | string; total: number | string | null }[];
+    /** Vale creado con la devolución (reembolso «Vale de tienda»). */
+    store_vouchers?: { code: string; initial_amount: number | string; expires_at: string | null }[] | null;
   },
   taxRate: number,
   cashier: string | null,
@@ -50,6 +52,13 @@ export function refundTicketDoc(
     paymentMethod: row.refund_method ?? undefined,
     notes: row.reason,
     cashier,
+    voucherIssued: row.store_vouchers?.[0]
+      ? {
+          code: row.store_vouchers[0].code,
+          amount: Number(row.store_vouchers[0].initial_amount),
+          expiresAt: row.store_vouchers[0].expires_at ? new Date(row.store_vouchers[0].expires_at) : null,
+        }
+      : null,
     lines: row.sale_return_items.map((i) => {
       const quantity = Number(i.quantity);
       const total = i.total != null ? Number(i.total) : quantity * Number(i.unit_price);
@@ -152,7 +161,7 @@ export function useSaleReturns() {
     async (returnId: string, taxRate: number): Promise<TicketDoc | null> => {
       const { data, error } = await supabase
         .from('sale_returns')
-        .select('return_number, refund_method, reason, total, created_at, seller_employee_id, sales(sale_number), sale_return_items(product_name, quantity, unit_price, total)')
+        .select('return_number, refund_method, reason, total, created_at, seller_employee_id, sales(sale_number), sale_return_items(product_name, quantity, unit_price, total), store_vouchers(code, initial_amount, expires_at)')
         .eq('id', returnId)
         .maybeSingle();
       if (error || !data) {
@@ -168,6 +177,7 @@ export function useSaleReturns() {
         seller_employee_id: string | null;
         sales: { sale_number: string } | null;
         sale_return_items: { product_name: string; quantity: number | string; unit_price: number | string; total: number | string | null }[];
+        store_vouchers: { code: string; initial_amount: number | string; expires_at: string | null }[] | null;
       };
       let cashier: string | null = null;
       if (row.seller_employee_id) {

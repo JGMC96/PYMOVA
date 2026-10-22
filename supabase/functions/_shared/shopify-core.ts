@@ -964,3 +964,67 @@ export function posOrderSearchQuery(saleId: string): string {
   if (!/^[0-9a-f-]{36}$/i.test(saleId)) throw new Error('Identificador de venta no válido');
   return `source_identifier:${saleId}`;
 }
+
+/** Pasarela con la que se apunta en Shopify lo pagado con vale de tienda. */
+export const VOUCHER_GATEWAY = 'Vale de tienda';
+
+/**
+ * Cobros del pedido de una venta de tienda: lo pagado con vale (si hay) y el resto con el
+ * método de la venta. Sin importes a 0. El vale nunca pasa del total (lo exige la venta).
+ */
+export function posSaleTransactions(
+  total: number,
+  voucherAmount: number,
+  gateway: string,
+): { gateway: string; amount: number }[] {
+  const t = Math.round(Number(total) * 100) / 100;
+  const v = Math.min(Math.max(Math.round(Number(voucherAmount || 0) * 100) / 100, 0), t);
+  const rest = Math.round((t - v) * 100) / 100;
+  return [
+    ...(v > 0 ? [{ gateway: VOUCHER_GATEWAY, amount: v }] : []),
+    ...(rest > 0 || v === 0 ? [{ gateway, amount: rest }] : []),
+  ];
+}
+
+export interface ShopifyOrderTransaction {
+  id: string;
+  kind: string;
+  status: string;
+  gateway: string;
+  amountSet?: { shopMoney: { amount: string } } | null;
+  parentTransaction?: { id: string } | null;
+}
+
+/**
+ * Reparte un reembolso entre los cobros del pedido, sin pasar de lo que le queda a cada uno
+ * (lo cobrado menos sus reembolsos). Primero el dinero (tarjeta, efectivo…) y al final el vale.
+ * Si no llega, se reparte lo que se puede.
+ */
+export function planRefundTransactions(
+  transactions: ShopifyOrderTransaction[],
+  amount: number,
+): { parentId: string; gateway: string; amount: number }[] {
+  const cents = (s: string | number | undefined | null) => Math.round(Number(s ?? 0) * 100);
+  const ok = transactions.filter((t) => t.status === 'SUCCESS');
+  const refunded = new Map<string, number>();
+  for (const t of ok) {
+    if (t.kind === 'REFUND' && t.parentTransaction?.id) {
+      refunded.set(t.parentTransaction.id, (refunded.get(t.parentTransaction.id) ?? 0) + cents(t.amountSet?.shopMoney.amount));
+    }
+  }
+  const parents = ok
+    .filter((t) => t.kind === 'SALE' || t.kind === 'CAPTURE')
+    .sort((a, b) => Number(a.gateway === VOUCHER_GATEWAY) - Number(b.gateway === VOUCHER_GATEWAY));
+  let left = cents(amount);
+  const plan: { parentId: string; gateway: string; amount: number }[] = [];
+  for (const p of parents) {
+    if (left <= 0) break;
+    const available = cents(p.amountSet?.shopMoney.amount) - (refunded.get(p.id) ?? 0);
+    const take = Math.min(available, left);
+    if (take > 0) {
+      plan.push({ parentId: p.id, gateway: p.gateway, amount: take / 100 });
+      left -= take;
+    }
+  }
+  return plan;
+}

@@ -64,6 +64,9 @@ export interface CreateSaleData {
   seller_session_id?: string | null;
   /** Autorización de un encargado para un descuento por encima del tope (0030). */
   authorization_id?: string | null;
+  /** Vale de tienda con el que se paga parte o todo el total (0039). */
+  voucher_code?: string | null;
+  voucher_amount?: number | null;
 }
 
 
@@ -144,6 +147,8 @@ export function useRetailSales() {
         // Parámetro nuevo de la 0027: `as never` hasta que se regenere types.ts.
         _seller_session_id: data.seller_session_id ?? null,
         _authorization_id: data.authorization_id ?? null,
+        _voucher_code: data.voucher_code ?? null,
+        _voucher_amount: data.voucher_amount ?? null,
       } as never);
 
       if (error) throw error;

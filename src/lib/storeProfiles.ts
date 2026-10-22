@@ -128,5 +128,6 @@ export const PAYMENT_LABELS: Record<string, string> = {
   cash: 'Efectivo',
   card: 'Tarjeta',
   transfer: 'Transferencia',
+  store_credit: 'Vale',
   other: 'Otro',
 };

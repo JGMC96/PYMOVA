@@ -120,6 +120,8 @@ export function SalesHistory() {
         return 'Efectivo';
       case 'transfer':
         return 'Transferencia';
+      case 'store_credit':
+        return 'Vale';
       default:
         return method || 'N/A';
     }

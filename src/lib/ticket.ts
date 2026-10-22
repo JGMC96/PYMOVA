@@ -77,6 +77,10 @@ export interface TicketDoc {
   originalNumber?: string | null;
   /** Cliente de la venta, si se eligió en el TPV. */
   clientName?: string | null;
+  /** Venta: parte pagada con un vale de tienda (el resto, con paymentMethod). */
+  voucherPaid?: { code: string; amount: number; balanceLeft?: number | null } | null;
+  /** Abono: vale de tienda creado con lo devuelto. */
+  voucherIssued?: { code: string; amount: number; expiresAt: Date | null } | null;
 }
 
 export const paymentLabels: Record<string, string> = {
@@ -101,6 +105,19 @@ const ticketBarcode = (number: string) => {
   } catch {
     return '';
   }
+};
+
+/** Vale creado en un abono: código con su código de barras, importe y caducidad. */
+const voucherBlock = (v: NonNullable<TicketDoc['voucherIssued']>) => {
+  const until = v.expiresAt
+    ? v.expiresAt.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    : null;
+  return `<hr/><div class="center bold">VALE DE TIENDA</div>
+  ${ticketBarcode(v.code)}
+  <div class="center ref">${esc(v.code)}</div>
+  <div class="row"><span>Importe</span><span class="bold">${eur(v.amount)}</span></div>
+  ${until ? `<div class="row"><span>Válido hasta</span><span>${until}</span></div>` : ''}
+  <div class="center small">Canjeable solo en tienda</div>`;
 };
 
 const multiline = (s?: string | null) =>
@@ -154,10 +171,13 @@ export function renderTicketBody(biz: TicketBusiness, doc: TicketDoc): string {
   <div class="row"><span>IVA ${doc.taxRate}%</span><span>${eur(sign * tax)}</span></div>
   ${tip ? `<div class="row"><span>Propina</span><span>${eur(tip)}</span></div>` : ''}
   <div class="row xl bold total"><span>TOTAL</span><span>${eur(sign * grand)}</span></div>
-  ${doc.paymentMethod ? `<div class="row"><span>${doc.kind === 'refund' ? 'Reembolso' : 'Pago'}</span><span>${esc(paymentLabels[doc.paymentMethod] ?? doc.paymentMethod)}</span></div>` : ''}
+  ${doc.voucherPaid ? `<div class="row"><span>Vale ${esc(doc.voucherPaid.code)}</span><span>${eur(doc.voucherPaid.amount)}</span></div>` : ''}
+  ${doc.voucherPaid && doc.voucherPaid.balanceLeft != null ? `<div class="row muted"><span>&nbsp;&nbsp;Saldo que queda</span><span>${eur(doc.voucherPaid.balanceLeft)}</span></div>` : ''}
+  ${doc.paymentMethod && !(doc.voucherPaid && doc.paymentMethod === 'store_credit') ? `<div class="row"><span>${doc.kind === 'refund' ? 'Reembolso' : 'Pago'}</span><span>${esc(paymentLabels[doc.paymentMethod] ?? doc.paymentMethod)}</span></div>` : ''}
   ${doc.cashReceived != null ? `<div class="row"><span>Entregado</span><span>${eur(doc.cashReceived)}</span></div>` : ''}
   ${doc.change != null && doc.change > 0 ? `<div class="row"><span>Cambio</span><span>${eur(doc.change)}</span></div>` : ''}
   <div class="muted small">IVA incluido</div>
+  ${doc.voucherIssued ? voucherBlock(doc.voucherIssued) : ''}
   ${doc.notes ? `<hr/><div class="small">${multiline(doc.notes)}</div>` : ''}
   <hr/>
   ${ticketBarcode(doc.number)}
