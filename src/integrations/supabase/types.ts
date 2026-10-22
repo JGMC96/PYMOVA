@@ -2488,6 +2488,8 @@ export type Database = {
           tax: number
           tip: number
           total: number
+          voucher_amount: number
+          voucher_id: string | null
         }
         Insert: {
           authorized_by_employee_id?: string | null
@@ -2514,6 +2516,8 @@ export type Database = {
           tax?: number
           tip?: number
           total?: number
+          voucher_amount?: number
+          voucher_id?: string | null
         }
         Update: {
           authorized_by_employee_id?: string | null
@@ -2540,6 +2544,8 @@ export type Database = {
           tax?: number
           tip?: number
           total?: number
+          voucher_amount?: number
+          voucher_id?: string | null
         }
         Relationships: [
           {
@@ -2575,6 +2581,13 @@ export type Database = {
             columns: ["seller_employee_id"]
             isOneToOne: false
             referencedRelation: "hr_employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_voucher_id_fkey"
+            columns: ["voucher_id"]
+            isOneToOne: false
+            referencedRelation: "store_vouchers"
             referencedColumns: ["id"]
           },
         ]
@@ -3072,6 +3085,162 @@ export type Database = {
           },
         ]
       }
+      store_voucher_movements: {
+        Row: {
+          amount: number
+          balance_after: number
+          business_id: string
+          created_at: string
+          created_by: string | null
+          employee_id: string | null
+          id: string
+          kind: string
+          note: string | null
+          return_id: string | null
+          sale_id: string | null
+          voucher_id: string
+        }
+        Insert: {
+          amount: number
+          balance_after: number
+          business_id: string
+          created_at?: string
+          created_by?: string | null
+          employee_id?: string | null
+          id?: string
+          kind: string
+          note?: string | null
+          return_id?: string | null
+          sale_id?: string | null
+          voucher_id: string
+        }
+        Update: {
+          amount?: number
+          balance_after?: number
+          business_id?: string
+          created_at?: string
+          created_by?: string | null
+          employee_id?: string | null
+          id?: string
+          kind?: string
+          note?: string | null
+          return_id?: string | null
+          sale_id?: string | null
+          voucher_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_voucher_movements_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "store_voucher_movements_return_id_fkey"
+            columns: ["return_id"]
+            isOneToOne: false
+            referencedRelation: "sale_returns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "store_voucher_movements_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "store_voucher_movements_voucher_id_fkey"
+            columns: ["voucher_id"]
+            isOneToOne: false
+            referencedRelation: "store_vouchers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      store_vouchers: {
+        Row: {
+          balance: number
+          business_id: string
+          client_id: string | null
+          code: string
+          created_at: string
+          created_by: string | null
+          created_by_employee_id: string | null
+          expires_at: string | null
+          id: string
+          initial_amount: number
+          origin: string
+          source_return_id: string | null
+          status: string
+          updated_at: string
+          void_reason: string | null
+          voided_at: string | null
+          voided_by: string | null
+        }
+        Insert: {
+          balance: number
+          business_id: string
+          client_id?: string | null
+          code: string
+          created_at?: string
+          created_by?: string | null
+          created_by_employee_id?: string | null
+          expires_at?: string | null
+          id?: string
+          initial_amount: number
+          origin?: string
+          source_return_id?: string | null
+          status?: string
+          updated_at?: string
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by?: string | null
+        }
+        Update: {
+          balance?: number
+          business_id?: string
+          client_id?: string | null
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          created_by_employee_id?: string | null
+          expires_at?: string | null
+          id?: string
+          initial_amount?: number
+          origin?: string
+          source_return_id?: string | null
+          status?: string
+          updated_at?: string
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_vouchers_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "store_vouchers_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "store_vouchers_source_return_id_fkey"
+            columns: ["source_return_id"]
+            isOneToOne: false
+            referencedRelation: "sale_returns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subscriptions: {
         Row: {
           business_id: string
@@ -3448,6 +3617,8 @@ export type Database = {
           _tax?: number
           _tip?: number
           _total?: number
+          _voucher_amount?: number
+          _voucher_code?: string
         }
         Returns: {
           sale_id: string
@@ -3503,6 +3674,10 @@ export type Database = {
         Returns: string
       }
       generate_sale_number: { Args: { _business_id: string }; Returns: string }
+      generate_store_voucher_code: {
+        Args: { _business_id: string }
+        Returns: string
+      }
       get_active_business: { Args: never; Returns: string }
       get_business_team: {
         Args: { _business_id: string }
@@ -3708,6 +3883,18 @@ export type Database = {
           record_id: string
           reference: string
           state: string
+        }[]
+      }
+      get_store_voucher: {
+        Args: { _business_id: string; _code: string }
+        Returns: {
+          balance: number
+          code: string
+          expired: boolean
+          expires_at: string
+          id: string
+          initial_amount: number
+          status: string
         }[]
       }
       get_user_role_in_business: {
@@ -3996,6 +4183,10 @@ export type Database = {
           locked_seconds: number
           ok: boolean
         }[]
+      }
+      void_store_voucher: {
+        Args: { _business_id: string; _reason: string; _voucher_id: string }
+        Returns: undefined
       }
     }
     Enums: {

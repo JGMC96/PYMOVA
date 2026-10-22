@@ -274,6 +274,13 @@
       "when": 1792613562302,
       "tag": "0038_tpv_varios",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1792663377449,
+      "tag": "0039_vales_tienda",
+      "breakpoints": true
     }
   ]
 }
