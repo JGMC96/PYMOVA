@@ -34,6 +34,7 @@ import { DEFAULT_TAX_RATE, taxBreakdown } from '@/lib/tax';
 import { cashChange, parseCash, quickCashAmounts } from '@/lib/cobro';
 import { CashRegisterStaleBanner } from './CashRegisterStaleBanner';
 import { VariosDialog } from './VariosDialog';
+import { matchesVarios } from '@/lib/varios';
 
 const PAYMENT_ICONS: Record<string, typeof Banknote> = {
   cash: Banknote,
@@ -93,6 +94,8 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
     () => (searchQuery.trim() ? filteredProducts.slice(0, 8) : []),
     [filteredProducts, searchQuery]
   );
+  // «Varios» no es un producto del catálogo: al buscarlo, sale como primera opción.
+  const showVariosResult = matchesVarios(searchQuery);
 
   useEffect(() => {
     if (!profile.paymentMethods.includes(selectedPayment)) {
@@ -342,8 +345,25 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
             </button>
           )}
 
-          {searchResults.length > 0 && (
+          {(searchResults.length > 0 || showVariosResult) && (
             <div className="absolute z-30 mt-1 w-full rounded-lg border bg-popover shadow-lg overflow-hidden">
+              {showVariosResult && (
+                <button
+                  onClick={() => {
+                    setSearchQuery('');
+                    setVariosOpen(true);
+                  }}
+                  className="w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-accent/60 transition-colors duration-100 ease-smooth"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate flex items-center gap-1.5">
+                      <PenLine className="w-3.5 h-3.5" />
+                      Varios
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">Línea libre: escribe la descripción y el precio</p>
+                  </div>
+                </button>
+              )}
               {searchResults.map((product) => (
                 <button
                   key={product.id}
