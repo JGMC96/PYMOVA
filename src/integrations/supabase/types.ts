@@ -204,12 +204,14 @@ export type Database = {
         Row: {
           business_id: string
           created_at: string
+          ean_prefix: string | null
           id: string
           invoice_prefix: string | null
           next_invoice_number: number
           next_online_order_number: number
           next_return_number: number
           next_sale_number: number
+          sku_pattern: string | null
           tax_rate: number | null
           ticket_address: string | null
           ticket_bold_items: boolean
@@ -229,12 +231,14 @@ export type Database = {
         Insert: {
           business_id: string
           created_at?: string
+          ean_prefix?: string | null
           id?: string
           invoice_prefix?: string | null
           next_invoice_number?: number
           next_online_order_number?: number
           next_return_number?: number
           next_sale_number?: number
+          sku_pattern?: string | null
           tax_rate?: number | null
           ticket_address?: string | null
           ticket_bold_items?: boolean
@@ -254,12 +258,14 @@ export type Database = {
         Update: {
           business_id?: string
           created_at?: string
+          ean_prefix?: string | null
           id?: string
           invoice_prefix?: string | null
           next_invoice_number?: number
           next_online_order_number?: number
           next_return_number?: number
           next_sale_number?: number
+          sku_pattern?: string | null
           tax_rate?: number | null
           ticket_address?: string | null
           ticket_bold_items?: boolean
@@ -419,6 +425,51 @@ export type Database = {
             columns: ["opened_by_employee_id"]
             isOneToOne: false
             referencedRelation: "hr_employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      catalog_code_reservations: {
+        Row: {
+          business_id: string
+          code: string
+          created_at: string
+          created_by: string | null
+          id: string
+          kind: string
+          variant_id: string | null
+        }
+        Insert: {
+          business_id: string
+          code: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind: string
+          variant_id?: string | null
+        }
+        Update: {
+          business_id?: string
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind?: string
+          variant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "catalog_code_reservations_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "catalog_code_reservations_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_variants"
             referencedColumns: ["id"]
           },
         ]
@@ -3729,6 +3780,15 @@ export type Database = {
         Args: { _business_id: string }
         Returns: boolean
       }
+      catalog_codes_status: {
+        Args: { _business_id: string }
+        Returns: {
+          can_generate: boolean
+          ean_prefix: string
+          locked: boolean
+          sku_pattern: string
+        }[]
+      }
       change_own_pin: {
         Args: {
           _business_id: string
@@ -3968,6 +4028,7 @@ export type Database = {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
       }
+      ean13_check_digit: { Args: { _first12: string }; Returns: number }
       email_queue_dispatch: { Args: never; Returns: undefined }
       employee_display_name: { Args: { _employee_id: string }; Returns: string }
       employee_effective_permissions: {
@@ -4285,6 +4346,10 @@ export type Database = {
         }
         Returns: number
       }
+      next_barcodes: {
+        Args: { _business_id: string; _count: number; _reserve?: boolean }
+        Returns: string[]
+      }
       next_document_number: {
         Args: { _business_id: string; _kind: string }
         Returns: number
@@ -4403,6 +4468,16 @@ export type Database = {
           _start_time: string
         }
         Returns: string
+      }
+      reserve_catalog_codes: {
+        Args: { _business_id: string; _items: Json; _product_id: string }
+        Returns: {
+          barcode: string
+          product_external_id: string
+          sku: string
+          variant_external_id: string
+          variant_id: string
+        }[]
       }
       retire_member: {
         Args: { _business_id: string; _user_id: string }
