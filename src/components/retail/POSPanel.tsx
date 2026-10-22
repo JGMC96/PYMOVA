@@ -37,6 +37,7 @@ import { VariosDialog } from './VariosDialog';
 import { VoucherDialog, type AppliedVoucher } from './VoucherDialog';
 import { voucherApplied } from '@/lib/vales';
 import { matchesVarios } from '@/lib/varios';
+import { matchesSearch } from '@/lib/search';
 
 const PAYMENT_ICONS: Record<string, typeof Banknote> = {
   cash: Banknote,
@@ -82,14 +83,10 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
   }, [products, profile.categories]);
 
   const filteredProducts = useMemo(() => {
-    const query = searchQuery.toLowerCase().trim();
     return products.filter((p) => {
       const matchesCategory = !categoryFilter || p.category === categoryFilter;
-      const matchesQuery =
-        !query ||
-        p.name.toLowerCase().includes(query) ||
-        p.category?.toLowerCase().includes(query) ||
-        p.sku?.toLowerCase().includes(query);
+      // Sin tildes ni mayúsculas y palabra a palabra («paris» encuentra «París»).
+      const matchesQuery = matchesSearch(searchQuery, [p.name, p.category, p.sku]);
       return matchesCategory && matchesQuery;
     });
   }, [products, searchQuery, categoryFilter]);

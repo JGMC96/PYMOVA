@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, Printer, ScanLine, Search, Trash2 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { matchesSearch } from '@/lib/search';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -78,10 +79,9 @@ export function LabelsPanel() {
   }, [templates, selectedId]);
 
   const results = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return [];
+    if (!query.trim()) return [];
     return products
-      .filter((p) => p.name.toLowerCase().includes(q) || p.sku?.toLowerCase().includes(q) || p.variants.some((v) => v.sku?.toLowerCase().includes(q)))
+      .filter((p) => matchesSearch(query, [p.name, p.sku, ...p.variants.map((v) => v.sku)]))
       .slice(0, 8);
   }, [products, query]);
 
