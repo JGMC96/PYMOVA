@@ -3871,6 +3871,24 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      client_id_for_email: {
+        Args: { _business_id: string; _email: string }
+        Returns: string
+      }
+      client_purchases: {
+        Args: { _business_id: string }
+        Returns: {
+          channel: string
+          client_id: string
+          created_at: string
+          net: number
+          number: string
+          payment_method: string
+          purchase_id: string
+          status: string
+          total: number
+        }[]
+      }
       clock_action: {
         Args: {
           _business_id: string
@@ -4085,6 +4103,10 @@ export type Database = {
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }[]
+      }
+      get_client_history: {
+        Args: { _business_id: string; _client_id: string }
+        Returns: Json
       }
       get_connected_sellers: {
         Args: { _business_id: string }
@@ -4333,6 +4355,30 @@ export type Database = {
       is_super_admin: { Args: never; Returns: boolean }
       issue_scheduled_job_ticket: { Args: { _action: string }; Returns: string }
       leave_business: { Args: { _business_id: string }; Returns: undefined }
+      list_clients_with_stats: {
+        Args: {
+          _business_id: string
+          _include_inactive?: boolean
+          _limit?: number
+          _offset?: number
+          _search?: string
+          _sort?: string
+        }
+        Returns: {
+          company: string
+          created_at: string
+          email: string
+          id: string
+          is_active: boolean
+          last_purchase_at: string
+          name: string
+          notes: string
+          phone: string
+          purchases: number
+          spent: number
+          total_count: number
+        }[]
+      }
       member_can: {
         Args: { _business_id: string; _perm: string }
         Returns: boolean

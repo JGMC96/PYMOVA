@@ -309,6 +309,13 @@
       "when": 1792684925079,
       "tag": "0043_codigos_catalogo",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1792692747255,
+      "tag": "0044_ficha_clientes",
+      "breakpoints": true
     }
   ]
 }
