@@ -9,6 +9,29 @@ export interface ShopifyConnection {
   orders_sync_enabled: boolean;
   webhooks_registered_at: string | null;
   last_orders_sync_at: string | null;
+  /** 0045: cuándo se importó el historial completo de pedidos. */
+  orders_history_imported_at?: string | null;
+}
+
+/** Importación del historial completo (por tandas). */
+export interface HistoryImportState {
+  running: boolean;
+  processed: number;
+  total: number | null;
+  created: number;
+  updated: number;
+  failed: number;
+  customersCreated: number;
+}
+
+interface HistoryChunk {
+  total: number | null;
+  created: number;
+  updated: number;
+  failed: number;
+  customers_created: number;
+  cursor: string | null;
+  done: boolean;
 }
 
 interface OrdersSyncSummary {
@@ -37,6 +60,8 @@ export function useShopifyOrdersSync() {
   const [isRegistering, setIsRegistering] = useState(false);
   const [lastSummary, setLastSummary] = useState<OrdersSyncSummary | null>(null);
   const requestIdRef = useRef(0);
+  const [history, setHistory] = useState<HistoryImportState | null>(null);
+  const cancelHistory = useRef(false);
 
   const refresh = useCallback(async () => {
     if (!activeBusinessId) {
@@ -92,6 +117,61 @@ export function useShopifyOrdersSync() {
     [activeBusinessId, refresh],
   );
 
+  // Historial completo de pedidos web, tanda a tanda (unos 200 pedidos por llamada).
+  const importHistory = useCallback(async () => {
+    if (!activeBusinessId) return;
+    cancelHistory.current = false;
+    let state: HistoryImportState = {
+      running: true, processed: 0, total: null, created: 0, updated: 0, failed: 0, customersCreated: 0,
+    };
+    setHistory(state);
+    let cursor: string | null = null;
+    try {
+      for (;;) {
+        const chunk: HistoryChunk = await invoke<HistoryChunk>({
+          action: 'import-history',
+          business_id: activeBusinessId,
+          cursor,
+          pages: 4,
+        });
+        state = {
+          ...state,
+          total: chunk.total ?? state.total,
+          created: state.created + chunk.created,
+          updated: state.updated + chunk.updated,
+          failed: state.failed + chunk.failed,
+          customersCreated: state.customersCreated + chunk.customers_created,
+          processed: state.processed + chunk.created + chunk.updated + chunk.failed,
+        };
+        setHistory(state);
+        if (chunk.done || !chunk.cursor) break;
+        if (cancelHistory.current) {
+          toast.info('Importación detenida. Puedes volver a lanzarla cuando quieras: no duplica pedidos.');
+          break;
+        }
+        cursor = chunk.cursor;
+      }
+      if (!cancelHistory.current) {
+        toast.success(
+          `Historial importado: ${state.created} pedidos nuevos y ${state.updated} actualizados${
+            state.failed ? `, ${state.failed} con error` : ''
+          }`,
+        );
+      }
+      await refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'No se pudo importar el historial', {
+        description: 'Lo importado se queda. Vuelve a lanzarla para seguir: no duplica pedidos.',
+      });
+    } finally {
+      setHistory((h) => (h ? { ...h, running: false } : h));
+    }
+  }, [activeBusinessId, refresh]);
+
+  const stopHistory = useCallback(() => {
+    cancelHistory.current = true;
+  }, []);
+
   const diagnose = useCallback(async () => {
     if (!activeBusinessId) return null;
     try {
@@ -137,6 +217,9 @@ export function useShopifyOrdersSync() {
     lastSummary,
     refresh,
     syncOrders,
+    history,
+    importHistory,
+    stopHistory,
     diagnose,
     registerWebhooks,
   };
