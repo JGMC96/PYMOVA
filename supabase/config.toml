@@ -40,3 +40,7 @@ verify_jwt = false
 # Stockagile (piloto TUILUS): solo usuarios, con auth.getUser().
 [functions.stockagile]
 verify_jwt = false
+
+# Códigos para productos nuevos: solo usuarios, con auth.getUser().
+[functions.catalog-codes]
+verify_jwt = false
