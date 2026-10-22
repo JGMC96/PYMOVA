@@ -11,10 +11,18 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { supabase } from '@/integrations/supabase/client';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { SaleReprintDialog } from '@/components/retail/SaleReprintDialog';
-import type { ClientWithStats } from '@/hooks/useClientList';
 import {
   CHANNEL_LABELS, eur, isVoidPurchase, purchaseStatusLabel, usualSizes, type ClientHistory,
 } from '@/lib/clientHistory';
+
+/** Lo mínimo para abrir la ficha (sirve la fila de Clientes o la clienta del TPV). */
+export interface ClientCard {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  notes?: string | null;
+}
 
 const day = (iso: string | null) => (iso ? format(new Date(iso), 'd MMM yyyy', { locale: es }) : '—');
 
@@ -27,7 +35,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function ClientDetailSheet({ client, onClose }: { client: ClientWithStats | null; onClose: () => void }) {
+export function ClientDetailSheet({ client, onClose }: { client: ClientCard | null; onClose: () => void }) {
   const { activeBusinessId } = useBusiness();
   const [history, setHistory] = useState<ClientHistory | null>(null);
   const [reprintId, setReprintId] = useState<string | null>(null);

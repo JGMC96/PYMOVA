@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { canEmailReceipt, usePosClients, type PosClient } from '@/hooks/usePosClients';
 import { cn } from '@/lib/utils';
+import { PosClientSummary } from './PosClientSummary';
 
 interface ClientSearchProps {
   onSelected: (client: PosClient) => void;
@@ -156,7 +157,8 @@ export function PosClientPicker({ value, onChange, className }: PosClientPickerP
   return (
     <>
       {value ? (
-        <div className={cn('flex items-center gap-2 rounded-md border px-3 py-2', className)}>
+        <div className={className}>
+        <div className="flex items-center gap-2 rounded-md border px-3 py-2">
           <UserRound className="w-4 h-4 text-muted-foreground shrink-0" />
           <div className="min-w-0 flex-1">
             <div className="text-sm font-medium truncate">{value.name}</div>
@@ -169,10 +171,12 @@ export function PosClientPicker({ value, onChange, className }: PosClientPickerP
             <X className="w-4 h-4" />
           </Button>
         </div>
+        <PosClientSummary client={value} />
+        </div>
       ) : (
         <Button variant="outline" size="sm" className={cn('w-full justify-start', className)} onClick={() => setOpen(true)}>
           <UserRound className="w-4 h-4 mr-2" />
-          Añadir cliente
+          Añadir cliente (historial y talla)
         </Button>
       )}
 
