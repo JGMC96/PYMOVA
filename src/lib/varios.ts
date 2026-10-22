@@ -49,3 +49,9 @@ export function variosCartItem(
     total: round2(v.price * v.quantity),
   };
 }
+
+/** ¿Lo escrito en el buscador del TPV es «Varios»? (sin tildes ni mayúsculas, desde 2 letras) */
+export function matchesVarios(query: string): boolean {
+  const q = query.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
+  return q.length >= 2 && ('varios'.startsWith(q) || q.startsWith('varios'));
+}

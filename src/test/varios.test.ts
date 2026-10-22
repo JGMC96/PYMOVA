@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseVarios, variosCartItem } from '@/lib/varios';
+import { matchesVarios, parseVarios, variosCartItem } from '@/lib/varios';
 
 describe('Varios en el TPV', () => {
   it('acepta descripción, precio con coma y unidades', () => {
@@ -35,5 +35,17 @@ describe('Varios en el TPV', () => {
     const a = variosCartItem({ name: 'Bolso', price: 10, quantity: 1 });
     const b = variosCartItem({ name: 'Bolso', price: 10, quantity: 1 });
     expect(a.product_id).not.toBe(b.product_id);
+  });
+});
+
+describe('buscar «Varios» en el TPV', () => {
+  it('lo encuentra desde 2 letras, sin tildes ni mayúsculas', () => {
+    expect(matchesVarios('va')).toBe(true);
+    expect(matchesVarios('VARIOS')).toBe(true);
+    expect(matchesVarios(' Vários ')).toBe(true);
+    expect(matchesVarios('varios bolso')).toBe(true);
+    expect(matchesVarios('v')).toBe(false);
+    expect(matchesVarios('bolonia')).toBe(false);
+    expect(matchesVarios('')).toBe(false);
   });
 });
