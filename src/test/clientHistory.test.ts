@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { eur, isVoidPurchase, purchaseStatusLabel, usualSizes } from '@/lib/clientHistory';
+import { eur, isVoidPurchase, posClientSummaryText, purchaseStatusLabel, usualSizes } from '@/lib/clientHistory';
 
 describe('ficha de clienta', () => {
   it('etiqueta de estado', () => {
@@ -19,6 +19,12 @@ describe('ficha de clienta', () => {
     expect(usualSizes([])).toEqual([]);
     expect(usualSizes([{ size: '38', units: 3 }, { size: '39', units: 1 }])).toEqual(['38']);
     expect(usualSizes([{ size: '38', units: 2 }, { size: '39', units: 2 }])).toEqual(['38', '39']);
+  });
+
+  it('línea corta del TPV', () => {
+    expect(posClientSummaryText(0, 0, [], null)).toBe('Primera compra');
+    expect(posClientSummaryText(3, 369, ['38'], '20 oct 2026')).toBe('3 compras · 369,00 € · talla 38 · última 20 oct 2026');
+    expect(posClientSummaryText(1, 50, ['38', '39'], null)).toBe('1 compra · 50,00 € · talla 38/39');
   });
 
   it('importes en euros', () => {

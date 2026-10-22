@@ -71,5 +71,16 @@ export function usualSizes(sizes: ClientHistory['sizes']): string[] {
   return sizes.filter((s) => Number(s.units) === top).map((s) => s.size);
 }
 
+/** Línea corta del TPV: «3 compras · 369,00 € · talla 38 · última 20 oct 2026». */
+export function posClientSummaryText(purchases: number, spent: number, sizes: string[], lastPurchase: string | null): string {
+  if (!purchases) return 'Primera compra';
+  return [
+    `${purchases} ${purchases === 1 ? 'compra' : 'compras'}`,
+    eur(spent),
+    sizes.length ? `talla ${sizes.join('/')}` : null,
+    lastPurchase ? `última ${lastPurchase}` : null,
+  ].filter(Boolean).join(' · ');
+}
+
 export const eur = (n: number | string | null | undefined) =>
   `${Number(n ?? 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
