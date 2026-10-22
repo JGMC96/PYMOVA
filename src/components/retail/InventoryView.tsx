@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Package, RefreshCw, Edit2, Layers, History } from 'lucide-react';
+import { Package, RefreshCw, Edit2, Layers, History, Tag } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -17,6 +17,8 @@ import { VariantsDialog } from './VariantsDialog';
 import { StockMovementsDialog } from './StockMovementsDialog';
 import { StockAdjustDialog, type StockAdjustTarget } from './StockAdjustDialog';
 import { useMyPermissions } from '@/hooks/useMyPermissions';
+import { LabelPrintDialog } from '@/components/labels/LabelPrintDialog';
+import { labelDataFor } from '@/lib/labels';
 
 export function InventoryView() {
   const { products, isLoading, isUpdating, toggleTracking, refreshProducts } = useInventory();
@@ -25,6 +27,13 @@ export function InventoryView() {
   const [adjustTarget, setAdjustTarget] = useState<StockAdjustTarget | null>(null);
   const [variantProduct, setVariantProduct] = useState<ProductWithStock | null>(null);
   const [historyProduct, setHistoryProduct] = useState<ProductWithStock | null>(null);
+  const [labelsProduct, setLabelsProduct] = useState<ProductWithStock | null>(null);
+  // Una etiqueta de cada talla (las cantidades se cambian en Comercio › Etiquetas).
+  const labelItems = labelsProduct
+    ? labelsProduct.variants.length
+      ? labelsProduct.variants.filter((v) => v.is_active).map((v) => ({ data: labelDataFor(labelsProduct, v), quantity: 1 }))
+      : [{ data: labelDataFor(labelsProduct), quantity: 1 }]
+    : [];
 
 
   const handleTrackingChange = async (productId: string, checked: boolean) => {
@@ -142,6 +151,14 @@ export function InventoryView() {
                     >
                       <History className="w-4 h-4" />
                     </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setLabelsProduct(product)}
+                      title="Imprimir etiquetas (una por talla)"
+                    >
+                      <Tag className="w-4 h-4" />
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -162,6 +179,12 @@ export function InventoryView() {
       )}
 
       <StockMovementsDialog product={historyProduct} onClose={() => setHistoryProduct(null)} />
+      <LabelPrintDialog
+        open={labelsProduct !== null}
+        onOpenChange={(o) => !o && setLabelsProduct(null)}
+        title={`Etiquetas · ${labelsProduct?.name ?? ''}`}
+        items={labelItems}
+      />
       <StockAdjustDialog target={adjustTarget} onClose={() => setAdjustTarget(null)} onDone={refreshProducts} />
     </Card>
   );

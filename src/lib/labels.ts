@@ -283,3 +283,41 @@ export function labelDataFor(
     barcode: variant ? variant.barcode : product.barcode ?? null,
   };
 }
+
+/** Orden de impresión: como se añadieron, o por producto y talla (35 < 36 < … < 41). */
+export type LabelOrder = 'added' | 'product';
+
+export function sortLabelRows<T extends { data: LabelData }>(rows: T[], order: LabelOrder): T[] {
+  if (order === 'added') return rows;
+  const cmp = (a: string | null, b: string | null) => (a ?? '').localeCompare(b ?? '', 'es', { numeric: true, sensitivity: 'base' });
+  return [...rows].sort((a, b) => cmp(a.data.name, b.data.name) || cmp(a.data.size, b.data.size));
+}
+
+/** Etiqueta en la que empieza la siguiente impresión en la misma hoja (1 si se acaba justo). */
+export function nextStartPosition(start: number, printed: number, perPage: number): number {
+  if (perPage <= 1) return 1;
+  return ((Math.max(1, start) - 1 + Math.max(0, printed)) % perPage) + 1;
+}
+
+const START_KEY = 'pymova_label_start';
+
+/** Posición de inicio guardada en este ordenador para un diseño (hojas A4 empezadas). */
+export function loadStartPosition(templateKey: string): number {
+  try {
+    const raw = JSON.parse(localStorage.getItem(START_KEY) ?? '{}') as Record<string, number>;
+    const n = Math.floor(Number(raw[templateKey]));
+    return n >= 1 ? n : 1;
+  } catch {
+    return 1;
+  }
+}
+
+export function saveStartPosition(templateKey: string, position: number) {
+  try {
+    const raw = JSON.parse(localStorage.getItem(START_KEY) ?? '{}') as Record<string, number>;
+    raw[templateKey] = position;
+    localStorage.setItem(START_KEY, JSON.stringify(raw));
+  } catch {
+    // Sin almacenamiento local: se empieza en la 1.
+  }
+}

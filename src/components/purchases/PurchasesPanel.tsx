@@ -29,19 +29,21 @@ export function PurchasesPanel() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<PurchaseOrder | null | 'new'>(null);
   const [receiving, setReceiving] = useState<PurchaseOrder | null>(null);
-  const [labelsFor, setLabelsFor] = useState<PurchaseOrder | null>(null);
+  // Etiquetas de una compra: de todo lo recibido o solo de lo que acaba de llegar.
+  const [labelsFor, setLabelsFor] = useState<{ order: PurchaseOrder; only?: Record<string, number> } | null>(null);
   const { products } = useInventory();
 
   // Etiquetas de una compra: una por par recibido, con los datos actuales del catálogo.
   const labelItems = useMemo(() => {
     if (!labelsFor) return [];
     const items: { data: LabelData; quantity: number }[] = [];
-    for (const i of labelsFor.items) {
-      if (i.qty_received <= 0) continue;
+    for (const i of labelsFor.order.items) {
+      const qty = labelsFor.only ? labelsFor.only[i.id] ?? 0 : i.qty_received;
+      if (qty <= 0) continue;
       const product = products.find((p) => p.id === i.product_id);
       if (!product) continue;
       const variant = i.variant_id ? product.variants.find((v) => v.id === i.variant_id) ?? null : null;
-      items.push({ data: labelDataFor(product, variant), quantity: i.qty_received });
+      items.push({ data: labelDataFor(product, variant), quantity: qty });
     }
     return items;
   }, [labelsFor, products]);
@@ -124,7 +126,7 @@ export function PurchasesPanel() {
                           </Button>
                         )}
                         {t.received > 0 && (
-                          <Button size="sm" variant="outline" onClick={() => setLabelsFor(o)} title="Imprimir etiquetas de lo recibido">
+                          <Button size="sm" variant="outline" onClick={() => setLabelsFor({ order: o })} title="Imprimir etiquetas de lo recibido">
                             <Tag className="w-4 h-4" />
                           </Button>
                         )}
@@ -184,15 +186,18 @@ export function PurchasesPanel() {
       <LabelPrintDialog
         open={labelsFor !== null}
         onOpenChange={(v) => !v && setLabelsFor(null)}
-        title={`Etiquetas de ${labelsFor?.number ?? ''}`}
+        title={labelsFor?.only ? `Etiquetas de lo recibido · ${labelsFor.order.number}` : `Etiquetas de ${labelsFor?.order.number ?? ''}`}
         items={labelItems}
       />
       <ReceivePurchaseDialog
         order={receiving}
         onClose={() => setReceiving(null)}
-        onReceived={() => {
+        onReceived={(received) => {
+          const order = receiving;
           setReceiving(null);
           void reload();
+          // Al momento, las etiquetas de lo que acaba de llegar.
+          if (order) setLabelsFor({ order, only: received });
         }}
       />
     </div>

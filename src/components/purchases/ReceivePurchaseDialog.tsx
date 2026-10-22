@@ -17,7 +17,8 @@ export function ReceivePurchaseDialog({
 }: {
   order: PurchaseOrder | null;
   onClose: () => void;
-  onReceived: () => void;
+  /** Lo recibido ahora (línea → unidades), para ofrecer sus etiquetas. */
+  onReceived: (received: Record<string, number>) => void;
 }) {
   const { receive, isSaving } = usePurchases();
   const [counts, setCounts] = useState<Record<string, number>>({});
@@ -54,7 +55,7 @@ export function ReceivePurchaseDialog({
   const handleConfirm = async () => {
     if (lines.length === 0) return;
     const receiptId = await receive(order.id, lines);
-    if (receiptId) onReceived();
+    if (receiptId) onReceived(Object.fromEntries(lines.map((l) => [l.item_id, l.quantity])));
   };
 
   return (

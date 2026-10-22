@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  DEFAULT_LABEL_CONFIG, expandLabels, fieldText, labelDataFor, labelSizeMm, newField, normalizeLabelConfig, renderLabel, renderLabelPages,
+  DEFAULT_LABEL_CONFIG, expandLabels, fieldText, labelDataFor, labelSizeMm, loadStartPosition, newField, nextStartPosition,
+  normalizeLabelConfig, renderLabel, renderLabelPages, saveStartPosition, sortLabelRows,
   type LabelData,
 } from '@/lib/labels';
 
@@ -68,5 +69,31 @@ describe('datos de la etiqueta', () => {
     });
     expect(labelDataFor(p, { name: 'M', attributes: { Color: 'Azul' }, price: 6, sku: null, barcode: null })).toMatchObject({ color: 'Azul', size: 'M', price: 6 });
     expect(labelDataFor({ ...p, sku: 'P1', barcode: 'B1' })).toMatchObject({ size: null, sku: 'P1', barcode: 'B1' });
+  });
+});
+
+describe('orden y hojas empezadas', () => {
+  const row = (name: string, size: string | null) => ({ data: { name, color: null, size, price: 1, sku: null, barcode: null } });
+
+  it('ordena por producto y talla con números naturales, o deja el orden en que se añadieron', () => {
+    const rows = [row('Zueco Rio', '40'), row('Botín Denia', '38'), row('Zueco Rio', '35'), row('Zueco Rio', '9')];
+    expect(sortLabelRows(rows, 'product').map((r) => `${r.data.name} ${r.data.size}`)).toEqual([
+      'Botín Denia 38', 'Zueco Rio 9', 'Zueco Rio 35', 'Zueco Rio 40',
+    ]);
+    expect(sortLabelRows(rows, 'added')).toBe(rows);
+  });
+
+  it('calcula dónde empieza la siguiente impresión en la misma hoja', () => {
+    expect(nextStartPosition(1, 5, 24)).toBe(6);
+    expect(nextStartPosition(20, 5, 24)).toBe(1);
+    expect(nextStartPosition(20, 4, 24)).toBe(24);
+    expect(nextStartPosition(3, 30, 24)).toBe(9); // (2 + 30) % 24 + 1
+    expect(nextStartPosition(7, 3, 1)).toBe(1);
+  });
+
+  it('recuerda la posición por diseño en este ordenador', () => {
+    saveStartPosition('d1', 9);
+    expect(loadStartPosition('d1')).toBe(9);
+    expect(loadStartPosition('otro')).toBe(1);
   });
 });
