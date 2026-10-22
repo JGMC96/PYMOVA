@@ -2991,6 +2991,7 @@ export type Database = {
           last_sync_error: string | null
           last_sync_status: string | null
           last_verified_at: string | null
+          orders_history_imported_at: string | null
           orders_sync_enabled: boolean
           pos_orders_enabled: boolean
           pos_orders_since: string
@@ -3015,6 +3016,7 @@ export type Database = {
           last_sync_error?: string | null
           last_sync_status?: string | null
           last_verified_at?: string | null
+          orders_history_imported_at?: string | null
           orders_sync_enabled?: boolean
           pos_orders_enabled?: boolean
           pos_orders_since?: string
@@ -3039,6 +3041,7 @@ export type Database = {
           last_sync_error?: string | null
           last_sync_status?: string | null
           last_verified_at?: string | null
+          orders_history_imported_at?: string | null
           orders_sync_enabled?: boolean
           pos_orders_enabled?: boolean
           pos_orders_since?: string
@@ -3827,6 +3830,7 @@ export type Database = {
           last_sync_error: string | null
           last_sync_status: string | null
           last_verified_at: string | null
+          orders_history_imported_at: string | null
           orders_sync_enabled: boolean
           pos_orders_enabled: boolean
           pos_orders_since: string
@@ -4658,6 +4662,7 @@ export type Database = {
           _order_number: string
           _payment_method: string
           _payment_status: string
+          _placed_at?: string
           _shipping_address: string
           _shipping_cost: number
           _source: string
