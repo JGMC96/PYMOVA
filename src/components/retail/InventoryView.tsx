@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Package, RefreshCw, Edit2, Layers, History, Tag } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Package, RefreshCw, Edit2, Layers, History, Tag, Barcode } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -19,6 +19,8 @@ import { StockAdjustDialog, type StockAdjustTarget } from './StockAdjustDialog';
 import { useMyPermissions } from '@/hooks/useMyPermissions';
 import { LabelPrintDialog } from '@/components/labels/LabelPrintDialog';
 import { labelDataFor } from '@/lib/labels';
+import { needsCodes } from '@/lib/catalogCodes';
+import { GenerateCodesDialog } from './GenerateCodesDialog';
 
 export function InventoryView() {
   const { products, isLoading, isUpdating, toggleTracking, refreshProducts } = useInventory();
@@ -28,6 +30,12 @@ export function InventoryView() {
   const [variantProduct, setVariantProduct] = useState<ProductWithStock | null>(null);
   const [historyProduct, setHistoryProduct] = useState<ProductWithStock | null>(null);
   const [labelsProduct, setLabelsProduct] = useState<ProductWithStock | null>(null);
+  const [codesProduct, setCodesProduct] = useState<ProductWithStock | null>(null);
+  // Todos los SKU del negocio, para proponer el siguiente modelo y no repetir.
+  const existingSkus = useMemo(
+    () => products.flatMap((p) => [p.sku, ...p.variants.map((v) => v.sku)]),
+    [products],
+  );
   // Una etiqueta de cada talla (las cantidades se cambian en Comercio › Etiquetas).
   const labelItems = labelsProduct
     ? labelsProduct.variants.length
@@ -159,6 +167,16 @@ export function InventoryView() {
                     >
                       <Tag className="w-4 h-4" />
                     </Button>
+                    {canEditCatalog && needsCodes(product.variants) && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setCodesProduct(product)}
+                        title="Poner SKU y código de barras a las tallas que no tienen"
+                      >
+                        <Barcode className="w-4 h-4" />
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
@@ -186,6 +204,12 @@ export function InventoryView() {
         items={labelItems}
       />
       <StockAdjustDialog target={adjustTarget} onClose={() => setAdjustTarget(null)} onDone={refreshProducts} />
+      <GenerateCodesDialog
+        product={codesProduct}
+        existingSkus={existingSkus}
+        onClose={() => setCodesProduct(null)}
+        onDone={refreshProducts}
+      />
     </Card>
   );
 
