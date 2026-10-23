@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Copias de trabajo de las sesiones de Claude (una por chat)
+.claude/worktrees/

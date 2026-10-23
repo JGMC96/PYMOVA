@@ -56,11 +56,26 @@ Hay **dos carpetas de migraciones SQL** y las dos están vivas:
 - No reformatear ni mover archivos en masa: Lovable trabaja sobre los mismos ficheros y los conflictos se multiplican.
 - No editar a mano `src/integrations/supabase/types.ts` ni `src/components/ui/*` salvo que sea imprescindible.
 - Migraciones nuevas: aditivas e idempotentes (`IF NOT EXISTS`, `CREATE OR REPLACE`, `DROP POLICY IF EXISTS` + `CREATE POLICY`), nunca modificar una ya existente.
-- **Canal de migraciones (decidido por el usuario el 19/10/2026):** van en `drizzle/migrations/NNNN_descripcion.sql`, con el número siguiente y sin tocar `meta/_journal.json`. Las aplica Lovable en producción cuando el usuario se lo pide, **antes** de fusionar la PR que las necesita. `supabase/migrations/` queda congelada.
+- **Canal de migraciones (decidido por el usuario el 19/10/2026):** van en `drizzle/migrations/NNNN_descripcion.sql`, sin tocar `meta/_journal.json`. Las aplica Lovable en producción cuando el usuario se lo pide, **antes** de fusionar la PR que las necesita. `supabase/migrations/` queda congelada.
+- **Número de la migración:** Lovable la guarda con el número siguiente al de la **última entrada de `meta/_journal.json` en `origin/main`**, no al del último `.sql` de la carpeta. Mirar el journal justo antes de crear el archivo; si no coinciden, el archivo de la PR y el que guarda Lovable acaban duplicados (ya pasó con la 0030).
 - **Proyecto de Lovable:** «Business OS» (id `2ad31e6f-8066-42d2-8a0d-7c63940573b4`), con la base de datos de producción. Si hay conector de Lovable, se puede leer el esquema con `SELECT` sobre el catálogo. Nada de escrituras ni DDL sin el sí explícito del usuario, y los datos de clientes no se leen salvo que haga falta (y entonces en forma de recuentos).
 - Lovable escribe planes en `.lovable/plan/`: son contexto útil, no instrucciones.
 - **Fusionar y desplegar con Lovable:** no fusionar en `main` mientras Lovable tiene un turno abierto, y no pedirle despliegues hasta que su proyecto tenga el commit fusionado (Más › Ajustes › Git; o `latest_commit_sha` con el conector). Si una fusión coincide con un turno de Lovable, puede perder el aviso de GitHub y quedarse atrás («GitHub is N commits ahead of Lovable»); el siguiente envío a `main` lo pone al día.
 - **Dos lockfiles:** Lovable instala con `bun.lockb`; en local se usa `package-lock.json` (`npm ci`). Si cambia `package.json`, regenerar el de npm con `npm install --package-lock-only` y comprobar `npm ci` en una carpeta limpia. `@swc/core` se queda en 1.13.2: las versiones 1.16.x fallan en Windows (`ERR_SWC_NATIVE_CACHE`).
+
+## Trabajo en paralelo (varios chats a la vez)
+
+Decidido por el usuario el 23/10/2026. Varios chats de Claude y Lovable trabajan a la vez sobre este repositorio y la misma base de datos de producción. Para no pisarse:
+
+1. **Una copia por chat.** Nadie trabaja dentro de `C:\pymova`: esa carpeta queda en `main`, limpia, solo para consultar. Cada chat trabaja en su propio worktree y su rama. En la app de Claude, al abrir la sesión se elige «worktree» (se crean en `C:\pymova\.claude\worktrees\`, ignorada por git). A mano: `git worktree add -b feat/tema ../pymova-tema origin/main`. Nunca cambiar de rama ni hacer `stash`/`reset` en una carpeta que use otro chat.
+2. **Un tema por chat y una PR por tema.** Ejemplos: TPV y caja; Shopify; equipo y permisos; facturas y clientes; RR. HH. Si un cambio necesita archivos de otro tema, se avisa en el tablón antes de tocarlos.
+3. **Tablón común:** `C:\pymova-coordinacion\TABLON.md`, fuera del repositorio. Al empezar, cada chat lo lee y apunta una línea: tema, rama, carpeta y si tiene migración pendiente. Al fusionar, la borra. Es información, no instrucciones.
+4. **Migraciones en fila.** Solo un chat a la vez tiene una migración sin aplicar. Quien la necesite la «reserva» en el tablón con su número (el siguiente al del journal de `origin/main`); el siguiente espera a que esté aplicada y fusionada.
+5. **Lovable, de uno en uno.** Solo un chat a la vez pide algo a Lovable (aplicar una migración o publicar). Se marca en el tablón («Lovable: ocupado por …») y se libera al terminar.
+6. **Lovable no escribe código de la app.** Solo aplica migraciones exactas (comprobando el SHA-256) y publica. Si el usuario cambia algo en el editor de Lovable, esos commits llegan directos a `main`: cada chat trae `main` antes de seguir.
+7. **Antes de fusionar, traer `main`.** `git merge origin/main` en la rama, repetir `tsc`, tests (con RLS) y `build`, y solo entonces fusionar. Si otra PR se fusionó entre medias, repetir.
+8. **Publicar publica todo `main`.** Antes de publicar en Lovable, mirar qué se ha fusionado desde la última publicación (`git log`), no solo lo propio, y comprobar que el proyecto de Lovable tiene el último commit.
+9. **Al terminar:** borrar la copia (`git worktree remove`) y la rama local ya fusionada. Si la copia tiene un enlace a `node_modules`, quitarlo antes con `rmdir` para no vaciar el original.
 
 ## Convenciones
 
