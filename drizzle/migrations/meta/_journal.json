@@ -358,6 +358,13 @@
       "when": 1792754109369,
       "tag": "0050_0050_facturas_blindaje",
       "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1792762566759,
+      "tag": "0051_0051_seguridad_shopify_servidor",
+      "breakpoints": true
     }
   ]
 }
