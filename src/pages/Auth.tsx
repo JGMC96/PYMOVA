@@ -317,9 +317,14 @@ const Auth = () => {
                   onChange={(e) => setPassword(e.target.value)}
                   className="pl-10"
                   required
-                  minLength={6}
+                  // Cuentas nuevas: 10 caracteres como mínimo. Al entrar no se exige, para que
+                  // quien tiene una contraseña más corta de antes pueda seguir entrando.
+                  minLength={isLogin ? undefined : 10}
                 />
               </div>
+              {!isLogin && (
+                <p className="text-xs text-muted-foreground">Al menos 10 caracteres.</p>
+              )}
             </div>
 
             <AnimatePresence initial={false}>

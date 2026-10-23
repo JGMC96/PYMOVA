@@ -4,8 +4,10 @@ import { MemoryRouter } from 'react-router-dom';
 import { useState } from 'react';
 
 // Supabase falso: guarda el listener de sesión y responde a las consultas del contexto.
-const { auth, from, calls } = vi.hoisted(() => {
+const { auth, from, calls, nivel } = vi.hoisted(() => {
   const calls: Record<string, number> = {};
+  // Nivel de la sesión para la verificación en dos pasos (0049).
+  const nivel = { current: 'aal1', next: 'aal1' };
   let listener: ((event: string, session: unknown) => void) | null = null;
   const tables: Record<string, unknown> = {
     business_members: [{ role: 'owner', business_id: 'b1', businesses: { id: 'b1', name: 'TUILUS' } }],
@@ -30,8 +32,15 @@ const { auth, from, calls } = vi.hoisted(() => {
       return { data: { subscription: { unsubscribe: () => (listener = null) } } };
     },
     getSession: () => Promise.resolve({ data: { session: { user: { id: 'u1' } } } }),
+    // Sin verificación en dos pasos (0049).
+    mfa: {
+      getAuthenticatorAssuranceLevel: () =>
+        Promise.resolve({ data: { currentLevel: nivel.current, nextLevel: nivel.next }, error: null }),
+      listFactors: () =>
+        Promise.resolve({ data: { all: [{ id: 'f1', factor_type: 'totp', status: 'verified' }] }, error: null }),
+    },
   };
-  return { auth, from, calls };
+  return { auth, from, calls, nivel };
 });
 
 vi.mock('@/integrations/supabase/client', () => ({
@@ -40,6 +49,7 @@ vi.mock('@/integrations/supabase/client', () => ({
 
 import { BusinessProvider } from '@/contexts/BusinessContext';
 import { RequireBusiness } from '@/components/auth/RequireBusiness';
+import { RequireAuth } from '@/components/auth/RequireAuth';
 
 function Carrito() {
   const [unidades, setUnidades] = useState(0);
@@ -65,6 +75,8 @@ describe('El panel no se recarga al refrescar la sesión', () => {
   beforeEach(() => {
     for (const k of Object.keys(calls)) delete calls[k];
     localStorage.clear();
+    nivel.current = 'aal1';
+    nivel.next = 'aal1';
   });
 
   it('un refresco de sesión (mismo usuario, objeto nuevo) no vacía el carrito ni vuelve a cargar los negocios', async () => {
@@ -90,5 +102,37 @@ describe('El panel no se recarga al refrescar la sesión', () => {
       auth.emit('SIGNED_IN', { user: { id: 'u2' } });
     });
     await waitFor(() => expect(calls.business_members).toBe(cargas + 1));
+  });
+});
+
+describe('Verificación en dos pasos (0049)', () => {
+  beforeEach(() => {
+    for (const k of Object.keys(calls)) delete calls[k];
+    localStorage.clear();
+    nivel.current = 'aal1';
+    nivel.next = 'aal2';
+  });
+
+  it('sin el código pide el segundo paso y no carga los negocios; con él, sí', async () => {
+    render(
+      <MemoryRouter>
+        <BusinessProvider>
+          <RequireAuth>
+            <RequireBusiness>
+              <Carrito />
+            </RequireBusiness>
+          </RequireAuth>
+        </BusinessProvider>
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText('Verificación en dos pasos')).toBeTruthy();
+    expect(calls.business_members ?? 0).toBe(0);
+
+    nivel.current = 'aal2';
+    await act(async () => {
+      auth.emit('MFA_CHALLENGE_VERIFIED', { user: { id: 'u1' } });
+    });
+    expect(await screen.findByRole('button', { name: 'Carrito: 0' })).toBeTruthy();
+    expect(calls.business_members).toBe(1);
   });
 });
