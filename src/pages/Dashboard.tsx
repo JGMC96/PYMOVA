@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { MessageSquare } from "lucide-react";
 import { useBusiness } from "@/contexts/BusinessContext";
@@ -10,7 +10,13 @@ import Clients from "@/pages/dashboard/Clients";
 import Products from "@/pages/dashboard/Products";
 import Invoices from "@/pages/dashboard/Invoices";
 import Payments from "@/pages/dashboard/Payments";
-import Retail from "@/pages/dashboard/Retail";
+import { RetailLayout } from "@/components/retail/RetailLayout";
+import { PosPage, PurchasesPage, SalesHistoryPage, SellersPage } from "@/pages/dashboard/retail/RetailPages";
+import { CashRegisterPanel } from "@/components/retail/CashRegisterPanel";
+import { EcommercePanel } from "@/components/retail/EcommercePanel";
+import { InventoryView } from "@/components/retail/InventoryView";
+import { LabelsPanel } from "@/components/labels/LabelsPanel";
+import { RETAIL_HOME } from "@/lib/dashboardMenu";
 import Marketing from "@/pages/dashboard/Marketing";
 import Hr from "@/pages/dashboard/Hr";
 import Integrations from "@/pages/dashboard/Integrations";
@@ -44,7 +50,19 @@ const Dashboard = () => {
               <Route path="products/*" element={<Products />} />
               <Route path="invoices/*" element={<Invoices />} />
               <Route path="payments/*" element={<Payments />} />
-              <Route path="retail/*" element={<Retail />} />
+              {/* Tienda: cada pantalla con su entrada en el menú (antes, pestañas de Retail). */}
+              <Route element={<RetailLayout />}>
+                <Route path="sales/pos" element={<PosPage />} />
+                <Route path="sales/register" element={<CashRegisterPanel />} />
+                <Route path="sales/history" element={<SalesHistoryPage />} />
+                <Route path="sales/online" element={<EcommercePanel />} />
+                <Route path="stock/inventory" element={<InventoryView />} />
+                <Route path="stock/purchases" element={<PurchasesPage />} />
+                <Route path="stock/labels" element={<LabelsPanel />} />
+                <Route path="team/sellers" element={<SellersPage />} />
+              </Route>
+              <Route path="sales" element={<Navigate to={RETAIL_HOME} replace />} />
+              <Route path="retail/*" element={<Navigate to={RETAIL_HOME} replace />} />
               <Route path="marketing/*" element={<Marketing />} />
               <Route path="hr/*" element={<Hr />} />
               <Route path="integrations/*" element={<Integrations />} />

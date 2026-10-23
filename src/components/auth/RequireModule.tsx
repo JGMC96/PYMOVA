@@ -15,7 +15,7 @@ const MODULE_NAMES: Record<ModuleKey, string> = {
   clients: 'Clientes',
   products: 'Productos',
   invoicing: 'Facturación',
-  payments: 'Pagos',
+  payments: 'Cobros',
   ai_advisor: 'Asesor IA',
   reports: 'Reportes',
   retail: 'Retail',
