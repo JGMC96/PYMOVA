@@ -7,7 +7,8 @@ export interface ClientPurchaseItem {
 }
 
 export interface ClientPurchase {
-  channel: 'store' | 'online';
+  /** «stockagile»: ticket de la tienda hecho en Stockagile (0046), solo para consultar. */
+  channel: 'store' | 'online' | 'stockagile';
   id: string;
   number: string;
   created_at: string;
@@ -37,6 +38,7 @@ export interface ClientHistory {
 export const CHANNEL_LABELS: Record<ClientPurchase['channel'], string> = {
   store: 'Tienda',
   online: 'Web',
+  stockagile: 'Tienda (Stockagile)',
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -56,12 +58,18 @@ export function purchaseStatusLabel(p: Pick<ClientPurchase, 'channel' | 'status'
     if (p.status !== 'returned') return null;
     return Number(p.net) > 0 ? 'Devolución parcial' : 'Devuelta';
   }
+  if (p.channel === 'stockagile') {
+    // En Stockagile la devolución es un ticket aparte, con su importe en negativo.
+    if (p.status === 'returned') return 'Devolución';
+    if (p.status === 'exchange') return 'Cambio';
+    return null;
+  }
   return STATUS_LABELS[p.status] ?? p.status;
 }
 
-/** ¿La compra no cuenta (cancelada, devuelta o reembolsada entera)? */
-export function isVoidPurchase(p: Pick<ClientPurchase, 'net'>): boolean {
-  return Number(p.net) <= 0;
+/** ¿La compra no cuenta (cancelada, devuelta o reembolsada entera)? Un ticket de devolución de Stockagile sí cuenta: resta. */
+export function isVoidPurchase(p: Pick<ClientPurchase, 'net' | 'channel'>): boolean {
+  return p.channel !== 'stockagile' && Number(p.net) <= 0;
 }
 
 /** Talla habitual: la más comprada (empates: todas las que empatan). */

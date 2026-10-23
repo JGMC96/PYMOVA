@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useBusiness } from '@/contexts/BusinessContext';
 import { supabase } from '@/integrations/supabase/client';
 import { STOCKAGILE_PILOT_BUSINESS_ID } from '../../../supabase/functions/_shared/stockagile-core.ts';
+import { StockagileSalesHistoryImport } from './StockagileSalesHistoryImport';
 
 interface CheckResult {
   ok: boolean;
@@ -89,6 +90,9 @@ export function StockagileCheckPanel() {
           Comprobar Stockagile
         </Button>
       </CardHeader>
+      <CardContent className={result ? 'pb-0' : undefined}>
+        <StockagileSalesHistoryImport />
+      </CardContent>
       {result && (
         <CardContent className="space-y-4">
           <div className="text-sm flex flex-wrap items-center gap-2">

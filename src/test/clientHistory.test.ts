@@ -8,11 +8,15 @@ describe('ficha de clienta', () => {
     expect(purchaseStatusLabel({ channel: 'store', status: 'returned', net: 0, total: 100 })).toBe('Devuelta');
     expect(purchaseStatusLabel({ channel: 'online', status: 'shipped', net: 100, total: 100 })).toBe('Enviado');
     expect(purchaseStatusLabel({ channel: 'online', status: 'refunded', net: 0, total: 100 })).toBe('Reembolsado');
+    expect(purchaseStatusLabel({ channel: 'stockagile', status: 'returned', net: -6, total: -6 })).toBe('Devolución');
+    expect(purchaseStatusLabel({ channel: 'stockagile', status: 'exchange', net: 10, total: 10 })).toBe('Cambio');
+    expect(purchaseStatusLabel({ channel: 'stockagile', status: 'done', net: 60, total: 60 })).toBeNull();
   });
 
   it('compras que no cuentan', () => {
-    expect(isVoidPurchase({ net: 0 })).toBe(true);
-    expect(isVoidPurchase({ net: 12.5 })).toBe(false);
+    expect(isVoidPurchase({ net: 0, channel: 'online' })).toBe(true);
+    expect(isVoidPurchase({ net: 12.5, channel: 'store' })).toBe(false);
+    expect(isVoidPurchase({ net: -6, channel: 'stockagile' })).toBe(false);
   });
 
   it('talla habitual, con empates', () => {
