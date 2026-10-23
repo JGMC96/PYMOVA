@@ -66,11 +66,13 @@ describe('token y errores de Stockagile', () => {
       .fn()
       .mockResolvedValueOnce(res(403, { detail: 'Invalid token.' }))
       .mockResolvedValueOnce(res(401, { error: 'ERROR_1', message: 'Company is not active' }))
-      .mockResolvedValueOnce(new Response('<html>Bad Gateway</html>', { status: 502 }));
+      .mockResolvedValueOnce(new Response('<html>Bad Gateway</html>', { status: 502 }))
+      .mockResolvedValueOnce(res(400, { created_at_after: ['Introduzca una fecha válida.'] }));
     const client = createStockagileClient(fetcher, 't');
     await expect(client.get('/warehouses')).rejects.toThrow('Stockagile no acepta el token (403: Invalid token.)');
     await expect(client.get('/warehouses')).rejects.toThrow('(401: Company is not active)');
     await expect(client.get('/warehouses')).rejects.toThrow('Stockagile respondió 502');
+    await expect(client.get('/pos-orders')).rejects.toThrow('Stockagile respondió 400: created_at_after: Introduzca una fecha válida.');
   });
 });
 
