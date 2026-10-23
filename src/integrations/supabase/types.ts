@@ -4519,6 +4519,7 @@ export type Database = {
         Args: { _business_id: string; _perm: string }
         Returns: boolean
       }
+      mfa_satisfied: { Args: never; Returns: boolean }
       move_to_dlq: {
         Args: {
           dlq_name: string
