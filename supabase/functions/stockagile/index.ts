@@ -352,7 +352,8 @@ async function importSales(
   let done = false;
   for (let i = 0; i < opts.maxPages; i++) {
     const data = await stockagile.get<StockagilePosOrder>('/pos-orders', {
-      created_at_after: opts.after,
+      // La API solo admite la fecha (AAAA-MM-DD); con la hora responde 400.
+      created_at_after: opts.after.slice(0, 10),
       page,
       page_size: SALES_PAGE_SIZE,
     });

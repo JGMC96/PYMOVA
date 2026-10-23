@@ -34,12 +34,21 @@ export function normalizeStockagileToken(raw: string | null | undefined): string
     .trim();
 }
 
-/** Motivo que da Stockagile en el cuerpo de un error (`message`, `detail` o `error`), recortado. */
+/**
+ * Motivo que da Stockagile en el cuerpo de un error (`message`, `detail` o `error`), o el de
+ * un campo no válido (`{ "campo": ["motivo"] }`), recortado.
+ */
 async function errorReason(res: Response): Promise<string | null> {
   try {
     const body = await res.clone().json();
     const reason = body?.message ?? body?.detail ?? body?.error ?? body?.oauth_error_description;
-    return typeof reason === 'string' && reason.trim() ? reason.trim().slice(0, 200) : null;
+    if (typeof reason === 'string' && reason.trim()) return reason.trim().slice(0, 200);
+    if (body && typeof body === 'object' && !Array.isArray(body)) {
+      const [field, value] = Object.entries(body)[0] ?? [];
+      const text = Array.isArray(value) ? value.join(' ') : typeof value === 'string' ? value : '';
+      if (field && text.trim()) return `${field}: ${text.trim()}`.slice(0, 200);
+    }
+    return null;
   } catch {
     return null;
   }
