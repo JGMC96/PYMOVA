@@ -86,9 +86,10 @@ export async function asRole<T>(
   role: 'authenticated' | 'anon',
   userId: string | null,
   fn: (tx: Tx) => Promise<T>,
+  extraClaims: Record<string, unknown> = {},
 ): Promise<T> {
   return (await sql.begin(async (tx) => {
-    const claims = JSON.stringify(userId ? { sub: userId, role } : { role });
+    const claims = JSON.stringify({ ...(userId ? { sub: userId, role } : { role }), ...extraClaims });
     await tx`SELECT set_config('request.jwt.claims', ${claims}, true)`;
     await tx.unsafe(`SET LOCAL ROLE ${role}`);
     return fn(tx);
@@ -97,5 +98,9 @@ export async function asRole<T>(
 
 export const asUser = <T>(sql: Sql, userId: string, fn: (tx: Tx) => Promise<T>) =>
   asRole(sql, 'authenticated', userId, fn);
+
+/** Como asUser, con la sesión de nivel `aal` indicado (verificación en dos pasos). */
+export const asUserAal = <T>(sql: Sql, userId: string, aal: 'aal1' | 'aal2', fn: (tx: Tx) => Promise<T>) =>
+  asRole(sql, 'authenticated', userId, fn, { aal });
 
 export const asAnon = <T>(sql: Sql, fn: (tx: Tx) => Promise<T>) => asRole(sql, 'anon', null, fn);

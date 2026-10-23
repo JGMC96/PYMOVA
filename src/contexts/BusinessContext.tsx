@@ -15,6 +15,8 @@ interface BusinessContextType {
   user: User | null;
   isAuthLoading: boolean;
   isBusinessesLoading: boolean;
+  /** Tiene la verificación en dos pasos y aún no ha metido el código en esta sesión (0049). */
+  mfaPending: boolean;
   
   // Business state
   activeBusinessId: string | null;
@@ -40,6 +42,10 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [isBusinessesLoading, setIsBusinessesLoading] = useState(true);
+  // Segundo paso: 'unknown' mientras se comprueba para este usuario. Con 'pending', el
+  // servidor no le deja ver ningún negocio hasta que mete el código (0049).
+  const [mfaState, setMfaState] = useState<'unknown' | 'ok' | 'pending'>('unknown');
+  const mfaUserIdRef = useRef<string | null>(null);
   
   // Business state
   const [activeBusinessId, setActiveBusinessId] = useState<string | null>(null);
@@ -241,6 +247,29 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
+  // ¿Le falta el segundo paso? Se mira con cada sesión nueva (al meter el código cambia),
+  // pero solo vuelve a 'unknown' si cambia el usuario, para no desmontar el panel al refrescar.
+  useEffect(() => {
+    if (!user) {
+      mfaUserIdRef.current = null;
+      setMfaState('unknown');
+      return;
+    }
+    if (mfaUserIdRef.current !== user.id) {
+      mfaUserIdRef.current = user.id;
+      setMfaState('unknown');
+    }
+    let cancelled = false;
+    void supabase.auth.mfa.getAuthenticatorAssuranceLevel().then(({ data, error }) => {
+      if (cancelled) return;
+      const pending = !error && data?.nextLevel === 'aal2' && data.currentLevel !== 'aal2';
+      setMfaState(pending ? 'pending' : 'ok');
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
   // Fetch businesses when the signed-in user changes (not on every session refresh)
   useEffect(() => {
     if (!userId) {
@@ -248,6 +277,8 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
       if (!isAuthLoading) setIsBusinessesLoading(false);
       return;
     }
+    // Sin el segundo paso, el servidor no devuelve sus negocios: se cargan después del código.
+    if (mfaState !== 'ok') return;
     if (loadedUserIdRef.current === userId) return;
     loadedUserIdRef.current = userId;
 
@@ -291,12 +322,14 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
     };
 
     loadBusinesses();
-  }, [userId, isAuthLoading, fetchUserBusinesses, fetchBusinessModules, fetchActiveBusinessFromProfile]);
+  }, [userId, isAuthLoading, mfaState, fetchUserBusinesses, fetchBusinessModules, fetchActiveBusinessFromProfile]);
 
   const value: BusinessContextType = {
     user,
-    isAuthLoading,
+    // Hasta saber si le falta el segundo paso, se sigue «cargando».
+    isAuthLoading: isAuthLoading || (!!user && mfaState === 'unknown'),
     isBusinessesLoading,
+    mfaPending: mfaState === 'pending',
     activeBusinessId,
     activeBusiness,
     userBusinesses,

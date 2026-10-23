@@ -35,6 +35,13 @@ CREATE TABLE IF NOT EXISTS auth.users (
   last_sign_in_at timestamptz,
   email_confirmed_at timestamptz
 );
+CREATE TABLE IF NOT EXISTS auth.mfa_factors (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  factor_type text NOT NULL DEFAULT 'totp',
+  status text NOT NULL DEFAULT 'unverified',
+  created_at timestamptz DEFAULT now()
+);
 CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$
   SELECT nullif(coalesce(current_setting('request.jwt.claim.sub', true),
          (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub')), '')::uuid

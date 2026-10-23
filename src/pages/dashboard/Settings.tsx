@@ -8,6 +8,7 @@ import { TeamSettings } from '@/components/settings/TeamSettings';
 import { BillingSettings } from '@/components/settings/BillingSettings';
 import { SecurityAuditSettings } from '@/components/settings/SecurityAuditSettings';
 import { StoreSettings } from '@/components/settings/StoreSettings';
+import { TwoFactorSettings } from '@/components/settings/TwoFactorSettings';
 import { IntegrationsIndex } from '@/pages/dashboard/Integrations';
 import { useRoleAccess } from '@/hooks/useRoleAccess';
 import { useBusiness } from '@/contexts/BusinessContext';
@@ -50,8 +51,9 @@ const Settings = () => {
           {isAdmin && <TabsTrigger value="audit">Seguridad</TabsTrigger>}
         </TabsList>
 
-        <TabsContent value="profile" className="mt-6">
+        <TabsContent value="profile" className="mt-6 space-y-6">
           <ProfileSettings />
+          <TwoFactorSettings />
         </TabsContent>
 
         <TabsContent value="business" className="mt-6">

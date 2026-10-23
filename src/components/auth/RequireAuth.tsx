@@ -1,13 +1,14 @@
 import { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useBusiness } from '@/contexts/BusinessContext';
+import { MfaChallenge } from '@/components/auth/MfaChallenge';
 
 interface RequireAuthProps {
   children: ReactNode;
 }
 
 export function RequireAuth({ children }: RequireAuthProps) {
-  const { user, isAuthLoading } = useBusiness();
+  const { user, isAuthLoading, mfaPending } = useBusiness();
   const location = useLocation();
 
   if (isAuthLoading) {
@@ -20,6 +21,11 @@ export function RequireAuth({ children }: RequireAuthProps) {
 
   if (!user) {
     return <Navigate to="/auth" state={{ from: location }} replace />;
+  }
+
+  // Verificación en dos pasos activada y sin el código en esta sesión.
+  if (mfaPending) {
+    return <MfaChallenge />;
   }
 
   return <>{children}</>;
