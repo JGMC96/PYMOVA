@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Clock, CalendarDays, Users, CalendarRange, FileText, Timer } from 'lucide-react';
+import { Clock, CalendarDays, Users, CalendarRange, FileText, Timer, ListChecks } from 'lucide-react';
 import { RequireModule } from '@/components/auth/RequireModule';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { useTimeClock } from '@/hooks/useTimeClock';
 import { TimeClockCard } from '@/components/hr/TimeClockCard';
 import { TimeEntriesList } from '@/components/hr/TimeEntriesList';
+import { MyTimeRecord } from '@/components/hr/MyTimeRecord';
 import { VacationBalanceCard } from '@/components/hr/VacationBalanceCard';
 import { AbsenceRequestDialog } from '@/components/hr/AbsenceRequestDialog';
 import { AbsencesList } from '@/components/hr/AbsencesList';
@@ -31,9 +32,14 @@ function HrInner() {
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="grid grid-cols-3 sm:grid-cols-6 w-full sm:w-auto">
+        <TabsList
+          className={`grid w-full sm:w-auto ${isAdmin ? 'grid-cols-4 sm:grid-cols-7' : 'grid-cols-2 sm:grid-cols-4'}`}
+        >
           <TabsTrigger value="clock" className="gap-2">
             <Clock className="w-4 h-4" /> Fichaje
+          </TabsTrigger>
+          <TabsTrigger value="record" className="gap-2">
+            <ListChecks className="w-4 h-4" /> Mi registro
           </TabsTrigger>
           <TabsTrigger value="absences" className="gap-2">
             <CalendarDays className="w-4 h-4" /> Ausencias
@@ -64,6 +70,10 @@ function HrInner() {
             <VacationBalanceCard dashboard={dashboard} />
           </div>
           <TimeEntriesList entries={todayEntries} />
+        </TabsContent>
+
+        <TabsContent value="record" className="mt-6">
+          <MyTimeRecord employeeId={dashboard?.my_employee_id ?? null} />
         </TabsContent>
 
         <TabsContent value="absences" className="space-y-4 mt-6">
