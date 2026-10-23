@@ -351,6 +351,13 @@
       "when": 1792748175527,
       "tag": "0049_verificacion_dos_pasos",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1792754109369,
+      "tag": "0050_0050_facturas_blindaje",
+      "breakpoints": true
     }
   ]
 }

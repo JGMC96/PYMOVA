@@ -8,6 +8,8 @@ import type { Product } from '@/types/database';
 import { useMyPermissions } from '@/hooks/useMyPermissions';
 
 export default function Products() {
+  // 0031: crear, editar y desactivar, con permiso de catálogo; costes y márgenes, con el suyo.
+  const { canEditCatalog, canSeeCosts } = useMyPermissions();
   const {
     products,
     isLoading,
@@ -18,9 +20,7 @@ export default function Products() {
     createProduct,
     updateProduct,
     toggleProductStatus,
-  } = useProducts();
-  // 0031: crear, editar y desactivar, con permiso de catálogo; costes y márgenes, con el suyo.
-  const { canEditCatalog, canSeeCosts } = useMyPermissions();
+  } = useProducts({ withCosts: canSeeCosts });
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);

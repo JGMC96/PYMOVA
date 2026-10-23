@@ -1,0 +1,90 @@
+# Comprobaciones automáticas de PYMOVA.
+# Se ejecutan en cada PR contra main, en cada envío a main (también los commits
+# de Lovable) y a mano. No bloquean nada por sí solas: solo bloquearían si se
+# marcan como obligatorias en la protección de ramas de GitHub.
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  comprobaciones:
+    name: Tipos, tests y build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      # En local y en CI se instala con package-lock.json (Lovable usa bun.lockb).
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci --no-audit --no-fund
+
+      - name: Tipos (tsc)
+        run: npx tsc --noEmit -p tsconfig.app.json
+
+      - name: Tests (sin los de RLS, que van en su propio job)
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      # Informativo hasta que el lint quede limpio (docs/AUDITORIA.md, M7).
+      - name: Lint (informativo)
+        continue-on-error: true
+        run: npm run lint
+
+      # Informativo: hoy los avisos altos vienen de tailwindcss 3 y sus
+      # dependencias de compilación, sin arreglo dentro de la versión 3.
+      - name: Dependencias vulnerables (informativo)
+        continue-on-error: true
+        run: npm audit --omit=dev --audit-level=high
+
+  rls:
+    name: RLS y RPC (Postgres)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Postgres desechable: el arnés crea una base temporal, aplica el shim de
+    # Supabase y todas las migraciones, y la borra al terminar.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      RLS_TEST_DATABASE_URL: postgres://postgres@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci --no-audit --no-fund
+
+      - name: Tests de RLS
+        run: npm run test:rls
