@@ -179,7 +179,7 @@ describe.skipIf(!RLS_DB_URL)('RLS · costes ocultos en el servidor', () => {
   });
 
   it('la migración 0052 se puede aplicar dos veces', async () => {
-    const file = resolve(__dirname, '../../../drizzle/migrations/0052_costes_ocultos.sql');
+    const file = resolve(__dirname, '../../../drizzle/migrations/0052_0052_costes_ocultos.sql');
     await sql.unsafe(readFileSync(file, 'utf8').replace(/\r\n/g, '\n'));
     const [g] = await sql`
       SELECT has_function_privilege('anon', 'public.get_catalog_costs(uuid, uuid)', 'EXECUTE') AS anon,
