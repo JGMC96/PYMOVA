@@ -1,8 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { toast } from 'sonner';
 import type { ProductVariant } from './useProductVariants';
+import { fetchAllRows } from '@/lib/fetchAllRows';
+import { fetchCatalogCosts, VARIANT_COLUMNS, type CatalogCosts } from '@/lib/catalogCosts';
 
 export interface ProductWithStock {
   id: string;
@@ -21,27 +23,14 @@ export interface ProductWithStock {
   variants: ProductVariant[];
 }
 
-const PAGE = 1000;
-
 /**
- * Todas las filas de una consulta, de 1.000 en 1.000: el servidor no devuelve más de 1.000
- * por petición y un negocio puede tener más tallas (Tuilus pasa de 1.200).
+ * Catálogo con stock y tallas. Sin coste salvo `withCosts` (solo con permiso de ver costes):
+ * entonces se piden aparte y se añaden a cada talla.
  */
-async function fetchAllRows<T>(
-  page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>,
-): Promise<{ data: T[]; error: unknown }> {
-  const all: T[] = [];
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await page(from, from + PAGE - 1);
-    if (error) return { data: all, error };
-    all.push(...(data ?? []));
-    if (!data || data.length < PAGE) return { data: all, error: null };
-  }
-}
-
-export function useInventory() {
+export function useInventory({ withCosts = false }: { withCosts?: boolean } = {}) {
   const { activeBusiness } = useBusiness();
   const [products, setProducts] = useState<ProductWithStock[]>([]);
+  const [costs, setCosts] = useState<CatalogCosts | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
 
@@ -65,7 +54,7 @@ export function useInventory() {
       fetchAllRows<Record<string, unknown>>((from, to) =>
         supabase
           .from('product_variants')
-          .select('*')
+          .select(VARIANT_COLUMNS as '*')
           .eq('business_id', businessId)
           .eq('is_active', true)
           .order('name')
@@ -102,6 +91,33 @@ export function useInventory() {
     fetchProducts();
   }, [fetchProducts]);
 
+  useEffect(() => {
+    const businessId = activeBusiness?.id;
+    if (!withCosts || !businessId) {
+      setCosts(null);
+      return;
+    }
+    let cancelled = false;
+    void fetchCatalogCosts(supabase, businessId).then(({ costs: c, error }) => {
+      if (error) console.error('Error fetching costs:', error);
+      if (!cancelled) setCosts(c);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeBusiness?.id, withCosts]);
+
+  const withCostPrices = useMemo(
+    () =>
+      costs
+        ? products.map((p) => ({
+            ...p,
+            variants: p.variants.map((v) => ({ ...v, cost_price: costs.variants.get(v.id) ?? null })),
+          }))
+        : products,
+    [products, costs],
+  );
+
   // El stock se cambia con useStockAdjust (adjust_stock, solo admins y con motivo).
 
   const toggleTracking = async (productId: string, trackInventory: boolean): Promise<boolean> => {
@@ -125,7 +141,7 @@ export function useInventory() {
   };
 
   return {
-    products,
+    products: withCostPrices,
     isLoading,
     isUpdating,
     toggleTracking,

@@ -46,7 +46,7 @@ interface ProductFormDialogProps {
   product: Product | null;
   onSubmit: (data: ProductFormData) => Promise<boolean>;
   isSubmitting: boolean;
-  /** Con permiso de ver costes (0031). Oculto, el formulario conserva el coste que ya tenía. */
+  /** Con permiso de ver costes (0031). Sin él, el coste no se carga y al guardar no se toca (useProducts). */
   showCosts?: boolean;
 }
 
