@@ -85,6 +85,19 @@ describe.skipIf(!RLS_DB_URL)('RLS · ventas de Stockagile', () => {
     ]);
   });
 
+  it('la tarea trae las ventas si la última copia tiene más de 4 minutos (0047)', async () => {
+    const hay = async () => (await sql<{ hay: boolean }[]>`SELECT public.stockagile_pending_work() AS hay`)[0].hay;
+    expect(await hay()).toBe(false); // sin conexión
+    await sql`INSERT INTO stockagile_connections (business_id) VALUES (${negocio})`;
+    expect(await hay()).toBe(true); // nunca copiadas
+    await sql`UPDATE stockagile_connections SET sales_synced_at = now() WHERE business_id = ${negocio}`;
+    expect(await hay()).toBe(false);
+    await sql`UPDATE stockagile_connections SET sales_synced_at = now() - interval '5 minutes' WHERE business_id = ${negocio}`;
+    expect(await hay()).toBe(true);
+    await sql`UPDATE stockagile_connections SET enabled = false WHERE business_id = ${negocio}`;
+    expect(await hay()).toBe(false);
+  });
+
   it('solo se leen, y solo los miembros', async () => {
     const mias = await asUser(sql, owner, (tx) => tx<{ n: number }[]>`SELECT count(*)::int AS n FROM stockagile_sales`);
     expect(mias[0].n).toBe(5);
