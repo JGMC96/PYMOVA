@@ -3337,16 +3337,22 @@ export type Database = {
           business_id: string
           created_at: string
           enabled: boolean
+          sales_history_imported_at: string | null
+          sales_synced_at: string | null
         }
         Insert: {
           business_id: string
           created_at?: string
           enabled?: boolean
+          sales_history_imported_at?: string | null
+          sales_synced_at?: string | null
         }
         Update: {
           business_id?: string
           created_at?: string
           enabled?: boolean
+          sales_history_imported_at?: string | null
+          sales_synced_at?: string | null
         }
         Relationships: [
           {
@@ -3354,6 +3360,132 @@ export type Database = {
             columns: ["business_id"]
             isOneToOne: true
             referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stockagile_sale_items: {
+        Row: {
+          barcode: string | null
+          color: string | null
+          id: string
+          product_name: string
+          quantity: number
+          sale_id: string
+          size: string | null
+          total: number | null
+          unit_price: number | null
+          variant_id: string | null
+        }
+        Insert: {
+          barcode?: string | null
+          color?: string | null
+          id?: string
+          product_name: string
+          quantity?: number
+          sale_id: string
+          size?: string | null
+          total?: number | null
+          unit_price?: number | null
+          variant_id?: string | null
+        }
+        Update: {
+          barcode?: string | null
+          color?: string | null
+          id?: string
+          product_name?: string
+          quantity?: number
+          sale_id?: string
+          size?: string | null
+          total?: number | null
+          unit_price?: number | null
+          variant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stockagile_sale_items_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "stockagile_sales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stockagile_sale_items_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stockagile_sales: {
+        Row: {
+          business_id: string
+          client_id: string | null
+          customer_email: string | null
+          customer_name: string | null
+          customer_phone: string | null
+          deleted: boolean
+          external_id: number
+          id: string
+          is_return: boolean
+          number: string | null
+          payment_methods: string | null
+          return_of_external_id: number | null
+          sold_at: string
+          synced_at: string
+          total: number
+          warehouse_name: string | null
+        }
+        Insert: {
+          business_id: string
+          client_id?: string | null
+          customer_email?: string | null
+          customer_name?: string | null
+          customer_phone?: string | null
+          deleted?: boolean
+          external_id: number
+          id?: string
+          is_return?: boolean
+          number?: string | null
+          payment_methods?: string | null
+          return_of_external_id?: number | null
+          sold_at: string
+          synced_at?: string
+          total?: number
+          warehouse_name?: string | null
+        }
+        Update: {
+          business_id?: string
+          client_id?: string | null
+          customer_email?: string | null
+          customer_name?: string | null
+          customer_phone?: string | null
+          deleted?: boolean
+          external_id?: number
+          id?: string
+          is_return?: boolean
+          number?: string | null
+          payment_methods?: string | null
+          return_of_external_id?: number | null
+          sold_at?: string
+          synced_at?: string
+          total?: number
+          warehouse_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stockagile_sales_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stockagile_sales_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
             referencedColumns: ["id"]
           },
         ]
