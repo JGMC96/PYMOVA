@@ -19,6 +19,7 @@ interface UsePaymentsReturn {
   fetchPayments: () => Promise<void>;
   createPayment: (data: CreatePaymentData) => Promise<boolean>;
   fetchPayableInvoices: () => Promise<InvoiceForPayment[]>;
+  deletePayment: (paymentId: string) => Promise<boolean>;
 }
 
 // Sanitize search term to prevent .or() parsing issues
@@ -175,7 +176,41 @@ export function usePayments(): UsePaymentsReturn {
     }
   }, [activeBusinessId, user, fetchPayments, toast]);
 
-  // Fetch invoices available for payment (sent, overdue, or paid for additional payments)
+  // Anular un cobro por RPC (0050): la factura se recalcula y el borrado queda en auditoría.
+  const deletePayment = useCallback(async (paymentId: string): Promise<boolean> => {
+    if (!activeBusinessId) {
+      return false;
+    }
+
+    try {
+      const { error: rpcError } = await supabase.rpc('delete_payment_and_recalc_invoice', {
+        _business_id: activeBusinessId,
+        _payment_id: paymentId,
+      });
+
+      if (rpcError) {
+        throw rpcError;
+      }
+
+      toast({
+        title: 'Cobro anulado',
+        description: 'La factura se ha recalculado',
+      });
+
+      await fetchPayments();
+      return true;
+    } catch (err) {
+      console.error('Error deleting payment:', err);
+      toast({
+        title: 'Error al anular el cobro',
+        description: err instanceof Error ? err.message : 'Ocurrió un error inesperado',
+        variant: 'destructive',
+      });
+      return false;
+    }
+  }, [activeBusinessId, fetchPayments, toast]);
+
+  // Facturas que pueden recibir cobros: enviadas o vencidas, con algo pendiente
   const fetchPayableInvoices = useCallback(async (): Promise<InvoiceForPayment[]> => {
     if (!activeBusinessId) {
       return [];
@@ -196,7 +231,7 @@ export function usePayments(): UsePaymentsReturn {
           )
         `)
         .eq('business_id', activeBusinessId)
-        .in('status', ['sent', 'overdue', 'paid'])
+        .in('status', ['sent', 'overdue'])
         .order('created_at', { ascending: false });
 
       if (invoicesError) {
@@ -222,7 +257,7 @@ export function usePayments(): UsePaymentsReturn {
         }
       }
 
-      // Transform to InvoiceForPayment
+      // Transform to InvoiceForPayment (sin las ya cubiertas: no se cobra de más)
       return (invoices || []).map((inv) => {
         const totalPaid = paidByInvoice[inv.id] || 0;
         const total = Number(inv.total);
@@ -234,9 +269,9 @@ export function usePayments(): UsePaymentsReturn {
           due_date: inv.due_date,
           client_name: inv.clients?.name || undefined,
           total_paid: totalPaid,
-          pending: Math.max(0, total - totalPaid),
+          pending: Math.max(0, Math.round((total - totalPaid) * 100) / 100),
         };
-      });
+      }).filter((inv) => inv.pending > 0);
     } catch (err) {
       console.error('Error fetching payable invoices:', err);
       toast({
@@ -257,5 +292,6 @@ export function usePayments(): UsePaymentsReturn {
     fetchPayments,
     createPayment,
     fetchPayableInvoices,
+    deletePayment,
   };
 }

@@ -90,8 +90,9 @@ export const MENU_SECTIONS: MenuSection[] = [
   {
     title: 'Facturación',
     items: [
-      { icon: FileText, label: 'Facturas', path: '/dashboard/invoices', moduleKey: 'invoicing' },
-      { icon: CreditCard, label: 'Cobros', path: '/dashboard/payments', moduleKey: 'payments' },
+      // 0050: facturas y cobros, solo administradores (el personal ya no los lee).
+      { icon: FileText, label: 'Facturas', path: '/dashboard/invoices', moduleKey: 'invoicing', allowed: adminOnly },
+      { icon: CreditCard, label: 'Cobros', path: '/dashboard/payments', moduleKey: 'payments', allowed: adminOnly },
     ],
   },
   {

@@ -1,6 +1,6 @@
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { MoreHorizontal, Send, CheckCircle, XCircle, FileText } from 'lucide-react';
+import { MoreHorizontal, Send, XCircle, FileText } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -39,7 +39,7 @@ const STATUS_CONFIG: Record<InvoiceStatus, { label: string; variant: 'default' |
 };
 
 export function InvoicesTable({ invoices, isLoading, onStatusChange }: InvoicesTableProps) {
-  // 0031: cambiar el estado de una factura, solo administradores.
+  // Cambiar el estado de una factura, solo administradores (0031; por RPC desde la 0050).
   const { isAdmin } = useRoleAccess('admin');
   const { format: formatPrice } = useMoney();
   if (isLoading) {
@@ -81,9 +81,10 @@ export function InvoicesTable({ invoices, isLoading, onStatusChange }: InvoicesT
         <TableBody>
           {invoices.map((invoice) => {
             const statusConfig = STATUS_CONFIG[invoice.status];
+            // 0050: «pagada» y «vencida» salen de los cobros; una factura con cobros no se cancela
+            // (lo comprueba el servidor).
             const canMarkAsSent = invoice.status === 'draft';
-            const canMarkAsPaid = invoice.status === 'sent' || invoice.status === 'overdue';
-            const canCancel = invoice.status === 'draft' || invoice.status === 'sent';
+            const canCancel = invoice.status === 'draft' || invoice.status === 'sent' || invoice.status === 'overdue';
 
             return (
               <TableRow key={invoice.id}>
@@ -123,18 +124,15 @@ export function InvoicesTable({ invoices, isLoading, onStatusChange }: InvoicesT
                           Marcar como Enviada
                         </DropdownMenuItem>
                       )}
-                      {canMarkAsPaid && (
-                        <DropdownMenuItem onClick={() => onStatusChange(invoice.id, 'paid')}>
-                          <CheckCircle className="h-4 w-4 mr-2" />
-                          Marcar como Pagada
-                        </DropdownMenuItem>
-                      )}
-                      {(canMarkAsSent || canMarkAsPaid) && canCancel && (
+                      {canMarkAsSent && canCancel && (
                         <DropdownMenuSeparator />
                       )}
                       {canCancel && (
                         <DropdownMenuItem
-                          onClick={() => onStatusChange(invoice.id, 'cancelled')}
+                          onClick={() => {
+                            if (!window.confirm(`¿Cancelar la factura ${invoice.invoice_number}? Conserva su número y no se puede deshacer.`)) return;
+                            onStatusChange(invoice.id, 'cancelled');
+                          }}
                           className="text-destructive focus:text-destructive"
                         >
                           <XCircle className="h-4 w-4 mr-2" />

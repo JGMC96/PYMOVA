@@ -117,11 +117,15 @@ describe.skipIf(!RLS_DB_URL)('RLS · rol personal y permisos de catálogo', () =
           _items => ${sql.json(items)}::jsonb, _due_date => NULL, _notes => NULL)`),
     ).rejects.toMatchObject(PERMISO_DENEGADO);
     await expect(asUser(sql, staff, (tx) => tx`SELECT public.generate_invoice_number(${negocio})`)).rejects.toMatchObject(PERMISO_DENEGADO);
-    expect((await asUser(sql, staff, (tx) => tx`UPDATE invoices SET status = 'sent' WHERE id = ${factura}`)).count).toBe(0);
+    // Desde la 0050 nadie edita facturas a mano: el estado cambia por RPC.
+    await expect(asUser(sql, staff, (tx) => tx`UPDATE invoices SET status = 'sent' WHERE id = ${factura}`)).rejects.toMatchObject(PERMISO_DENEGADO);
     await expect(
       asUser(sql, staff, (tx) => tx`INSERT INTO invoice_items (invoice_id, description, quantity, unit_price, total) VALUES (${factura}, 'x', 1, 1, 1)`),
     ).rejects.toMatchObject(PERMISO_DENEGADO);
-    expect((await asUser(sql, admin, (tx) => tx`UPDATE invoices SET status = 'sent' WHERE id = ${factura}`)).count).toBe(1);
+    await expect(
+      asUser(sql, staff, (tx) => tx`SELECT public.set_invoice_status(${negocio}, ${factura}, 'sent')`),
+    ).rejects.toMatchObject(PERMISO_DENEGADO);
+    await asUser(sql, admin, (tx) => tx`SELECT public.set_invoice_status(${negocio}, ${factura}, 'sent')`);
 
     await expect(
       asUser(sql, staff, (tx) => tx`SELECT public.create_payment_and_recalc_invoice(${negocio}, ${factura}, 10)`),
