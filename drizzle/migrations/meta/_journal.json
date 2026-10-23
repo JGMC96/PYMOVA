@@ -330,6 +330,13 @@
       "when": 1792741846123,
       "tag": "0046_0046_ventas_stockagile",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1792742865391,
+      "tag": "0047_ventas_stockagile_tarea",
+      "breakpoints": true
     }
   ]
 }

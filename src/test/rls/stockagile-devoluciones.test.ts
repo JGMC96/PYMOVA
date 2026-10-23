@@ -63,7 +63,8 @@ describe.skipIf(!RLS_DB_URL)('RLS · devoluciones del TPV a Stockagile', () => {
     const [o] = await asUser(sql, owner, (tx) => tx<{ id: string }[]>`SELECT public.create_business('Otra', null) AS id`);
     otro = o.id;
     await sql`INSERT INTO business_members (business_id, user_id, role, is_active) VALUES (${negocio}, ${staff}, 'staff', true)`;
-    await sql`INSERT INTO stockagile_connections (business_id) VALUES (${negocio})`;
+    // Ventas al día (0047): aquí solo cuentan los movimientos de stock.
+    await sql`INSERT INTO stockagile_connections (business_id, sales_synced_at) VALUES (${negocio}, now() + interval '1 day')`;
   }, 120_000);
 
   afterAll(async () => {
