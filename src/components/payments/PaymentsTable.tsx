@@ -1,4 +1,4 @@
-import { CreditCard, Eye } from 'lucide-react';
+import { CreditCard, Undo2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import {
@@ -20,6 +20,7 @@ interface PaymentsTableProps {
   payments: PaymentWithInvoice[];
   isLoading: boolean;
   onNewPayment: () => void;
+  onDeletePayment: (payment: PaymentWithInvoice) => void;
 }
 
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
@@ -39,6 +40,7 @@ function LoadingSkeleton() {
           <TableCell><Skeleton className="h-4 w-24" /></TableCell>
           <TableCell><Skeleton className="h-5 w-20 rounded-full" /></TableCell>
           <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+          <TableCell />
         </TableRow>
       ))}
     </>
@@ -49,7 +51,7 @@ function EmptyState({ onNewPayment }: { onNewPayment: () => void }) {
   const { isAdmin } = useRoleAccess('admin');
   return (
     <TableRow>
-      <TableCell colSpan={5} className="h-48">
+      <TableCell colSpan={6} className="h-48">
         <div className="flex flex-col items-center justify-center text-center">
           <CreditCard className="h-12 w-12 text-muted-foreground/50 mb-4" />
           <h3 className="text-lg font-medium">No hay pagos registrados</h3>
@@ -71,8 +73,10 @@ export function PaymentsTable({
   payments,
   isLoading,
   onNewPayment,
+  onDeletePayment,
 }: PaymentsTableProps) {
   const { format: formatPrice } = useMoney();
+  const { isAdmin } = useRoleAccess('admin');
   return (
     <div className="rounded-md border">
       <Table>
@@ -83,6 +87,7 @@ export function PaymentsTable({
             <TableHead>Monto</TableHead>
             <TableHead>Método</TableHead>
             <TableHead>Notas</TableHead>
+            <TableHead className="w-[50px]"></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -117,6 +122,20 @@ export function PaymentsTable({
                 </TableCell>
                 <TableCell className="text-muted-foreground max-w-[200px] truncate">
                   {payment.notes || '-'}
+                </TableCell>
+                <TableCell>
+                  {isAdmin && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      title="Anular cobro"
+                      aria-label="Anular cobro"
+                      onClick={() => onDeletePayment(payment)}
+                    >
+                      <Undo2 className="h-4 w-4" />
+                    </Button>
+                  )}
                 </TableCell>
               </TableRow>
             ))

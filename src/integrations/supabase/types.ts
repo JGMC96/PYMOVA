@@ -4178,6 +4178,10 @@ export type Database = {
         Args: { _business_id: string }
         Returns: string
       }
+      delete_payment_and_recalc_invoice: {
+        Args: { _business_id: string; _payment_id: string }
+        Returns: undefined
+      }
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
@@ -4716,6 +4720,14 @@ export type Database = {
         Returns: string
       }
       set_active_business: { Args: { _business_id: string }; Returns: boolean }
+      set_invoice_status: {
+        Args: {
+          _business_id: string
+          _invoice_id: string
+          _status: Database["public"]["Enums"]["invoice_status"]
+        }
+        Returns: Database["public"]["Enums"]["invoice_status"]
+      }
       set_employee_permissions: {
         Args: {
           _business_id: string
