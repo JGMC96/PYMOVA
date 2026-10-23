@@ -6,6 +6,9 @@
 // - `push`: envía a Stockagile los movimientos pendientes de la cola stockagile_stock_moves
 //   (devoluciones con reposición, 0037) con `POST /stock/move`. Lo llama el TPV tras una
 //   devolución y la tarea «stockagile-devoluciones» cada 5 minutos (con ticket).
+// - Ventas de la tienda (0046): copia de consulta de los tickets del TPV de Stockagile en
+//   stockagile_sales. La misma tarea trae los de los 2 últimos días; `import-sales` lo hace al
+//   momento y `import-sales-history` trae el historial completo por tandas. No mueven stock.
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import {
@@ -21,6 +24,7 @@ import {
   type StockagileWarehouse,
 } from '../_shared/stockagile-core.ts';
 import { consumeTicket, hasTicket } from '../_shared/scheduled-ticket.ts';
+import { isStoreOrder, mapPosOrder, type StockagilePosOrder } from '../_shared/stockagile-sales.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
@@ -292,6 +296,95 @@ async function push(admin: SupabaseClient, stockagile: StockagileClient, busines
   return { sent, failed, review };
 }
 
+const SALES_PAGE_SIZE = 100;
+const HISTORY_FROM = '2020-01-01T00:00:00Z';
+
+/** Guarda una página de tickets de Stockagile (solo los de la tienda) y rehace sus líneas. */
+async function saveSalesPage(admin: SupabaseClient, businessId: string, orders: StockagilePosOrder[]) {
+  const store = orders.filter(isStoreOrder);
+  if (store.length === 0) return 0;
+  const now = new Date().toISOString();
+  const mapped = store.map((o) => mapPosOrder(businessId, o, now));
+  const { data: saved, error } = await admin
+    .from('stockagile_sales')
+    .upsert(mapped.map((m) => m.sale), { onConflict: 'business_id,external_id' })
+    .select('id, external_id');
+  if (error) throw new Error(`No se pudieron guardar las ventas: ${error.message}`);
+  const idByExternal = new Map(((saved ?? []) as { id: string; external_id: number }[]).map((r) => [Number(r.external_id), r.id]));
+  const ids = [...idByExternal.values()];
+  const { error: delError } = await admin.from('stockagile_sale_items').delete().in('sale_id', ids);
+  if (delError) throw new Error(`No se pudieron rehacer las líneas: ${delError.message}`);
+
+  // Talla de PYMOVA por el código de barras (si hay una sola con ese código).
+  const barcodes = [...new Set(mapped.flatMap((m) => m.items.map((i) => i.barcode)).filter((b): b is string => !!b))];
+  const variantByBarcode = new Map<string, string | null>();
+  if (barcodes.length) {
+    const { data: variants } = await admin
+      .from('product_variants').select('id, barcode').eq('business_id', businessId).in('barcode', barcodes);
+    for (const v of (variants ?? []) as { id: string; barcode: string }[]) {
+      variantByBarcode.set(v.barcode, variantByBarcode.has(v.barcode) ? null : v.id);
+    }
+  }
+  const items = mapped.flatMap((m) => {
+    const saleId = idByExternal.get(m.sale.external_id);
+    return saleId
+      ? m.items.map((i) => ({ ...i, sale_id: saleId, variant_id: i.barcode ? variantByBarcode.get(i.barcode) ?? null : null }))
+      : [];
+  });
+  if (items.length) {
+    const { error: insError } = await admin.from('stockagile_sale_items').insert(items);
+    if (insError) throw new Error(`No se pudieron guardar las líneas: ${insError.message}`);
+  }
+  return store.length;
+}
+
+/** Tickets de Stockagile creados desde `after`, de la página `page` en adelante (hasta `maxPages`). */
+async function importSales(
+  admin: SupabaseClient,
+  stockagile: StockagileClient,
+  businessId: string,
+  opts: { after: string; page?: number; maxPages: number },
+) {
+  let page = opts.page ?? 1;
+  let saved = 0;
+  let seen = 0;
+  let count: number | null = null;
+  let done = false;
+  for (let i = 0; i < opts.maxPages; i++) {
+    const data = await stockagile.get<StockagilePosOrder>('/pos-orders', {
+      created_at_after: opts.after,
+      page,
+      page_size: SALES_PAGE_SIZE,
+    });
+    count = data.count ?? count;
+    seen += data.results.length;
+    saved += await saveSalesPage(admin, businessId, data.results);
+    if (!data.next) {
+      done = true;
+      break;
+    }
+    page++;
+  }
+  return { saved, seen, count, next_page: done ? null : page, done };
+}
+
+/** Los tickets recientes: desde 2 días antes de la última copia (recoge cambios y devoluciones). */
+async function syncRecentSales(admin: SupabaseClient, stockagile: StockagileClient, businessId: string) {
+  const { data: conn } = await admin
+    .from('stockagile_connections').select('sales_synced_at').eq('business_id', businessId).maybeSingle();
+  const last = (conn as { sales_synced_at?: string | null } | null)?.sales_synced_at;
+  const from = last ? new Date(last).getTime() : Date.now() - 3 * 86_400_000;
+  const startedAt = new Date().toISOString();
+  const result = await importSales(admin, stockagile, businessId, {
+    after: new Date(from - 2 * 86_400_000).toISOString(),
+    maxPages: 10,
+  });
+  if (result.done) {
+    await admin.from('stockagile_connections').update({ sales_synced_at: startedAt }).eq('business_id', businessId);
+  }
+  return result;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
@@ -312,7 +405,14 @@ Deno.serve(async (req) => {
       for (const c of (connections ?? []) as { business_id: string }[]) {
         // El token es de TUILUS: ningún otro negocio puede usarlo.
         if (c.business_id !== STOCKAGILE_PILOT_BUSINESS_ID) continue;
-        results[c.business_id] = await push(admin, stockagile, c.business_id);
+        const moves = await push(admin, stockagile, c.business_id);
+        let sales: unknown;
+        try {
+          sales = await syncRecentSales(admin, stockagile, c.business_id);
+        } catch (error) {
+          sales = { error: error instanceof Error ? error.message : 'Error desconocido' };
+        }
+        results[c.business_id] = { ...moves, sales };
       }
       return json({ ok: true, results });
     }
@@ -336,6 +436,27 @@ Deno.serve(async (req) => {
       const { data: isMember } = await userClient.rpc('is_member_of_business', { _business_id: businessId });
       if (!isMember) return json({ error: 'No tienes acceso a este negocio' }, 403);
       return json({ ok: true, ...(await push(admin, stockagile, businessId)) });
+    }
+    if (action === 'import-sales') {
+      // Botón «Actualizar» de las ventas de Stockagile: cualquier miembro del negocio.
+      const { data: isMember } = await userClient.rpc('is_member_of_business', { _business_id: businessId });
+      if (!isMember) return json({ error: 'No tienes acceso a este negocio' }, 403);
+      return json({ ok: true, ...(await syncRecentSales(admin, stockagile, businessId)) });
+    }
+    if (action === 'import-sales-history') {
+      // Historial completo por tandas: la pantalla va pidiendo páginas hasta `done`.
+      const { data: isAdmin } = await userClient.rpc('has_min_role', { _business_id: businessId, _min_role: 'admin' });
+      if (!isAdmin) return json({ error: 'Necesitas permisos de administrador' }, 403);
+      const page = Math.max(1, Math.trunc(Number(body.page ?? 1)) || 1);
+      const result = await importSales(admin, stockagile, businessId, { after: HISTORY_FROM, page, maxPages: 5 });
+      if (result.done) {
+        const now = new Date().toISOString();
+        await admin
+          .from('stockagile_connections')
+          .update({ sales_history_imported_at: now })
+          .eq('business_id', businessId);
+      }
+      return json({ ok: true, ...result });
     }
     if (action === 'check') {
       const { data: isAdmin } = await userClient.rpc('has_min_role', { _business_id: businessId, _min_role: 'admin' });

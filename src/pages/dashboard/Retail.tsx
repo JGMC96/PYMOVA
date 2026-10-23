@@ -8,6 +8,7 @@ import {
 import { RequireModule } from '@/components/auth/RequireModule';
 import { POSPanel } from '@/components/retail/POSPanel';
 import { SalesHistory } from '@/components/retail/SalesHistory';
+import { StockagileSalesPanel } from '@/components/retail/StockagileSalesPanel';
 import { InventoryView } from '@/components/retail/InventoryView';
 import { CashRegisterPanel } from '@/components/retail/CashRegisterPanel';
 import { EcommercePanel } from '@/components/retail/EcommercePanel';
@@ -119,8 +120,9 @@ const Retail = () => {
             <EcommercePanel />
           </TabsContent>
 
-          <TabsContent value="history" className="mt-6">
+          <TabsContent value="history" className="mt-6 space-y-6">
             <SalesHistory />
+            <StockagileSalesPanel />
           </TabsContent>
 
           <TabsContent value="inventory" className="mt-6">

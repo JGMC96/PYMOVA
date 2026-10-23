@@ -139,7 +139,7 @@ export function ClientDetailSheet({ client, onClose }: { client: ClientCard | nu
                 <ul className="space-y-2">
                   {history.purchases.map((p) => {
                     const status = purchaseStatusLabel(p);
-                    const Icon = p.channel === 'store' ? Store : Globe;
+                    const Icon = p.channel === 'online' ? Globe : Store;
                     return (
                       <li key={`${p.channel}-${p.id}`} className="rounded-lg border p-3">
                         <div className="flex items-center justify-between gap-2">
