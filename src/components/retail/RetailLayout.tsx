@@ -15,8 +15,11 @@ const PAGES: Record<string, { title: string; description?: string }> = {
   '/dashboard/sales/register': { title: 'Caja', description: 'Apertura, cierre y arqueo de la caja.' },
   '/dashboard/sales/history': { title: 'Historial de ventas', description: 'Tickets, devoluciones y reimpresiones.' },
   '/dashboard/sales/online': { title: 'Pedidos web', description: 'Pedidos de la tienda online.' },
-  '/dashboard/stock/inventory': { title: 'Inventario', description: 'Stock por producto y talla.' },
-  '/dashboard/stock/purchases': { title: 'Compras', description: 'Pedidos a proveedor y recepción de mercancía.' },
+  '/dashboard/stock/inventory': { title: 'Inventario', description: 'Unidades de cada producto y talla.' },
+  '/dashboard/stock/purchases': {
+    title: 'Compras',
+    description: 'Pedidos a proveedor y recepción de la mercancía. Al recibir, el stock sube en la ubicación de la compra.',
+  },
   '/dashboard/stock/labels': { title: 'Etiquetas', description: 'Diseño e impresión de etiquetas con código de barras.' },
   '/dashboard/team/sellers': { title: 'Vendedores', description: 'Quién vende en el TPV, sus PIN y sus permisos.' },
 };

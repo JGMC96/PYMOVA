@@ -330,7 +330,7 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
       <SellerBar />
       {!openSession ? (
         <div className="mb-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-600 dark:text-amber-400">
-          No hay caja abierta. Para cobrar en efectivo, ábrela en la pestaña <strong>Caja</strong>. Con tarjeta o transferencia puedes vender igualmente.
+          No hay caja abierta. Para cobrar en efectivo, ábrela en <strong>Ventas › Caja</strong>. Con tarjeta o transferencia puedes vender igualmente.
         </div>
       ) : (
         <CashRegisterStaleBanner openedAt={openSession.opened_at} onGoToRegister={onGoToRegister} />

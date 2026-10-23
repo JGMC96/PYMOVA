@@ -135,7 +135,7 @@ export function SalesHistory() {
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="flex items-center gap-2">
           <Receipt className="w-5 h-5" />
-          Historial de Ventas
+          Ventas en PYMOVA
         </CardTitle>
         <Button
           variant="outline"
