@@ -4244,6 +4244,14 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_catalog_costs: {
+        Args: { _business_id: string; _product_id?: string }
+        Returns: {
+          cost_price: number
+          id: string
+          kind: string
+        }[]
+      }
       get_client_history: {
         Args: { _business_id: string; _client_id: string }
         Returns: Json
