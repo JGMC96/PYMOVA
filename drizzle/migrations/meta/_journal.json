@@ -365,6 +365,13 @@
       "when": 1792762566759,
       "tag": "0051_0051_seguridad_shopify_servidor",
       "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1792763613870,
+      "tag": "0052_0052_costes_ocultos",
+      "breakpoints": true
     }
   ]
 }
