@@ -37,9 +37,9 @@ export function PaymentsHeader({
     <div className="space-y-4">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Pagos</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Cobros</h1>
           <p className="text-muted-foreground">
-            Registra y gestiona los pagos de tus facturas
+            Registra y gestiona los cobros de tus facturas
           </p>
         </div>
         {isAdmin && (

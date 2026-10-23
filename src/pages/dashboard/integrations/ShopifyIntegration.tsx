@@ -26,6 +26,7 @@ import { StockagileCheckPanel } from '@/components/integrations/StockagileCheckP
 import { ShopifyCustomersCard } from '@/components/integrations/ShopifyCustomersCard';
 import { VariantMappingReport } from '@/components/integrations/VariantMappingReport';
 import { useRoleAccess } from '@/hooks/useRoleAccess';
+import { INTEGRATIONS_SETTINGS } from '@/lib/dashboardMenu';
 
 /** La integración la gestionan los administradores: el servidor rechaza al personal sus acciones. */
 const ShopifyIntegration = () => {
@@ -35,7 +36,7 @@ const ShopifyIntegration = () => {
     return (
       <div className="space-y-6">
         <Button variant="ghost" size="sm" asChild className="-ml-2">
-          <Link to="/dashboard/integrations">
+          <Link to={INTEGRATIONS_SETTINGS}>
             <ArrowLeft className="w-4 h-4 mr-1.5" />
             Integraciones
           </Link>
@@ -151,7 +152,7 @@ const ShopifyIntegrationAdmin = () => {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <Button variant="ghost" size="sm" asChild className="-ml-2 mb-2">
-            <Link to="/dashboard/integrations">
+            <Link to={INTEGRATIONS_SETTINGS}>
               <ArrowLeft className="w-4 h-4 mr-1.5" />
               Integraciones
             </Link>

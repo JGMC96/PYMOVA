@@ -17,6 +17,7 @@ import { useDashboardMetrics } from "@/hooks/useDashboardMetrics";
 import { useRecentActivity, formatRelativeTime, type ActivityEventType } from "@/hooks/useRecentActivity";
 import { useMoney } from "@/hooks/useMoney";
 import { useRoleAccess } from "@/hooks/useRoleAccess";
+import { RETAIL_HOME } from "@/lib/dashboardMenu";
 
 const formatChange = (value: number, isPercentage: boolean = true): string => {
   const prefix = value > 0 ? '+' : '';
@@ -58,7 +59,7 @@ const StaffOverview = () => {
         <p className="text-muted-foreground">Accesos rápidos para tu turno</p>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Card className="cursor-pointer hover:border-primary/50" onClick={() => navigate("/dashboard/retail")}>
+        <Card className="cursor-pointer hover:border-primary/50" onClick={() => navigate(RETAIL_HOME)}>
           <CardHeader>
             <CardTitle className="text-lg">Punto de venta</CardTitle>
           </CardHeader>

@@ -1,5 +1,4 @@
-import { Routes, Route } from 'react-router-dom';
-import { Link } from 'react-router-dom';
+import { Routes, Route, Navigate, Link } from 'react-router-dom';
 import { Plug, ShoppingBag, Globe, Store, Table2, CreditCard, Sparkles, Loader2, Check, ArrowRight } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -7,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { useIntegrationInterests } from '@/hooks/useIntegrationInterests';
 import ShopifyIntegration from './integrations/ShopifyIntegration';
 import type { LucideIcon } from 'lucide-react';
+import { INTEGRATIONS_SETTINGS } from '@/lib/dashboardMenu';
 
 
 interface Integration {
@@ -66,7 +66,7 @@ const INTEGRATIONS: Integration[] = [
   },
 ];
 
-const IntegrationsIndex = () => {
+export const IntegrationsIndex = ({ showHeader = true }: { showHeader?: boolean }) => {
   const { interests, isLoading, savingKey, toggleInterest } = useIntegrationInterests();
 
   const priorityOf = (key: string) => {
@@ -79,15 +79,21 @@ const IntegrationsIndex = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-display font-bold text-foreground flex items-center gap-2">
-          <Plug className="w-7 h-7 text-accent" />
-          Integraciones
-        </h1>
-        <p className="text-muted-foreground mt-1">
+      {showHeader ? (
+        <div>
+          <h1 className="text-3xl font-display font-bold text-foreground flex items-center gap-2">
+            <Plug className="w-7 h-7 text-accent" />
+            Integraciones
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Conecta Pymova con tus plataformas para importar productos, stock y clientes.
+          </p>
+        </div>
+      ) : (
+        <p className="text-muted-foreground">
           Conecta Pymova con tus plataformas para importar productos, stock y clientes.
         </p>
-      </div>
+      )}
 
       <Card className="border-accent/30 bg-accent/5">
         <CardContent className="flex items-start gap-3 py-4">
@@ -192,7 +198,7 @@ const IntegrationsIndex = () => {
 
 const Integrations = () => (
   <Routes>
-    <Route index element={<IntegrationsIndex />} />
+    <Route index element={<Navigate to={INTEGRATIONS_SETTINGS} replace />} />
     <Route path="shopify" element={<ShopifyIntegration />} />
   </Routes>
 );
