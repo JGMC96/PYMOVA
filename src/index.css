@@ -191,4 +191,28 @@
   .animate-pulse-slow {
     animation: pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
+
+  /* Barra de desplazamiento discreta (menú lateral): fina y visible solo al pasar el ratón. */
+  .scrollbar-subtle {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+  .scrollbar-subtle:hover {
+    scrollbar-color: hsl(var(--sidebar-border)) transparent;
+  }
+  .scrollbar-subtle::-webkit-scrollbar {
+    width: 6px;
+  }
+  .scrollbar-subtle::-webkit-scrollbar-track,
+  .scrollbar-subtle::-webkit-scrollbar-button {
+    display: none;
+    background: transparent;
+  }
+  .scrollbar-subtle::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 9999px;
+  }
+  .scrollbar-subtle:hover::-webkit-scrollbar-thumb {
+    background: hsl(var(--sidebar-border));
+  }
 }

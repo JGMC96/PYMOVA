@@ -71,7 +71,7 @@ export const DashboardSidebar = ({ isOpen, onToggle }: DashboardSidebarProps) =>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-4 overflow-y-auto">
+      <nav className="flex-1 px-4 py-3 space-y-3 overflow-y-auto scrollbar-subtle">
         {sections.map((section, index) => (
           <div key={section.title ?? `suelto-${index}`} className="space-y-1">
             {section.title && (isOpen ? (
@@ -96,7 +96,7 @@ export const DashboardSidebar = ({ isOpen, onToggle }: DashboardSidebarProps) =>
                       }
                     })}
                     className={cn(
-                      "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl",
+                      "w-full flex items-center gap-3 px-3 py-2 rounded-xl",
                       "text-sidebar-foreground/40 hover:bg-sidebar-accent/30 transition-colors",
                       !isOpen && "justify-center"
                     )}
@@ -117,7 +117,7 @@ export const DashboardSidebar = ({ isOpen, onToggle }: DashboardSidebarProps) =>
                   key={item.path}
                   to={item.path}
                   className={cn(
-                    "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors",
+                    "flex items-center gap-3 px-3 py-2 rounded-xl transition-colors",
                     isActive
                       ? "bg-sidebar-primary text-sidebar-primary-foreground"
                       : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent",

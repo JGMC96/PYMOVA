@@ -62,13 +62,7 @@ export function PurchasesPanel() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-semibold">Compras</h2>
-          <p className="text-sm text-muted-foreground">
-            Pedidos a proveedor y recepción de la mercancía. Al recibir, el stock sube en la ubicación de la compra.
-          </p>
-        </div>
+      <div className="flex justify-end">
         <Button onClick={() => setEditing('new')}>
           <PackagePlus className="w-4 h-4 mr-2" />
           Nueva compra

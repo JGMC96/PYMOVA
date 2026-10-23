@@ -118,7 +118,7 @@ function NamePicker({
   if (options.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
-        No hay dependientes con PIN. Un administrador puede crearlos en la pestaña <strong>Vendedores</strong>.
+        No hay dependientes con PIN. Un administrador puede crearlos en <strong>Equipo › Vendedores</strong>.
       </p>
     );
   }

@@ -53,7 +53,7 @@ export function InventoryView() {
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="flex items-center gap-2">
           <Package className="w-5 h-5" />
-          Inventario
+          Stock por producto
         </CardTitle>
         <Button variant="outline" size="sm" onClick={refreshProducts}>
           <RefreshCw className="w-4 h-4 mr-2" />
