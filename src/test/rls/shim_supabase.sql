@@ -3,17 +3,26 @@
 -- el esquema storage y los privilegios por defecto que Supabase da en public.
 -- Las extensiones que solo existen en Supabase (pg_net, pg_cron, supabase_vault,
 -- pgmq) las neutraliza harness.ts al aplicar las migraciones.
+-- Los roles son del clúster, no de la base: en un Postgres recién creado varios
+-- archivos de test los crean a la vez, y el que llega segundo recibe
+-- unique_violation (o duplicate_object). Se ignora: el rol ya existe.
 DO $$
+DECLARE
+  _rol record;
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
-    CREATE ROLE anon NOLOGIN NOINHERIT;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
-    CREATE ROLE authenticated NOLOGIN NOINHERIT;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
-    CREATE ROLE service_role NOLOGIN NOINHERIT BYPASSRLS;
-  END IF;
+  FOR _rol IN SELECT * FROM (VALUES
+    ('anon', 'NOLOGIN NOINHERIT'),
+    ('authenticated', 'NOLOGIN NOINHERIT'),
+    ('service_role', 'NOLOGIN NOINHERIT BYPASSRLS')
+  ) AS r(nombre, opciones) LOOP
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = _rol.nombre) THEN
+      BEGIN
+        EXECUTE format('CREATE ROLE %I %s', _rol.nombre, _rol.opciones);
+      EXCEPTION WHEN unique_violation OR duplicate_object THEN
+        NULL;
+      END;
+    END IF;
+  END LOOP;
 END $$;
 GRANT anon, authenticated, service_role TO CURRENT_USER;
 
