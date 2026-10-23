@@ -3,7 +3,8 @@
 // reserve_catalog_codes (permiso de catálogo; bloqueado mientras Stockagile esté conectado).
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
-import { serviceClient, shopifyGraphql, ShopifyError } from '../_shared/shopify-client.ts';
+import { getShopDomain, serviceClient, shopifyGraphql, ShopifyError } from '../_shared/shopify-client.ts';
+import { storeConnection } from '../_shared/shopify-connection.ts';
 import {
   shopifyCodeConflicts, variantCodeUpdates, type ReservedCode, type ShopifyVariantCodes,
 } from '../_shared/catalog-codes.ts';
@@ -69,6 +70,10 @@ Deno.serve(async (req) => {
       .eq('id', productId).eq('business_id', businessId).maybeSingle();
     if (!product) return json({ error: 'Producto no encontrado' }, 404);
     const shopifyProduct = product.external_source === 'shopify' && product.external_id ? String(product.external_id) : null;
+    // Solo escribe en Shopify el negocio vinculado a la tienda de este despliegue (S1/S4).
+    if (shopifyProduct && !(await storeConnection(admin, businessId, getShopDomain(), 'business_id'))) {
+      return json({ error: 'Este negocio no tiene la tienda de Shopify vinculada' }, 409);
+    }
 
     // Lo que hay en Shopify manda: si una talla ya tiene ese código allí, no se toca.
     if (shopifyProduct) {

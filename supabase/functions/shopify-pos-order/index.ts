@@ -7,7 +7,8 @@
 // La llaman el TPV (usuario) y la tarea programada «shopify-tpv» (ticket de un solo uso).
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
-import { serviceClient, shopifyGraphql, ShopifyError } from '../_shared/shopify-client.ts';
+import { getShopDomain, serviceClient, shopifyGraphql, ShopifyError } from '../_shared/shopify-client.ts';
+import { storeBusinessIds, storeConnection } from '../_shared/shopify-connection.ts';
 import {
   posOrderAttributes, posOrderSearchQuery, posSaleTransactions, posTicketTags, VOUCHER_GATEWAY,
 } from '../_shared/shopify-core.ts';
@@ -85,11 +86,12 @@ async function markDone(admin: SupabaseClient, sale: SaleRow, order: { id: strin
 
 /** Envía a Shopify las ventas pendientes de un negocio. */
 async function processBusiness(admin: SupabaseClient, businessId: string): Promise<Record<string, unknown>> {
-  const { data: connection } = await admin
-    .from('shopify_connections')
-    .select('pos_orders_enabled, pos_orders_since, default_location_gid')
-    .eq('business_id', businessId)
-    .maybeSingle();
+  // Solo la conexión de la tienda de este despliegue (S1): un dominio cualquiera no basta.
+  const connection = await storeConnection<{
+    pos_orders_enabled: boolean;
+    pos_orders_since: string | null;
+    default_location_gid: string | null;
+  }>(admin, businessId, getShopDomain(), 'pos_orders_enabled, pos_orders_since, default_location_gid');
   if (!connection) return { status: 'skipped', reason: 'Sin tienda de Shopify vinculada' };
   if (!connection.pos_orders_enabled) return { status: 'skipped', reason: 'Pedidos de tienda desactivados' };
 
@@ -228,17 +230,13 @@ Deno.serve(async (req) => {
     // Tarea programada: sin JWT, con ticket de un solo uso; todos los negocios con pedidos de tienda.
     if (hasTicket(body)) {
       if (!(await consumeTicket(admin, body, 'pos-orders'))) return json({ error: 'No autorizado' }, 401);
-      const { data: conns } = await admin
-        .from('shopify_connections')
-        .select('business_id')
-        .eq('pos_orders_enabled', true)
-        .is('uninstalled_at', null);
+      const ids = await storeBusinessIds(admin, getShopDomain(), 'pos_orders_enabled');
       const results = [];
-      for (const c of conns ?? []) {
+      for (const id of ids) {
         try {
-          results.push({ business_id: c.business_id, ...(await processBusiness(admin, c.business_id)) });
+          results.push({ business_id: id, ...(await processBusiness(admin, id)) });
         } catch (error) {
-          results.push({ business_id: c.business_id, error: error instanceof Error ? error.message : 'Error' });
+          results.push({ business_id: id, error: error instanceof Error ? error.message : 'Error' });
         }
       }
       return json({ status: 'ok', results });
