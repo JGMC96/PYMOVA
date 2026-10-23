@@ -227,7 +227,7 @@ export function useInvoices(): UseInvoicesReturn {
     }
   }, [activeBusinessId, user, fetchInvoices, toast]);
 
-  // Update invoice status
+  // Emitir o cancelar por RPC (0050): «pagada» y «vencida» salen de los cobros.
   const updateInvoiceStatus = useCallback(async (id: string, status: InvoiceStatus): Promise<boolean> => {
     if (!activeBusinessId) {
       toast({
@@ -239,21 +239,14 @@ export function useInvoices(): UseInvoicesReturn {
     }
 
     try {
-      const updateData: { status: InvoiceStatus; paid_at?: string } = { status };
-      
-      // If marking as paid, set paid_at
-      if (status === 'paid') {
-        updateData.paid_at = new Date().toISOString();
-      }
+      const { data: newStatus, error: rpcError } = await supabase.rpc('set_invoice_status', {
+        _business_id: activeBusinessId,
+        _invoice_id: id,
+        _status: status,
+      });
 
-      const { error: updateError } = await supabase
-        .from('invoices')
-        .update(updateData)
-        .eq('id', id)
-        .eq('business_id', activeBusinessId);
-
-      if (updateError) {
-        throw updateError;
+      if (rpcError) {
+        throw rpcError;
       }
 
       const statusLabels: Record<InvoiceStatus, string> = {
@@ -266,7 +259,7 @@ export function useInvoices(): UseInvoicesReturn {
 
       toast({
         title: 'Estado actualizado',
-        description: `Factura marcada como ${statusLabels[status]}`,
+        description: `Factura marcada como ${statusLabels[(newStatus as InvoiceStatus) || status]}`,
       });
 
       await fetchInvoices();

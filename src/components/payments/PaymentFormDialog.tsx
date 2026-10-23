@@ -75,8 +75,6 @@ export function PaymentFormDialog({
 }: PaymentFormDialogProps) {
   const { format: formatPrice } = useMoney();
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceForPayment | null>(null);
-  const [showOverpayConfirm, setShowOverpayConfirm] = useState(false);
-  const [pendingSubmit, setPendingSubmit] = useState<FormValues | null>(null);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(paymentSchema),
@@ -100,8 +98,6 @@ export function PaymentFormDialog({
         notes: '',
       });
       setSelectedInvoice(null);
-      setShowOverpayConfirm(false);
-      setPendingSubmit(null);
     }
   }, [open, form]);
 
@@ -120,22 +116,16 @@ export function PaymentFormDialog({
     }
   }, [watchedInvoiceId, invoices, form]);
 
-  // Watch amount to detect overpay
+  // 0050: no se cobra más de lo pendiente (el servidor también lo rechaza).
   const watchedAmount = form.watch('amount');
-  const isOverpay = selectedInvoice && watchedAmount > selectedInvoice.pending && selectedInvoice.pending > 0;
+  const isOverpay = !!selectedInvoice && watchedAmount > selectedInvoice.pending;
 
   const handleSubmit = async (values: FormValues) => {
-    // Check for overpay and require confirmation
-    if (selectedInvoice && values.amount > selectedInvoice.pending && selectedInvoice.pending > 0) {
-      setPendingSubmit(values);
-      setShowOverpayConfirm(true);
+    if (selectedInvoice && values.amount > selectedInvoice.pending) {
+      form.setError('amount', { message: 'No puede superar lo pendiente' });
       return;
     }
 
-    await executeSubmit(values);
-  };
-
-  const executeSubmit = async (values: FormValues) => {
     const success = await onSubmit({
       invoice_id: values.invoice_id,
       amount: values.amount,
@@ -147,19 +137,6 @@ export function PaymentFormDialog({
     if (success) {
       onOpenChange(false);
     }
-  };
-
-  const handleConfirmOverpay = async () => {
-    if (pendingSubmit) {
-      setShowOverpayConfirm(false);
-      await executeSubmit(pendingSubmit);
-      setPendingSubmit(null);
-    }
-  };
-
-  const handleCancelOverpay = () => {
-    setShowOverpayConfirm(false);
-    setPendingSubmit(null);
   };
 
   return (
@@ -245,47 +222,13 @@ export function PaymentFormDialog({
             )}
 
             {/* Overpay warning */}
-            {isOverpay && !showOverpayConfirm && (
+            {isOverpay && (
               <Alert variant="destructive">
                 <AlertTriangle className="h-4 w-4" />
                 <AlertTitle>Monto excede el pendiente</AlertTitle>
                 <AlertDescription>
-                  El monto ingresado ({formatPrice(watchedAmount)}) supera el pendiente 
-                  ({formatPrice(selectedInvoice?.pending || 0)}). Se te pedirá confirmación al guardar.
-                </AlertDescription>
-              </Alert>
-            )}
-
-            {/* Overpay confirmation dialog */}
-            {showOverpayConfirm && (
-              <Alert variant="destructive" className="border-2">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>¿Confirmar sobrepago?</AlertTitle>
-                <AlertDescription className="space-y-3">
-                  <p>
-                    Estás registrando {formatPrice(pendingSubmit?.amount || 0)} cuando solo 
-                    quedan pendientes {formatPrice(selectedInvoice?.pending || 0)}.
-                  </p>
-                  <div className="flex gap-2">
-                    <Button 
-                      type="button" 
-                      variant="destructive" 
-                      size="sm"
-                      onClick={handleConfirmOverpay}
-                      disabled={isSubmitting}
-                    >
-                      {isSubmitting ? 'Guardando...' : 'Confirmar sobrepago'}
-                    </Button>
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      size="sm"
-                      onClick={handleCancelOverpay}
-                      disabled={isSubmitting}
-                    >
-                      Cancelar
-                    </Button>
-                  </div>
+                  El monto ingresado ({formatPrice(watchedAmount)}) supera el pendiente
+                  ({formatPrice(selectedInvoice?.pending || 0)}). Como mucho, cobra lo pendiente.
                 </AlertDescription>
               </Alert>
             )}
@@ -380,7 +323,7 @@ export function PaymentFormDialog({
               >
                 Cancelar
               </Button>
-              <Button type="submit" disabled={isSubmitting || showOverpayConfirm}>
+              <Button type="submit" disabled={isSubmitting || isOverpay}>
                 {isSubmitting ? 'Guardando...' : 'Registrar pago'}
               </Button>
             </DialogFooter>

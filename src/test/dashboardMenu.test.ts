@@ -27,6 +27,7 @@ describe('menú por áreas', () => {
     expect(todas).not.toContain('Compras');
     expect(todas).not.toContain('Vendedores');
     expect(menu).toContainEqual(['Equipo', ['RRHH']]);
+    expect(menu.map(([title]) => title)).not.toContain('Facturación');
   });
 
   it('lo que no entra en el plan sale con candado', () => {
