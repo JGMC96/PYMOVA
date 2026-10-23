@@ -12,6 +12,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { useInventory, type ProductWithStock } from '@/hooks/useInventory';
+import { useMyPermissions } from '@/hooks/useMyPermissions';
 import {
   usePurchases, type PurchaseDraftLine, type PurchaseOrder, type StockLocation, type Supplier,
 } from '@/hooks/usePurchases';
@@ -61,7 +62,9 @@ export function PurchaseEditorDialog({
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
 }) {
-  const { products } = useInventory();
+  // El coste de cada talla rellena el de la compra, si quien compra puede verlo.
+  const { canSeeCosts } = useMyPermissions();
+  const { products } = useInventory({ withCosts: canSeeCosts });
   const { fetchSuppliers, fetchLocations, saveSupplier, saveOrder, isSaving } = usePurchases();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [locations, setLocations] = useState<StockLocation[]>([]);

@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { toast } from 'sonner';
+import { fetchCatalogCosts, VARIANT_COLUMNS, type CatalogCosts } from '@/lib/catalogCosts';
 
 export interface ProductVariant {
   id: string;
@@ -27,9 +28,11 @@ export interface VariantFormData {
   stock_quantity?: number;
 }
 
-export function useProductVariants(productId?: string) {
+/** Tallas de un producto (o del negocio). Sin coste salvo `withCosts` (permiso de ver costes). */
+export function useProductVariants(productId?: string, { withCosts = false }: { withCosts?: boolean } = {}) {
   const { activeBusiness } = useBusiness();
   const [variants, setVariants] = useState<ProductVariant[]>([]);
+  const [costs, setCosts] = useState<CatalogCosts | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -39,7 +42,7 @@ export function useProductVariants(productId?: string) {
 
     let query = supabase
       .from('product_variants')
-      .select('*')
+      .select(VARIANT_COLUMNS as '*')
       .eq('business_id', activeBusiness.id)
       .eq('is_active', true)
       .order('name');
@@ -53,7 +56,7 @@ export function useProductVariants(productId?: string) {
       toast.error('Error al cargar variantes');
     } else {
       setVariants(
-        (data ?? []).map((v) => ({
+        ((data ?? []) as unknown as ProductVariant[]).map((v) => ({
           ...v,
           attributes: (v.attributes as Record<string, string>) ?? {},
         })) as ProductVariant[]
@@ -62,9 +65,28 @@ export function useProductVariants(productId?: string) {
     setIsLoading(false);
   }, [activeBusiness?.id, productId]);
 
+  const fetchCosts = useCallback(async () => {
+    if (!withCosts || !activeBusiness?.id) {
+      setCosts(null);
+      return;
+    }
+    const { costs: c, error } = await fetchCatalogCosts(supabase, activeBusiness.id, productId);
+    if (error) console.error('Error fetching costs:', error);
+    setCosts(error ? null : c);
+  }, [activeBusiness?.id, productId, withCosts]);
+
   useEffect(() => {
     fetchVariants();
   }, [fetchVariants]);
+
+  useEffect(() => {
+    void fetchCosts();
+  }, [fetchCosts]);
+
+  const variantsWithCosts = useMemo(
+    () => variants.map((v) => ({ ...v, cost_price: costs?.variants.get(v.id) ?? null })),
+    [variants, costs],
+  );
 
   const createVariant = async (pid: string, data: VariantFormData): Promise<boolean> => {
     if (!activeBusiness?.id) return false;
@@ -78,7 +100,8 @@ export function useProductVariants(productId?: string) {
       sku: data.sku || null,
       barcode: data.barcode || null,
       price: data.price ?? null,
-      cost_price: data.cost_price ?? null,
+      // Sin ver costes, la talla nueva se crea sin coste.
+      cost_price: costs !== null ? (data.cost_price ?? null) : null,
       stock_quantity: data.stock_quantity ?? 0,
       created_by: userData.user?.id ?? null,
     });
@@ -91,12 +114,16 @@ export function useProductVariants(productId?: string) {
     }
     toast.success('Variante creada');
     fetchVariants();
+    void fetchCosts();
     return true;
   };
 
   const updateVariant = async (id: string, data: Partial<VariantFormData>): Promise<boolean> => {
     setIsSaving(true);
-    const { error } = await supabase.from('product_variants').update(data).eq('id', id);
+    // Sin ver costes no se toca el coste que tenga.
+    const { cost_price, ...rest } = data;
+    const payload = costs !== null && cost_price !== undefined ? { ...rest, cost_price } : rest;
+    const { error } = await supabase.from('product_variants').update(payload).eq('id', id);
     setIsSaving(false);
 
     if (error) {
@@ -105,6 +132,7 @@ export function useProductVariants(productId?: string) {
       return false;
     }
     fetchVariants();
+    void fetchCosts();
     return true;
   };
 
@@ -127,7 +155,7 @@ export function useProductVariants(productId?: string) {
   };
 
   return {
-    variants,
+    variants: variantsWithCosts,
     isLoading,
     isSaving,
     createVariant,
