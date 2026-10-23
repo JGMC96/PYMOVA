@@ -337,6 +337,13 @@
       "when": 1792742865391,
       "tag": "0047_ventas_stockagile_tarea",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1792748148745,
+      "tag": "0048_seguridad_pedidos_web",
+      "breakpoints": true
     }
   ]
 }
