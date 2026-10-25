@@ -4182,6 +4182,10 @@ export type Database = {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
       }
+      delete_payment_and_recalc_invoice: {
+        Args: { _business_id: string; _payment_id: string }
+        Returns: undefined
+      }
       ean13_check_digit: { Args: { _first12: string }; Returns: number }
       email_queue_dispatch: { Args: never; Returns: undefined }
       employee_display_name: { Args: { _employee_id: string }; Returns: string }
@@ -4238,6 +4242,14 @@ export type Database = {
           joined_at: string
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
+        }[]
+      }
+      get_catalog_costs: {
+        Args: { _business_id: string; _product_id?: string }
+        Returns: {
+          cost_price: number
+          id: string
+          kind: string
         }[]
       }
       get_client_history: {
@@ -4732,6 +4744,14 @@ export type Database = {
       set_employee_pin: {
         Args: { _business_id: string; _employee_id: string; _pin: string }
         Returns: undefined
+      }
+      set_invoice_status: {
+        Args: {
+          _business_id: string
+          _invoice_id: string
+          _status: Database["public"]["Enums"]["invoice_status"]
+        }
+        Returns: Database["public"]["Enums"]["invoice_status"]
       }
       set_online_order_status: {
         Args: {

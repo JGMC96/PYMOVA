@@ -1,8 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { toast } from 'sonner';
 import type { ProductVariant } from './useProductVariants';
+import { fetchAllRows } from '@/lib/fetchAllRows';
+import { fetchCatalogCosts, VARIANT_COLUMNS, type CatalogCosts } from '@/lib/catalogCosts';
+import { hasStockLeft } from '@/lib/posSearch';
 
 export interface ProductWithStock {
   id: string;
@@ -21,27 +24,18 @@ export interface ProductWithStock {
   variants: ProductVariant[];
 }
 
-const PAGE = 1000;
-
 /**
- * Todas las filas de una consulta, de 1.000 en 1.000: el servidor no devuelve más de 1.000
- * por petición y un negocio puede tener más tallas (Tuilus pasa de 1.200).
+ * Catálogo con stock y tallas. Sin coste salvo `withCosts` (solo con permiso de ver costes):
+ * entonces se piden aparte y se añaden a cada talla. Con `inactiveWithStock` (solo el TPV),
+ * también los productos inactivos en Shopify que aún tienen stock en la tienda (0053).
  */
-async function fetchAllRows<T>(
-  page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>,
-): Promise<{ data: T[]; error: unknown }> {
-  const all: T[] = [];
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await page(from, from + PAGE - 1);
-    if (error) return { data: all, error };
-    all.push(...(data ?? []));
-    if (!data || data.length < PAGE) return { data: all, error: null };
-  }
-}
-
-export function useInventory() {
+export function useInventory({
+  withCosts = false,
+  inactiveWithStock = false,
+}: { withCosts?: boolean; inactiveWithStock?: boolean } = {}) {
   const { activeBusiness } = useBusiness();
   const [products, setProducts] = useState<ProductWithStock[]>([]);
+  const [costs, setCosts] = useState<CatalogCosts | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
 
@@ -52,20 +46,21 @@ export function useInventory() {
     const businessId = activeBusiness.id;
     const [{ data, error }, { data: variantData, error: variantError }] = await Promise.all([
       // `color` es de la 0042: se lee sin tipos hasta que se regenere types.ts.
-      fetchAllRows<Record<string, unknown>>((from, to) =>
-        supabase
+      fetchAllRows<Record<string, unknown>>((from, to) => {
+        let q = supabase
           .from('products')
           .select('id, name, description, price, unit, category, is_active, stock_quantity, track_inventory, barcode, sku, color' as '*')
-          .eq('business_id', businessId)
-          .eq('is_active', true)
+          .eq('business_id', businessId);
+        if (!inactiveWithStock) q = q.eq('is_active', true);
+        return q
           .order('name')
           .order('id')
-          .range(from, to) as unknown as PromiseLike<{ data: Record<string, unknown>[] | null; error: unknown }>,
-      ),
+          .range(from, to) as unknown as PromiseLike<{ data: Record<string, unknown>[] | null; error: unknown }>;
+      }),
       fetchAllRows<Record<string, unknown>>((from, to) =>
         supabase
           .from('product_variants')
-          .select('*')
+          .select(VARIANT_COLUMNS as '*')
           .eq('business_id', businessId)
           .eq('is_active', true)
           .order('name')
@@ -85,22 +80,49 @@ export function useInventory() {
       const byProduct = new Map<string, ProductVariant[]>();
       for (const v of variants) byProduct.set(v.product_id, [...(byProduct.get(v.product_id) ?? []), v]);
 
-      setProducts(
-        data.map((p) => ({
-          ...p,
-          stock_quantity: (p.stock_quantity as number | null) ?? 0,
-          track_inventory: (p.track_inventory as boolean | null) ?? false,
-          color: (p.color as string | null | undefined) ?? null,
-          variants: byProduct.get(p.id as string) ?? [],
-        })) as unknown as ProductWithStock[]
-      );
+      const all = data.map((p) => ({
+        ...p,
+        stock_quantity: (p.stock_quantity as number | null) ?? 0,
+        track_inventory: (p.track_inventory as boolean | null) ?? false,
+        color: (p.color as string | null | undefined) ?? null,
+        variants: byProduct.get(p.id as string) ?? [],
+      })) as unknown as ProductWithStock[];
+      // Inactivos solo si les queda stock; los activos, siempre.
+      setProducts(inactiveWithStock ? all.filter((p) => p.is_active || hasStockLeft(p)) : all);
     }
     setIsLoading(false);
-  }, [activeBusiness?.id]);
+  }, [activeBusiness?.id, inactiveWithStock]);
 
   useEffect(() => {
     fetchProducts();
   }, [fetchProducts]);
+
+  useEffect(() => {
+    const businessId = activeBusiness?.id;
+    if (!withCosts || !businessId) {
+      setCosts(null);
+      return;
+    }
+    let cancelled = false;
+    void fetchCatalogCosts(supabase, businessId).then(({ costs: c, error }) => {
+      if (error) console.error('Error fetching costs:', error);
+      if (!cancelled) setCosts(c);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeBusiness?.id, withCosts]);
+
+  const withCostPrices = useMemo(
+    () =>
+      costs
+        ? products.map((p) => ({
+            ...p,
+            variants: p.variants.map((v) => ({ ...v, cost_price: costs.variants.get(v.id) ?? null })),
+          }))
+        : products,
+    [products, costs],
+  );
 
   // El stock se cambia con useStockAdjust (adjust_stock, solo admins y con motivo).
 
@@ -125,7 +147,7 @@ export function useInventory() {
   };
 
   return {
-    products,
+    products: withCostPrices,
     isLoading,
     isUpdating,
     toggleTracking,

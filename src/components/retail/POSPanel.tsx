@@ -37,7 +37,7 @@ import { VariosDialog } from './VariosDialog';
 import { VoucherDialog, type AppliedVoucher } from './VoucherDialog';
 import { voucherApplied } from '@/lib/vales';
 import { matchesVarios } from '@/lib/varios';
-import { matchesSearch } from '@/lib/search';
+import { findByCode, POS_SEARCH_LIMIT, searchPosProducts, type PosSearchHit } from '@/lib/posSearch';
 
 const PAYMENT_ICONS: Record<string, typeof Banknote> = {
   cash: Banknote,
@@ -46,7 +46,8 @@ const PAYMENT_ICONS: Record<string, typeof Banknote> = {
 };
 
 export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {}) {
-  const { products, isLoading: productsLoading, refreshProducts } = useInventory();
+  // También los inactivos en Shopify que aún tienen stock en la tienda (0053), marcados y detrás.
+  const { products, isLoading: productsLoading, refreshProducts } = useInventory({ inactiveWithStock: true });
   const { createSale, isCreating } = useRetailSales();
   const { settings } = useBusinessSettings();
   const { profile } = useStoreProfile();
@@ -82,18 +83,17 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
     return Array.from(new Set([...fromProducts, ...profile.categories]));
   }, [products, profile.categories]);
 
-  const filteredProducts = useMemo(() => {
-    return products.filter((p) => {
-      const matchesCategory = !categoryFilter || p.category === categoryFilter;
-      // Sin tildes ni mayúsculas y palabra a palabra («paris» encuentra «París»).
-      const matchesQuery = matchesSearch(searchQuery, [p.name, p.category, p.sku]);
-      return matchesCategory && matchesQuery;
-    });
-  }, [products, searchQuery, categoryFilter]);
+  // Sin tildes ni mayúsculas, palabra a palabra y también por talla, SKU o código de la talla.
+  const searchHits = useMemo(
+    () => searchPosProducts(products.filter((p) => !categoryFilter || p.category === categoryFilter), searchQuery),
+    [products, searchQuery, categoryFilter]
+  );
+  const filteredProducts = useMemo(() => searchHits.map((h) => h.product), [searchHits]);
 
+  // Con el catálogo abierto, la búsqueda filtra el catálogo y no sale el desplegable.
   const searchResults = useMemo(
-    () => (searchQuery.trim() ? filteredProducts.slice(0, 8) : []),
-    [filteredProducts, searchQuery]
+    () => (searchQuery.trim() && !showCatalog ? searchHits.slice(0, POS_SEARCH_LIMIT) : []),
+    [searchHits, searchQuery, showCatalog]
   );
   // «Varios» no es un producto del catálogo: al buscarlo, sale como primera opción.
   const showVariosResult = matchesVarios(searchQuery);
@@ -145,25 +145,27 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
     pushToCart(product);
   };
 
+  // Si la búsqueda señala una talla con stock, va directa al ticket; si no, se elige.
+  const handleSearchHitClick = (hit: PosSearchHit<ProductWithStock>) => {
+    if (hit.variant && hit.variant.stock_quantity > 0) {
+      setSearchQuery('');
+      pushToCart(hit.product, hit.variant);
+      return;
+    }
+    handleProductClick(hit.product);
+  };
+
   const handleBarcodeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const code = barcode.trim();
     if (!code) return;
 
-    for (const product of products) {
-      const variant = product.variants.find((v) => v.barcode === code || v.sku === code);
-      if (variant) {
-        pushToCart(product, variant);
-        setBarcode('');
-        return;
-      }
-      if (product.barcode === code || product.sku === code) {
-        pushToCart(product);
-        setBarcode('');
-        return;
-      }
+    const hit = findByCode(products, code);
+    if (hit) {
+      pushToCart(hit.product, hit.variant);
+    } else {
+      toast.error(`Sin coincidencias para "${code}"`);
     }
-    toast.error(`Sin coincidencias para "${code}"`);
     setBarcode('');
   };
 
@@ -357,7 +359,7 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
           )}
 
           {(searchResults.length > 0 || showVariosResult) && (
-            <div className="absolute z-30 mt-1 w-full rounded-lg border bg-popover shadow-lg overflow-hidden">
+            <div className="absolute z-30 mt-1 w-full max-h-[60vh] overflow-y-auto rounded-lg border bg-popover shadow-lg">
               {showVariosResult && (
                 <button
                   onClick={() => {
@@ -375,21 +377,40 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
                   </div>
                 </button>
               )}
-              {searchResults.map((product) => (
+              {searchResults.map((hit) => {
+                const { product, variant } = hit;
+                return (
+                  <button
+                    key={variant?.id ?? product.id}
+                    onClick={() => handleSearchHitClick(hit)}
+                    className="w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-accent/60 transition-colors duration-100 ease-smooth"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">
+                        {variant ? `${product.name} · ${variant.name}` : product.name}
+                        {!product.is_active && <InactiveBadge className="ml-2" />}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {[variant ? variant.sku ?? variant.barcode : product.sku, product.category]
+                          .filter(Boolean)
+                          .join(' · ')}
+                        {variant && ` · Stock: ${variant.stock_quantity}`}
+                      </p>
+                    </div>
+                    <span className="text-sm font-semibold shrink-0">
+                      {(variant?.price ?? product.price).toFixed(2)} €
+                    </span>
+                  </button>
+                );
+              })}
+              {searchHits.length > searchResults.length && (
                 <button
-                  key={product.id}
-                  onClick={() => handleProductClick(product)}
-                  className="w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-accent/60 transition-colors duration-100 ease-smooth"
+                  onClick={() => setShowCatalog(true)}
+                  className="w-full px-3 py-2.5 text-left text-sm font-medium text-primary border-t hover:bg-accent/60 transition-colors duration-100 ease-smooth"
                 >
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium truncate">{product.name}</p>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {[product.sku, product.category].filter(Boolean).join(' · ')}
-                    </p>
-                  </div>
-                  <span className="text-sm font-semibold shrink-0">{product.price.toFixed(2)} €</span>
+                  Ver los {searchHits.length} resultados en el catálogo
                 </button>
-              ))}
+              )}
             </div>
           )}
         </div>
@@ -564,6 +585,7 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
                           )}
                         </p>
                         <div className="flex flex-wrap gap-1 mt-1">
+                          {!product.is_active && <InactiveBadge />}
                           {product.variants.length > 0 && (
                             <Badge variant="outline" className="text-xs gap-1">
                               <Layers className="w-3 h-3" />
@@ -839,6 +861,12 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Elige una opción · {variantProduct?.name}</DialogTitle>
+            {variantProduct && !variantProduct.is_active && (
+              <p className="text-sm text-muted-foreground">
+                <InactiveBadge className="mr-1.5" />
+                No está activo en Shopify: se vende en tienda, pero no sale en la web.
+              </p>
+            )}
           </DialogHeader>
           <div className="grid grid-cols-2 gap-2 max-h-[50vh] overflow-y-auto">
             {variantProduct?.variants.map((variant) => (
@@ -869,5 +897,14 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
 
       <SaleTicketDialog open={ticketOpen} onOpenChange={setTicketOpen} ticket={ticket} />
     </>
+  );
+}
+
+/** Producto inactivo en Shopify (borrador o archivado) que aún tiene stock en la tienda. */
+function InactiveBadge({ className }: { className?: string }) {
+  return (
+    <Badge variant="outline" className={cn('text-xs font-normal text-muted-foreground', className)}>
+      Inactivo en Shopify
+    </Badge>
   );
 }

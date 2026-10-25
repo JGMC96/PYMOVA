@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { useToast } from '@/hooks/use-toast';
 import type { Product } from '@/types/database';
+import { fetchCatalogCosts, PRODUCT_COLUMNS, type CatalogCosts } from '@/lib/catalogCosts';
 
 export interface ProductFormData {
   name: string;
@@ -51,11 +52,16 @@ function sanitizeSearchTerm(term: string): string {
     .trim();
 }
 
-export function useProducts(): UseProductsReturn {
+/**
+ * Productos del negocio. Sin coste salvo `withCosts` (solo con permiso de ver costes): entonces
+ * se piden aparte. Sin costes cargados, crear o editar no toca el coste que ya tenga.
+ */
+export function useProducts({ withCosts = false }: { withCosts?: boolean } = {}): UseProductsReturn {
   const { activeBusinessId, user } = useBusiness();
   const { toast } = useToast();
   
   const [products, setProducts] = useState<Product[]>([]);
+  const [costs, setCosts] = useState<CatalogCosts | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -77,7 +83,7 @@ export function useProducts(): UseProductsReturn {
     try {
       let query = supabase
         .from('products')
-        .select('*')
+        .select(PRODUCT_COLUMNS as '*')
         .eq('business_id', activeBusinessId)
         .order('name', { ascending: true });
 
@@ -105,7 +111,7 @@ export function useProducts(): UseProductsReturn {
         throw fetchError;
       }
 
-      setProducts(data || []);
+      setProducts((data as unknown as Product[]) || []);
       setError(null);
     } catch (err) {
       if (requestId !== requestIdRef.current) {
@@ -137,6 +143,27 @@ export function useProducts(): UseProductsReturn {
     runFetch(newRequestId);
   }, [runFetch]);
 
+  const fetchCosts = useCallback(async () => {
+    if (!withCosts || !activeBusinessId) {
+      setCosts(null);
+      return;
+    }
+    const { costs: c, error: costsError } = await fetchCatalogCosts(supabase, activeBusinessId);
+    if (costsError) console.error('Error fetching costs:', costsError);
+    setCosts(costsError ? null : c);
+  }, [activeBusinessId, withCosts]);
+
+  useEffect(() => {
+    void fetchCosts();
+  }, [fetchCosts]);
+
+  const productsWithCosts = useMemo(
+    () => products.map((p) => ({ ...p, cost_price: costs?.products.get(p.id) ?? null })),
+    [products, costs],
+  );
+  // Solo se guarda el coste si se ha podido ver: si no, el formulario lo trae vacío.
+  const costLoaded = costs !== null;
+
   // Create product
   const createProduct = useCallback(async (data: ProductFormData): Promise<boolean> => {
     if (!activeBusinessId || !user) {
@@ -159,7 +186,7 @@ export function useProducts(): UseProductsReturn {
           name: normalizedData.name,
           description: normalizedData.description || null,
           price: normalizedData.price,
-          cost_price: normalizedData.cost_price ?? null,
+          ...(costLoaded ? { cost_price: normalizedData.cost_price ?? null } : {}),
           unit: normalizedData.unit || null,
           category: normalizedData.category || null,
         });
@@ -173,7 +200,7 @@ export function useProducts(): UseProductsReturn {
         description: 'El producto se ha creado correctamente',
       });
 
-      await fetchProducts();
+      await Promise.all([fetchProducts(), fetchCosts()]);
       return true;
     } catch (err) {
       console.error('Error creating product:', err);
@@ -184,7 +211,7 @@ export function useProducts(): UseProductsReturn {
       });
       return false;
     }
-  }, [activeBusinessId, user, fetchProducts, toast]);
+  }, [activeBusinessId, user, fetchProducts, fetchCosts, costLoaded, toast]);
 
   // Update product
   const updateProduct = useCallback(async (id: string, data: ProductFormData): Promise<boolean> => {
@@ -206,7 +233,7 @@ export function useProducts(): UseProductsReturn {
           name: normalizedData.name,
           description: normalizedData.description || null,
           price: normalizedData.price,
-          cost_price: normalizedData.cost_price ?? null,
+          ...(costLoaded ? { cost_price: normalizedData.cost_price ?? null } : {}),
           unit: normalizedData.unit || null,
           category: normalizedData.category || null,
         })
@@ -222,7 +249,7 @@ export function useProducts(): UseProductsReturn {
         description: 'Los cambios se han guardado correctamente',
       });
 
-      await fetchProducts();
+      await Promise.all([fetchProducts(), fetchCosts()]);
       return true;
     } catch (err) {
       console.error('Error updating product:', err);
@@ -233,7 +260,7 @@ export function useProducts(): UseProductsReturn {
       });
       return false;
     }
-  }, [activeBusinessId, fetchProducts, toast]);
+  }, [activeBusinessId, fetchProducts, fetchCosts, costLoaded, toast]);
 
   // Toggle product status (soft delete/reactivate) - NO DELETE FUNCTION EXISTS
   const toggleProductStatus = useCallback(async (id: string, currentStatus: boolean): Promise<boolean> => {
@@ -279,7 +306,7 @@ export function useProducts(): UseProductsReturn {
   }, [activeBusinessId, fetchProducts, toast]);
 
   return {
-    products,
+    products: productsWithCosts,
     isLoading,
     error,
     searchTerm,

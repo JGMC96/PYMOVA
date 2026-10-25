@@ -8,17 +8,16 @@ import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { useHrEmployees } from '@/hooks/useHrEmployees';
 import { useHrReports, type MonthlyReportRow } from '@/hooks/useHrReports';
-import { csvRow } from '@/lib/csv';
+import {
+  buildMonthlyCsv,
+  downloadCsv,
+  formatSeconds,
+  formatSessionDate,
+  monthName,
+  monthlyTotals,
+  reportYears,
+} from '@/lib/hrReport';
 import { CorrectSessionDialog } from './CorrectSessionDialog';
-
-const formatSeconds = (s: number) => {
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  return `${h}h ${String(m).padStart(2, '0')}m`;
-};
-
-const estadoDe = (r: MonthlyReportRow) =>
-  r.needs_review ? 'Pendiente de revisión' : r.correction_reason ? 'Corregida' : r.status === 'open' ? 'Abierta' : 'Cerrada';
 
 export function MonthlyReport() {
   const { employees } = useHrEmployees();
@@ -29,32 +28,11 @@ export function MonthlyReport() {
 
   const { rows, isLoading, correctSession } = useHrReports(employeeId || null, year, month);
   const [editing, setEditing] = useState<MonthlyReportRow | null>(null);
-  const pendientes = rows.filter((r) => r.needs_review).length;
-
-  const totalWorked = rows.reduce((sum, r) => sum + r.worked_seconds, 0);
-  const totalBreak = rows.reduce((sum, r) => sum + r.break_seconds, 0);
+  const { worked: totalWorked, breaks: totalBreak, pending: pendientes } = monthlyTotals(rows);
+  const hasCorrections = rows.some((r) => r.correction_reason);
 
   const exportCsv = () => {
-    const header = csvRow(['Fecha', 'Entrada', 'Salida', 'Trabajado(h)', 'Pausas(h)', 'Estado', 'Motivo de corrección']) + '\n';
-    const lines = rows.map((r) =>
-      csvRow([
-        r.session_date,
-        format(new Date(r.clock_in_at), 'HH:mm'),
-        r.clock_out_at ? format(new Date(r.clock_out_at), 'HH:mm') : '',
-        (r.worked_seconds / 3600).toFixed(2),
-        (r.break_seconds / 3600).toFixed(2),
-        estadoDe(r),
-        r.correction_reason ?? '',
-      ])
-    );
-    const csv = header + lines.join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `reporte_${year}_${month}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadCsv(buildMonthlyCsv(rows), `reporte_${year}_${month}.csv`);
   };
 
   return (
@@ -80,7 +58,7 @@ export function MonthlyReport() {
             </SelectTrigger>
             <SelectContent>
               {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                <SelectItem key={m} value={String(m)}>{format(new Date(2000, m - 1, 1), 'MMMM')}</SelectItem>
+                <SelectItem key={m} value={String(m)} className="capitalize">{monthName(m)}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -89,7 +67,7 @@ export function MonthlyReport() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {[now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1].map((y) => (
+              {reportYears(now.getFullYear()).map((y) => (
                 <SelectItem key={y} value={String(y)}>{y}</SelectItem>
               ))}
             </SelectContent>
@@ -138,13 +116,14 @@ export function MonthlyReport() {
                   <TableHead>Trabajado</TableHead>
                   <TableHead>Pausas</TableHead>
                   <TableHead>Estado</TableHead>
+                  {hasCorrections && <TableHead>Motivo de corrección</TableHead>}
                   <TableHead className="w-[1%]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {rows.map((r) => (
                   <TableRow key={r.id}>
-                    <TableCell>{format(new Date(r.session_date), 'dd/MM/yyyy')}</TableCell>
+                    <TableCell>{formatSessionDate(r.session_date)}</TableCell>
                     <TableCell>{format(new Date(r.clock_in_at), 'HH:mm')}</TableCell>
                     <TableCell>{r.clock_out_at ? format(new Date(r.clock_out_at), 'HH:mm') : '—'}</TableCell>
                     <TableCell className="font-mono">{formatSeconds(r.worked_seconds)}</TableCell>
@@ -153,11 +132,14 @@ export function MonthlyReport() {
                       {r.needs_review ? (
                         <Badge variant="destructive">Pendiente de revisión</Badge>
                       ) : r.correction_reason ? (
-                        <Badge variant="secondary" title={r.correction_reason}>Corregida</Badge>
+                        <Badge variant="secondary">Corregida</Badge>
                       ) : r.status === 'open' ? (
                         <Badge variant="outline">Abierta</Badge>
                       ) : null}
                     </TableCell>
+                    {hasCorrections && (
+                      <TableCell className="text-sm text-muted-foreground">{r.correction_reason ?? ''}</TableCell>
+                    )}
                     <TableCell>
                       <Button variant="ghost" size="sm" className="gap-1" onClick={() => setEditing(r)}>
                         <Pencil className="w-3.5 h-3.5" />
