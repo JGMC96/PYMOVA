@@ -83,7 +83,7 @@ export async function createUser(sql: Sql, email: string): Promise<string> {
 /** Ejecuta `fn` en una transacción con el rol y los claims de JWT indicados. */
 export async function asRole<T>(
   sql: Sql,
-  role: 'authenticated' | 'anon',
+  role: 'authenticated' | 'anon' | 'service_role',
   userId: string | null,
   fn: (tx: Tx) => Promise<T>,
   extraClaims: Record<string, unknown> = {},
@@ -104,3 +104,6 @@ export const asUserAal = <T>(sql: Sql, userId: string, aal: 'aal1' | 'aal2', fn:
   asRole(sql, 'authenticated', userId, fn, { aal });
 
 export const asAnon = <T>(sql: Sql, fn: (tx: Tx) => Promise<T>) => asRole(sql, 'anon', null, fn);
+
+/** Como las edge functions con el rol de servicio (sin usuario). */
+export const asService = <T>(sql: Sql, fn: (tx: Tx) => Promise<T>) => asRole(sql, 'service_role', null, fn);

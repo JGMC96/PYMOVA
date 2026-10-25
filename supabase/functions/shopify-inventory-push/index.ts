@@ -2,7 +2,8 @@
 // La cola vive en `shopify_inventory_pushes`; aquí se resuelve la ubicación y se aplica el delta.
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
-import { serviceClient, shopifyGraphql, ShopifyError } from '../_shared/shopify-client.ts';
+import { getShopDomain, serviceClient, shopifyGraphql, ShopifyError } from '../_shared/shopify-client.ts';
+import { storeConnection } from '../_shared/shopify-connection.ts';
 import { consumeTicket, hasTicket } from '../_shared/scheduled-ticket.ts';
 import { loadLevelsFor } from '../_shared/shopify-levels.ts';
 import { levelPages } from '../_shared/shopify-levels-db.ts';
@@ -67,11 +68,12 @@ type PushResult =
 
 /** Aplica en Shopify los envíos de stock pendientes de un negocio (lote de BATCH_SIZE). */
 async function pushForBusiness(admin: SupabaseClient, businessId: string): Promise<PushResult> {
-  const { data: connection } = await admin
-    .from('shopify_connections')
-    .select('shop_domain, default_location_gid, stock_push_enabled')
-    .eq('business_id', businessId)
-    .maybeSingle();
+  // Solo la conexión de la tienda de este despliegue (S1): un dominio cualquiera no basta.
+  const connection = await storeConnection<{
+    shop_domain: string;
+    default_location_gid: string | null;
+    stock_push_enabled: boolean;
+  }>(admin, businessId, getShopDomain(), 'shop_domain, default_location_gid, stock_push_enabled');
 
   if (!connection) {
     return { status: 'skipped', reason: 'Sin tienda de Shopify vinculada', pushed: 0 };

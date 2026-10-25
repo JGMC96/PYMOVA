@@ -3,7 +3,7 @@ import { PaymentsHeader } from '@/components/payments/PaymentsHeader';
 import { PaymentsTable } from '@/components/payments/PaymentsTable';
 import { PaymentFormDialog } from '@/components/payments/PaymentFormDialog';
 import { usePayments } from '@/hooks/usePayments';
-import type { InvoiceForPayment, CreatePaymentData } from '@/types/database';
+import type { InvoiceForPayment, CreatePaymentData, PaymentWithInvoice } from '@/types/database';
 
 export default function PaymentsList() {
   const {
@@ -13,6 +13,7 @@ export default function PaymentsList() {
     setSearchTerm,
     createPayment,
     fetchPayableInvoices,
+    deletePayment,
   } = usePayments();
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -38,6 +39,12 @@ export default function PaymentsList() {
     setDialogOpen(true);
   };
 
+  const handleDeletePayment = async (payment: PaymentWithInvoice) => {
+    const factura = payment.invoice_number ? ` de la factura ${payment.invoice_number}` : '';
+    if (!window.confirm(`¿Anular este cobro${factura}? La factura volverá a quedar pendiente por ese importe.`)) return;
+    await deletePayment(payment.id);
+  };
+
   const handleSubmit = async (data: CreatePaymentData): Promise<boolean> => {
     setIsSubmitting(true);
     try {
@@ -60,6 +67,7 @@ export default function PaymentsList() {
         payments={payments}
         isLoading={isLoading}
         onNewPayment={handleNewPayment}
+        onDeletePayment={handleDeletePayment}
       />
 
       <PaymentFormDialog

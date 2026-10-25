@@ -312,12 +312,21 @@ Deno.serve(async (req) => {
 
     // ----------------------------------------------------------------- claim
     if (action === 'claim') {
-      const { error } = await userClient.rpc('claim_shopify_shop', {
+      // Solo el servicio puede vincular (0051): el rol de admin ya se ha comprobado arriba con
+      // el cliente del usuario, y la tienda es siempre la del despliegue.
+      const { error } = await admin.rpc('claim_shopify_shop', {
         _business_id: businessId,
         _shop_domain: shop,
         _api_version: SHOPIFY_API_VERSION,
       });
       if (error) return json({ error: error.message }, 403);
+      // Con el rol de servicio no hay usuario en la sesión: se apunta quién la vinculó.
+      await admin
+        .from('shopify_connections')
+        .update({ created_by: userData.user.id })
+        .eq('business_id', businessId)
+        .eq('shop_domain', shop)
+        .is('created_by', null);
       return json({ ok: true, shop_domain: shop });
     }
 

@@ -29,11 +29,12 @@ interface VariantsDialogProps {
 export function VariantsDialog({
   open, onOpenChange, productId, productName, basePrice, onChanged,
 }: VariantsDialogProps) {
-  const { variants, isLoading, isSaving, createVariant, deleteVariant, refreshVariants } = useProductVariants(productId);
-  const { profile } = useStoreProfile();
-  const { isAdmin } = useRoleAccess('admin');
   // 0031: dar de alta o de baja tallas, con permiso de catálogo; costes y stock, con los suyos.
   const { canEditCatalog, canSeeCosts, canAdjustStock } = useMyPermissions();
+  const { variants, isLoading, isSaving, createVariant, deleteVariant, refreshVariants } =
+    useProductVariants(productId, { withCosts: canSeeCosts });
+  const { profile } = useStoreProfile();
+  const { isAdmin } = useRoleAccess('admin');
   const [adjustTarget, setAdjustTarget] = useState<StockAdjustTarget | null>(null);
 
   const [name, setName] = useState('');

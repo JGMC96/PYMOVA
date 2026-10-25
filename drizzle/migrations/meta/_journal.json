@@ -351,6 +351,34 @@
       "when": 1792748175527,
       "tag": "0049_verificacion_dos_pasos",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1792754109369,
+      "tag": "0050_0050_facturas_blindaje",
+      "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1792762566759,
+      "tag": "0051_0051_seguridad_shopify_servidor",
+      "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1792763613870,
+      "tag": "0052_0052_costes_ocultos",
+      "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1792954640128,
+      "tag": "0053_0053_tpv_vender_inactivos",
+      "breakpoints": true
     }
   ]
 }
