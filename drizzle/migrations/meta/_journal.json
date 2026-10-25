@@ -372,6 +372,13 @@
       "when": 1792763613870,
       "tag": "0052_0052_costes_ocultos",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1792954640128,
+      "tag": "0053_0053_tpv_vender_inactivos",
+      "breakpoints": true
     }
   ]
 }
