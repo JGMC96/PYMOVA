@@ -6,25 +6,13 @@ import { fetchCatalogCosts, PRODUCT_COLUMNS, VARIANT_COLUMNS } from '@/lib/catal
 
 type Result = { data: unknown[] | null; error: unknown };
 
-/** Cliente falso: la RPC y las lecturas de tabla devuelven lo que se le pase. */
-function fakeClient(rpc: Result, tables: Record<string, Result> = {}) {
-  const calls: { table: string; select: string; filters: string[] }[] = [];
+/** Cliente falso: la RPC devuelve lo que se le pase; las tablas no se deben tocar. */
+function fakeClient(rpc: Result) {
   const client = {
     rpc: vi.fn(() => ({ range: () => Promise.resolve(rpc) })),
-    from: vi.fn((table: string) => {
-      const call = { table, select: '', filters: [] as string[] };
-      calls.push(call);
-      const q = {
-        select: (cols: string) => ((call.select = cols), q),
-        eq: (col: string, val: string) => (call.filters.push(`${col}=${val}`), q),
-        not: (col: string) => (call.filters.push(`${col} not null`), q),
-        order: () => q,
-        range: () => Promise.resolve(tables[table] ?? { data: [], error: null }),
-      };
-      return q;
-    }),
+    from: vi.fn(),
   };
-  return { client: client as unknown as SupabaseClient, calls, raw: client };
+  return { client: client as unknown as SupabaseClient, raw: client };
 }
 
 describe('fetchCatalogCosts', () => {
@@ -43,24 +31,6 @@ describe('fetchCatalogCosts', () => {
     expect(raw.from).not.toHaveBeenCalled();
     expect([...costs.products]).toEqual([['p1', 12.5]]);
     expect([...costs.variants]).toEqual([['v1', 10]]);
-  });
-
-  it('sin la RPC todavía, lee el coste de las tablas', async () => {
-    const { client, calls } = fakeClient(
-      { data: null, error: { code: 'PGRST202', message: 'Could not find the function' } },
-      {
-        products: { data: [{ id: 'p1', cost_price: 20 }], error: null },
-        product_variants: { data: [{ id: 'v1', cost_price: 18 }], error: null },
-      },
-    );
-    const { costs, error } = await fetchCatalogCosts(client, 'b1', 'p1');
-    expect(error).toBeNull();
-    expect(costs.products.get('p1')).toBe(20);
-    expect(costs.variants.get('v1')).toBe(18);
-    expect(calls.map((c) => [c.table, c.select, c.filters])).toEqual([
-      ['products', 'id, cost_price', ['business_id=b1', 'cost_price not null', 'id=p1']],
-      ['product_variants', 'id, cost_price', ['business_id=b1', 'cost_price not null', 'product_id=p1']],
-    ]);
   });
 
   it('sin permiso, devuelve el error y ningún coste', async () => {
