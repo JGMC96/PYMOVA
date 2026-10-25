@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findByCode, searchPosProducts } from '@/lib/posSearch';
+import { findByCode, hasStockLeft, searchPosProducts } from '@/lib/posSearch';
 
 const talla = (name: string, sku: string | null, barcode: string | null, stock = 1) => ({
   name,
@@ -86,6 +86,45 @@ describe('buscador del TPV', () => {
     expect(zueco).toEqual([denia, bolso]);
     const codigo = searchPosProducts(products, 'bol-1');
     expect(codigo[0]).toMatchObject({ product: bolso, variant: null, exactCode: true });
+  });
+});
+
+describe('productos inactivos en Shopify en el TPV', () => {
+  const crema = {
+    name: 'Zueco Crema',
+    category: 'Zuecos Verano',
+    sku: 'ZC-1',
+    barcode: '8435000002222',
+    is_active: false,
+    variants: [talla('38', 'ZC-1-38', '8435000002238')],
+  };
+  const activos = { ...denia, is_active: true };
+
+  it('van detrás de los activos en cada grupo, también sin búsqueda', () => {
+    expect(searchPosProducts([crema, activos, bolso], 'zueco').map((h) => h.product)).toEqual([activos, crema, bolso]);
+    expect(searchPosProducts([crema, activos], '').map((h) => h.product)).toEqual([activos, crema]);
+  });
+
+  it('por código exacto salen igual, y la talla queda señalada', () => {
+    const [hit] = searchPosProducts([activos, crema], '8435000002238');
+    expect(hit).toMatchObject({ product: crema, exactCode: true });
+    expect(hit.variant?.name).toBe('38');
+    expect(findByCode([crema, activos], 'ZC-1')?.product).toBe(crema);
+  });
+
+  it('con el mismo código, el lector se queda con el activo', () => {
+    const copia = { ...crema, sku: 'TSSD25ZU001' };
+    expect(findByCode([copia, activos], 'tssd25zu001')?.product).toBe(activos);
+  });
+});
+
+describe('¿le queda stock?', () => {
+  it('con tallas, si alguna tiene; sin tallas, si lleva el stock y tiene', () => {
+    expect(hasStockLeft(denia)).toBe(true);
+    expect(hasStockLeft({ ...denia, variants: [talla('39', null, null, 0)] })).toBe(false);
+    expect(hasStockLeft({ ...bolso, track_inventory: true, stock_quantity: 2 })).toBe(true);
+    expect(hasStockLeft({ ...bolso, track_inventory: true, stock_quantity: 0 })).toBe(false);
+    expect(hasStockLeft({ ...bolso, track_inventory: false, stock_quantity: 5 })).toBe(false);
   });
 });
 

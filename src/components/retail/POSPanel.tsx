@@ -46,7 +46,8 @@ const PAYMENT_ICONS: Record<string, typeof Banknote> = {
 };
 
 export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {}) {
-  const { products, isLoading: productsLoading, refreshProducts } = useInventory();
+  // También los inactivos en Shopify que aún tienen stock en la tienda (0053), marcados y detrás.
+  const { products, isLoading: productsLoading, refreshProducts } = useInventory({ inactiveWithStock: true });
   const { createSale, isCreating } = useRetailSales();
   const { settings } = useBusinessSettings();
   const { profile } = useStoreProfile();
@@ -387,6 +388,7 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
                     <div className="min-w-0">
                       <p className="text-sm font-medium truncate">
                         {variant ? `${product.name} · ${variant.name}` : product.name}
+                        {!product.is_active && <InactiveBadge className="ml-2" />}
                       </p>
                       <p className="text-xs text-muted-foreground truncate">
                         {[variant ? variant.sku ?? variant.barcode : product.sku, product.category]
@@ -583,6 +585,7 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
                           )}
                         </p>
                         <div className="flex flex-wrap gap-1 mt-1">
+                          {!product.is_active && <InactiveBadge />}
                           {product.variants.length > 0 && (
                             <Badge variant="outline" className="text-xs gap-1">
                               <Layers className="w-3 h-3" />
@@ -858,6 +861,12 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Elige una opción · {variantProduct?.name}</DialogTitle>
+            {variantProduct && !variantProduct.is_active && (
+              <p className="text-sm text-muted-foreground">
+                <InactiveBadge className="mr-1.5" />
+                No está activo en Shopify: se vende en tienda, pero no sale en la web.
+              </p>
+            )}
           </DialogHeader>
           <div className="grid grid-cols-2 gap-2 max-h-[50vh] overflow-y-auto">
             {variantProduct?.variants.map((variant) => (
@@ -888,5 +897,14 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
 
       <SaleTicketDialog open={ticketOpen} onOpenChange={setTicketOpen} ticket={ticket} />
     </>
+  );
+}
+
+/** Producto inactivo en Shopify (borrador o archivado) que aún tiene stock en la tienda. */
+function InactiveBadge({ className }: { className?: string }) {
+  return (
+    <Badge variant="outline" className={cn('text-xs font-normal text-muted-foreground', className)}>
+      Inactivo en Shopify
+    </Badge>
   );
 }
