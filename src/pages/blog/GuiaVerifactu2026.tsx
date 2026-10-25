@@ -164,7 +164,7 @@ const GuiaVerifactu2026 = () => {
   useHead();
 
   return (
-    <div className="min-h-screen bg-[#020617]">
+    <div className="dark min-h-screen bg-[#020617]">
       <Header />
       <main className="mx-auto max-w-3xl px-6 pb-24 pt-32">
         <article className="text-slate-300">

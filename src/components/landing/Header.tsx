@@ -45,7 +45,7 @@ export const Header = () => {
             </Link>
             <Link to="/auth?tab=register">
               <button className="px-5 py-2.5 bg-white text-slate-950 rounded-full text-sm font-semibold hover:bg-slate-200 transition-all shadow-[0_0_20px_rgba(255,255,255,0.1)]">
-                Comenzar gratis
+                Probar gratis
               </button>
             </Link>
           </div>
@@ -87,7 +87,7 @@ export const Header = () => {
               </Link>
               <Link to="/auth?tab=register">
                 <button className="w-full px-5 py-2.5 bg-white text-slate-950 rounded-full text-sm font-semibold">
-                  Comenzar gratis
+                  Probar gratis
                 </button>
               </Link>
             </div>
