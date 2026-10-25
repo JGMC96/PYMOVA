@@ -81,6 +81,8 @@ export interface TicketDoc {
   voucherPaid?: { code: string; amount: number; balanceLeft?: number | null } | null;
   /** Abono: vale de tienda creado con lo devuelto. */
   voucherIssued?: { code: string; amount: number; expiresAt: Date | null } | null;
+  /** Copia de un ticket ya emitido (p. ej. «DUPLICADO · Ticket de Stockagile»), bajo el título. */
+  duplicateLabel?: string | null;
 }
 
 export const paymentLabels: Record<string, string> = {
@@ -159,6 +161,7 @@ export function renderTicketBody(biz: TicketBusiness, doc: TicketDoc): string {
   </div>
   <hr/>
   <div class="center bold">${title}</div>
+  ${doc.duplicateLabel ? `<div class="center bold">${esc(doc.duplicateLabel)}</div>` : ''}
   <div class="row"><span>Nº</span><span class="bold">${esc(doc.number)}</span></div>
   <div class="row"><span>Fecha</span><span>${date}</span></div>
   ${doc.originalNumber ? `<div class="row"><span>Rectifica</span><span>${esc(doc.originalNumber)}</span></div>` : ''}

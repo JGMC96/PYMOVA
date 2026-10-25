@@ -1,9 +1,9 @@
 // Retail › Historial: ventas de la tienda hechas en Stockagile (0046), solo para consultar.
-// No son ventas de PYMOVA: no se devuelven ni se reimprimen aquí.
-import { Fragment, useState } from 'react';
+// No son ventas de PYMOVA: no se devuelven aquí, pero se puede imprimir un duplicado.
+import { Fragment, useCallback, useState } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { ChevronDown, ChevronRight, Loader2, RefreshCw, Store } from 'lucide-react';
+import { ChevronDown, ChevronRight, Loader2, Printer, RefreshCw, Store } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,12 +12,15 @@ import { useBusiness } from '@/contexts/BusinessContext';
 import { useStockagileSales } from '@/hooks/useStockagileSales';
 import { eur } from '@/lib/clientHistory';
 import { STOCKAGILE_PILOT_BUSINESS_ID } from '../../../supabase/functions/_shared/stockagile-core.ts';
+import { StockagileReprintDialog } from './StockagileReprintDialog';
 
 export function StockagileSalesPanel() {
   const { activeBusinessId } = useBusiness();
   const enabled = activeBusinessId === STOCKAGILE_PILOT_BUSINESS_ID;
   const { sales, hasMore, isLoading, isSyncing, loadMore, syncNow } = useStockagileSales(enabled);
   const [open, setOpen] = useState<string | null>(null);
+  const [reprintId, setReprintId] = useState<string | null>(null);
+  const closeReprint = useCallback(() => setReprintId(null), []);
 
   if (!enabled) return null;
 
@@ -31,6 +34,7 @@ export function StockagileSalesPanel() {
           </CardTitle>
           <CardDescription>
             Copia para consultar de los tickets hechos en Stockagile. Se actualiza sola cada 5 minutos y no mueve stock.
+            Se puede imprimir un duplicado; las devoluciones de estos tickets aún se hacen en Stockagile.
           </CardDescription>
         </div>
         <Button variant="outline" size="sm" onClick={() => void syncNow()} disabled={isSyncing}>
@@ -51,6 +55,7 @@ export function StockagileSalesPanel() {
                 <TableHead>Cliente</TableHead>
                 <TableHead>Pago</TableHead>
                 <TableHead className="text-right">Total</TableHead>
+                <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -76,11 +81,26 @@ export function StockagileSalesPanel() {
                       </TableCell>
                       <TableCell className="text-muted-foreground">{s.payment_methods ?? '—'}</TableCell>
                       <TableCell className="text-right font-semibold tabular-nums">{eur(s.total)}</TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          aria-label={`Imprimir duplicado del ticket ${s.number ?? ''}`}
+                          title="Imprimir duplicado"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setReprintId(s.id);
+                          }}
+                        >
+                          <Printer className="w-4 h-4" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                     {isOpen && (
                       <TableRow>
                         <TableCell />
-                        <TableCell colSpan={5}>
+                        <TableCell colSpan={6}>
                           <ul className="space-y-0.5 text-sm">
                             {s.stockagile_sale_items.map((i) => (
                               <li key={i.id} className="flex justify-between gap-2">
@@ -107,6 +127,7 @@ export function StockagileSalesPanel() {
           </div>
         )}
       </CardContent>
+      <StockagileReprintDialog saleId={reprintId} onClose={closeReprint} />
     </Card>
   );
 }
