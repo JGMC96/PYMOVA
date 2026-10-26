@@ -128,7 +128,7 @@ export function useSaleReturns() {
       const { data, error } = await supabase.rpc('create_sale_return', {
         _business_id: activeBusiness.id,
         _sale_id: params.saleId,
-        _items: items as any,
+        _items: items,
         _reason: params.reason || null,
         _refund_method: params.refundMethod || null,
         _restock: params.restock ?? true,
@@ -144,7 +144,7 @@ export function useSaleReturns() {
         return null;
       }
 
-      const row = Array.isArray(data) ? data[0] : (data as any);
+      const row = Array.isArray(data) ? data[0] : data;
       const bizId = activeBusiness.id;
       void ((params.restock ?? true) ? pushShopifyStock(bizId) : Promise.resolve()).then(() =>
         pushShopifyPosRefunds(bizId)

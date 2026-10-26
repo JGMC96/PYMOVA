@@ -39,8 +39,8 @@ export const DashboardHeader = ({ user, onLogout, onMenuToggle }: DashboardHeade
       await onLogout();
       toast.success("Sesión cerrada correctamente");
       // El componente se desmonta tras navigate('/'), no reseteamos estado.
-    } catch (err: any) {
-      setErrorMsg(err?.message || "No se pudo cerrar la sesión. Comprueba tu conexión e inténtalo de nuevo.");
+    } catch (err) {
+      setErrorMsg((err as { message?: string } | null)?.message || "No se pudo cerrar la sesión. Comprueba tu conexión e inténtalo de nuevo.");
       setStatus("error");
     }
   };

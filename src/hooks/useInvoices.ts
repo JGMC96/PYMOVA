@@ -104,7 +104,7 @@ export function useInvoices(): UseInvoicesReturn {
       }
 
       // Map data to include client_name
-      const mappedInvoices: InvoiceWithClient[] = (data || []).map((invoice: any) => ({
+      const mappedInvoices: InvoiceWithClient[] = (data || []).map((invoice) => ({
         ...invoice,
         client_name: invoice.clients?.name || null,
         clients: undefined, // Remove the nested object

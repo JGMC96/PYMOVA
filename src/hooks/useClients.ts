@@ -31,7 +31,7 @@ function normalizeClientData(data: ClientFormData): ClientFormData {
   return {
     name: data.name.trim(),
     email: data.email?.trim().toLowerCase() || undefined,
-    phone: data.phone?.replace(/[\s\-]/g, '') || undefined,
+    phone: data.phone?.replace(/[\s-]/g, '') || undefined,
     company: data.company?.trim() || undefined,
     notes: data.notes?.trim() || undefined,
   };

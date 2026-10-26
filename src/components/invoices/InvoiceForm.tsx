@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, type ComponentProps } from 'react';
 import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -267,7 +267,7 @@ export function InvoiceForm({
               <InvoiceLineItem
                 key={field.id}
                 index={index}
-                control={form.control as any}
+                control={form.control as unknown as ComponentProps<typeof InvoiceLineItem>['control']}
                 products={products}
                 onRemove={() => remove(index)}
                 canRemove={fields.length > 1}

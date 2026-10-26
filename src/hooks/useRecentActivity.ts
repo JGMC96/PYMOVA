@@ -82,7 +82,7 @@ export function useRecentActivity(limit: number = 10): UseRecentActivityReturn {
       }
 
       // Normalize amount from Postgres numeric (string) to JavaScript number
-      const rows = (data as any[] | null) ?? [];
+      const rows = data ?? [];
       const normalized: ActivityEvent[] = rows.map((r) => ({
         event_type: r.event_type as ActivityEventType,
         event_id: r.event_id,
