@@ -37,11 +37,11 @@ export function usePermissions(initial: PermissionFilters = { scope: 'mine', sta
     const reqId = ++requestIdRef.current;
     setIsLoading(true);
     try {
-      let query = (supabase
-        .from('hr_permissions' as any)
+      let query = supabase
+        .from('hr_permissions')
         .select('*, hr_employees!inner(user_id)')
         .eq('business_id', activeBusinessId)
-        .order('permission_date', { ascending: false }) as any);
+        .order('permission_date', { ascending: false });
 
       if (filters.status && filters.status !== 'all') query = query.eq('status', filters.status);
       if (filters.type && filters.type !== 'all') query = query.eq('permission_type', filters.type);
@@ -51,7 +51,7 @@ export function usePermissions(initial: PermissionFilters = { scope: 'mine', sta
       if (reqId !== requestIdRef.current) return;
       if (error) throw error;
 
-      const rows = (data || []) as any[];
+      const rows = (data || []) as (HrPermission & { hr_employees: { user_id: string | null } | null })[];
       const userIds = Array.from(new Set(rows.map((r) => r.hr_employees?.user_id).filter(Boolean)));
       let profMap = new Map<string, string | null>();
       if (userIds.length) {
@@ -59,7 +59,7 @@ export function usePermissions(initial: PermissionFilters = { scope: 'mine', sta
           .from('profiles')
           .select('id, full_name')
           .in('id', userIds);
-        profMap = new Map((profs || []).map((p: any) => [p.id, p.full_name]));
+        profMap = new Map((profs || []).map((p) => [p.id, p.full_name]));
       }
 
       setPermissions(
@@ -84,7 +84,7 @@ export function usePermissions(initial: PermissionFilters = { scope: 'mine', sta
     async (data: CreatePermissionData) => {
       if (!activeBusinessId) return false;
       try {
-        const { error } = await (supabase.rpc as any)('request_permission', {
+        const { error } = await supabase.rpc('request_permission', {
           _business_id: activeBusinessId,
           _permission_type: data.permission_type,
           _permission_date: data.permission_date,
@@ -97,8 +97,8 @@ export function usePermissions(initial: PermissionFilters = { scope: 'mine', sta
         toast({ title: 'Solicitud enviada', description: 'Pendiente de aprobación' });
         await fetchAll();
         return true;
-      } catch (err: any) {
-        toast({ title: 'Error', description: err?.message || 'Error inesperado', variant: 'destructive' });
+      } catch (err) {
+        toast({ title: 'Error', description: (err as { message?: string } | null)?.message || 'Error inesperado', variant: 'destructive' });
         return false;
       }
     },
@@ -108,7 +108,7 @@ export function usePermissions(initial: PermissionFilters = { scope: 'mine', sta
   const reviewPermission = useCallback(
     async (id: string, approve: boolean, notes?: string) => {
       try {
-        const { error } = await (supabase.rpc as any)('review_permission', {
+        const { error } = await supabase.rpc('review_permission', {
           _permission_id: id,
           _approve: approve,
           _notes: notes || null,
@@ -117,8 +117,8 @@ export function usePermissions(initial: PermissionFilters = { scope: 'mine', sta
         toast({ title: approve ? 'Permiso aprobado' : 'Permiso rechazado' });
         await fetchAll();
         return true;
-      } catch (err: any) {
-        toast({ title: 'Error', description: err?.message || 'Error inesperado', variant: 'destructive' });
+      } catch (err) {
+        toast({ title: 'Error', description: (err as { message?: string } | null)?.message || 'Error inesperado', variant: 'destructive' });
         return false;
       }
     },

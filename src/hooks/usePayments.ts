@@ -54,7 +54,7 @@ export function usePayments(): UsePaymentsReturn {
     }
 
     try {
-      let query = supabase
+      const query = supabase
         .from('payments')
         .select(`
           *,

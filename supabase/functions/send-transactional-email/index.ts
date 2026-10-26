@@ -1,6 +1,7 @@
 import * as React from 'npm:react@18.3.1'
 import { renderAsync } from 'npm:@react-email/components@0.0.22'
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import type { SupabaseClient } from 'npm:@supabase/supabase-js@2'
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
 import { TEMPLATES } from '../_shared/transactional-email-templates/registry.ts'
 import { redactEmail } from '../_shared/privacy.ts'
@@ -56,17 +57,17 @@ interface ResolvedSend {
   templateName: string
   recipientEmail: string
   idempotencyKey: string
-  templateData: Record<string, any>
-  logMetadata: Record<string, any>
+  templateData: object
+  logMetadata: Record<string, unknown>
 }
 
 // Ticket de una venta del TPV. Lo pide cualquier miembro activo del negocio, pero el
 // destinatario es el correo del cliente de la venta y solo si aceptó recibirlo; el
 // contenido sale de la base de datos. Como mucho SALE_RECEIPT_DAILY_LIMIT envíos al día.
 async function resolveSaleReceipt(
-  supabase: any,
+  supabase: SupabaseClient,
   callerId: string,
-  body: Record<string, any>,
+  body: Record<string, unknown>,
   messageId: string,
 ): Promise<ResolvedSend | Response> {
   const saleId = body.saleId || body.sale_id
@@ -175,7 +176,7 @@ Deno.serve(async (req) => {
   }
 
   // Parse request body
-  let body: Record<string, any>
+  let body: Record<string, unknown>
   try {
     body = await req.json()
   } catch {
@@ -199,14 +200,14 @@ Deno.serve(async (req) => {
 
   let templateName: string
   let recipientEmail: string | undefined
-  let templateData: Record<string, any> = {}
+  let templateData: object = {}
   let idempotencyKey: string
-  let logMetadata: Record<string, any> | null = null
+  let logMetadata: Record<string, unknown> | null = null
 
   if (isServiceRole) {
-    templateName = body.templateName || body.template_name
-    recipientEmail = body.recipientEmail || body.recipient_email
-    idempotencyKey = body.idempotencyKey || body.idempotency_key || messageId
+    templateName = (body.templateName || body.template_name) as string
+    recipientEmail = (body.recipientEmail || body.recipient_email) as string | undefined
+    idempotencyKey = (body.idempotencyKey || body.idempotency_key || messageId) as string
     if (body.templateData && typeof body.templateData === 'object') {
       templateData = body.templateData
     }

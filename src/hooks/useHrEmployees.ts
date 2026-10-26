@@ -24,11 +24,11 @@ export function useHrEmployees() {
     const reqId = ++requestIdRef.current;
     setIsLoading(true);
     try {
-      const { data, error } = await (supabase
-        .from('hr_employees' as any)
+      const { data, error } = await supabase
+        .from('hr_employees')
         .select('*')
         .eq('business_id', activeBusinessId)
-        .order('created_at', { ascending: true }) as any);
+        .order('created_at', { ascending: true });
       if (reqId !== requestIdRef.current) return;
       if (error) throw error;
 
@@ -41,7 +41,7 @@ export function useHrEmployees() {
           .from('profiles')
           .select('id, full_name')
           .in('id', ids);
-        profMap = new Map((profs || []).map((p: any) => [p.id, p.full_name]));
+        profMap = new Map((profs || []).map((p) => [p.id, p.full_name]));
       }
       setEmployees(
         rows.map((r) => ({ ...r, full_name: (r.user_id ? profMap.get(r.user_id) : null) ?? r.display_name ?? null })),
@@ -60,16 +60,16 @@ export function useHrEmployees() {
   const updateEmployee = useCallback(
     async (id: string, patch: Partial<Pick<HrEmployee, 'hire_date' | 'weekly_hours' | 'annual_vacation_days' | 'is_active'>>) => {
       try {
-        const { error } = await (supabase
-          .from('hr_employees' as any)
+        const { error } = await supabase
+          .from('hr_employees')
           .update(patch)
-          .eq('id', id) as any);
+          .eq('id', id);
         if (error) throw error;
         toast({ title: 'Empleado actualizado' });
         await fetchAll();
         return true;
-      } catch (err: any) {
-        toast({ title: 'Error', description: err?.message, variant: 'destructive' });
+      } catch (err) {
+        toast({ title: 'Error', description: (err as { message?: string } | null)?.message, variant: 'destructive' });
         return false;
       }
     },
@@ -87,21 +87,21 @@ export function useHrEmployees() {
       if (!members?.length) return;
       const existing = new Set(employees.map((e) => e.user_id));
       const toInsert = members
-        .filter((m: any) => !existing.has(m.user_id))
-        .map((m: any) => ({
+        .filter((m) => !existing.has(m.user_id))
+        .map((m) => ({
           business_id: activeBusinessId,
           user_id: m.user_id,
           hire_date: new Date().toISOString().slice(0, 10),
         }));
       if (toInsert.length) {
-        await (supabase.from('hr_employees' as any).insert(toInsert) as any);
+        await supabase.from('hr_employees').insert(toInsert);
         toast({ title: `Empleados creados: ${toInsert.length}` });
         await fetchAll();
       } else {
         toast({ title: 'Todos los miembros ya están registrados' });
       }
-    } catch (err: any) {
-      toast({ title: 'Error', description: err?.message, variant: 'destructive' });
+    } catch (err) {
+      toast({ title: 'Error', description: (err as { message?: string } | null)?.message, variant: 'destructive' });
     }
   }, [activeBusinessId, employees, fetchAll, toast]);
 

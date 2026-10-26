@@ -212,14 +212,18 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
       Object.keys(sessionStorage)
         .filter((k) => k.startsWith('sb-') || k.includes('supabase'))
         .forEach((k) => sessionStorage.removeItem(k));
-    } catch {}
+    } catch {
+      // Sin acceso al almacenamiento del navegador: no hay nada que limpiar.
+    }
 
     // 4. Revocar cookie de Google en background para evitar auto-login
     try {
       const img = new Image();
       img.referrerPolicy = 'no-referrer';
       img.src = 'https://accounts.google.com/Logout';
-    } catch {}
+    } catch {
+      // Si falla, el cierre de sesión sigue igual.
+    }
 
     navigate('/');
   }, [navigate]);

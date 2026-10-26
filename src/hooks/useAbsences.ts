@@ -36,11 +36,11 @@ export function useAbsences(initial: AbsenceFilters = { scope: 'mine', status: '
     const reqId = ++requestIdRef.current;
     setIsLoading(true);
     try {
-      let query = (supabase
-        .from('hr_absences' as any)
+      let query = supabase
+        .from('hr_absences')
         .select('*, hr_employees!inner(user_id)')
         .eq('business_id', activeBusinessId)
-        .order('start_date', { ascending: false }) as any);
+        .order('start_date', { ascending: false });
 
       if (filters.status && filters.status !== 'all') query = query.eq('status', filters.status);
       if (filters.type && filters.type !== 'all') query = query.eq('absence_type', filters.type);
@@ -52,7 +52,7 @@ export function useAbsences(initial: AbsenceFilters = { scope: 'mine', status: '
       if (reqId !== requestIdRef.current) return;
       if (error) throw error;
 
-      const rows = (data || []) as any[];
+      const rows = (data || []) as (HrAbsence & { hr_employees: { user_id: string | null } | null })[];
       const userIds = Array.from(new Set(rows.map((r) => r.hr_employees?.user_id).filter(Boolean)));
       let profilesMap = new Map<string, string | null>();
       if (userIds.length) {
@@ -60,7 +60,7 @@ export function useAbsences(initial: AbsenceFilters = { scope: 'mine', status: '
           .from('profiles')
           .select('id, full_name')
           .in('id', userIds);
-        profilesMap = new Map((profs || []).map((p: any) => [p.id, p.full_name]));
+        profilesMap = new Map((profs || []).map((p) => [p.id, p.full_name]));
       }
 
       setAbsences(
@@ -85,7 +85,7 @@ export function useAbsences(initial: AbsenceFilters = { scope: 'mine', status: '
     async (data: CreateAbsenceData) => {
       if (!activeBusinessId) return false;
       try {
-        const { error } = await (supabase.rpc as any)('request_absence', {
+        const { error } = await supabase.rpc('request_absence', {
           _business_id: activeBusinessId,
           _absence_type: data.absence_type,
           _start_date: data.start_date,
@@ -97,10 +97,10 @@ export function useAbsences(initial: AbsenceFilters = { scope: 'mine', status: '
         toast({ title: 'Solicitud enviada', description: 'Pendiente de aprobación' });
         await fetchAll();
         return true;
-      } catch (err: any) {
+      } catch (err) {
         toast({
           title: 'Error al solicitar',
-          description: err?.message || 'Error inesperado',
+          description: (err as { message?: string } | null)?.message || 'Error inesperado',
           variant: 'destructive',
         });
         return false;
@@ -112,7 +112,7 @@ export function useAbsences(initial: AbsenceFilters = { scope: 'mine', status: '
   const reviewAbsence = useCallback(
     async (id: string, approve: boolean, notes?: string) => {
       try {
-        const { error } = await (supabase.rpc as any)('review_absence', {
+        const { error } = await supabase.rpc('review_absence', {
           _absence_id: id,
           _approve: approve,
           _notes: notes || null,
@@ -121,10 +121,10 @@ export function useAbsences(initial: AbsenceFilters = { scope: 'mine', status: '
         toast({ title: approve ? 'Solicitud aprobada' : 'Solicitud rechazada' });
         await fetchAll();
         return true;
-      } catch (err: any) {
+      } catch (err) {
         toast({
           title: 'Error',
-          description: err?.message || 'Error inesperado',
+          description: (err as { message?: string } | null)?.message || 'Error inesperado',
           variant: 'destructive',
         });
         return false;
