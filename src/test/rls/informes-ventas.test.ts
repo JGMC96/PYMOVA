@@ -4,6 +4,7 @@
 // la comparación del año anterior. Solo lectura.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { asAnon, asUser, createTestDb, createUser, RLS_DB_URL, type Sql, type TestDb } from './harness';
+import type { SalesReport } from '@/lib/informes';
 
 const PERMISO_DENEGADO = { code: '42501' };
 
@@ -31,7 +32,7 @@ describe.skipIf(!RLS_DB_URL)('RLS · informe de ventas (0055)', () => {
 
   const informe = (user: string, desde = '2026-10-01', hasta = '2026-10-31', business = negocio) =>
     asUser(sql, user, async (tx) => {
-      const [r] = await tx<{ r: any }[]>`SELECT public.get_sales_report(${business}, ${desde}::date, ${hasta}::date) AS r`;
+      const [r] = await tx<{ r: SalesReport }[]>`SELECT public.get_sales_report(${business}, ${desde}::date, ${hasta}::date) AS r`;
       return r.r;
     });
 

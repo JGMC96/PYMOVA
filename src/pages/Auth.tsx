@@ -122,7 +122,8 @@ const Auth = () => {
         if (error) throw error;
         toast.success("¡Cuenta creada! Revisa tu email para confirmar.");
       }
-    } catch (error: any) {
+    } catch (err) {
+      const error = err as { message: string };
       console.error("Auth error:", error);
       if (error.message.includes("User already registered")) {
         toast.error("Este email ya está registrado. Intenta iniciar sesión.");
@@ -146,7 +147,8 @@ const Auth = () => {
         },
       });
       if (error) throw error;
-    } catch (error: any) {
+    } catch (err) {
+      const error = err as { message?: string };
       console.error("Google sign-in error:", error);
       toast.error(error.message || "Error al iniciar sesión con Google");
       setIsLoading(false);
