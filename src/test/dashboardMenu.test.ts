@@ -9,7 +9,7 @@ const etiquetas = (access: MenuAccess) =>
 
 describe('menú por áreas', () => {
   it('el propietario con todo el plan ve todas las áreas y entradas, sin candados', () => {
-    expect(etiquetas({ enabledModules: TODOS, isAdmin: true, canAdjustStock: true })).toEqual([
+    expect(etiquetas({ enabledModules: TODOS, isAdmin: true, isOwner: true, canAdjustStock: true })).toEqual([
       ['', ['Inicio']],
       ['Ventas', ['TPV', 'Caja', 'Historial', 'Pedidos web']],
       ['Productos y stock', ['Productos', 'Inventario', 'Compras', 'Etiquetas']],
@@ -17,12 +17,13 @@ describe('menú por áreas', () => {
       ['Facturación', ['Facturas', 'Cobros']],
       ['Marketing', ['Marketing']],
       ['Equipo', ['RRHH', 'Vendedores']],
+      ['Informes', ['Informes']],
       ['', ['Asesor IA']],
     ]);
   });
 
   it('sin permiso, la entrada no se ve (ni con candado)', () => {
-    const menu = etiquetas({ enabledModules: TODOS, isAdmin: false, canAdjustStock: false });
+    const menu = etiquetas({ enabledModules: TODOS, isAdmin: false, isOwner: false, canAdjustStock: false });
     const todas = menu.flatMap(([, items]) => items);
     expect(todas).not.toContain('Compras');
     expect(todas).not.toContain('Vendedores');
@@ -30,8 +31,15 @@ describe('menú por áreas', () => {
     expect(menu.map(([title]) => title)).not.toContain('Facturación');
   });
 
+  it('Informes solo lo ve el propietario: ni el administrador ni el personal', () => {
+    const titulos = (access: MenuAccess) => etiquetas(access).map(([title]) => title);
+    expect(titulos({ enabledModules: TODOS, isAdmin: true, isOwner: true, canAdjustStock: true })).toContain('Informes');
+    expect(titulos({ enabledModules: TODOS, isAdmin: true, isOwner: false, canAdjustStock: true })).not.toContain('Informes');
+    expect(titulos({ enabledModules: TODOS, isAdmin: false, isOwner: false, canAdjustStock: false })).not.toContain('Informes');
+  });
+
   it('lo que no entra en el plan sale con candado', () => {
-    const menu = etiquetas({ enabledModules: ['clients', 'products'], isAdmin: true, canAdjustStock: true });
+    const menu = etiquetas({ enabledModules: ['clients', 'products'], isAdmin: true, isOwner: true, canAdjustStock: true });
     expect(menu).toContainEqual(['Ventas', ['TPV 🔒', 'Caja 🔒', 'Historial 🔒', 'Pedidos web 🔒']]);
     expect(menu).toContainEqual(['Productos y stock', ['Productos', 'Inventario 🔒', 'Compras 🔒', 'Etiquetas 🔒']]);
   });
@@ -40,7 +48,7 @@ describe('menú por áreas', () => {
     const sinEquipo = MENU_SECTIONS.map((s) =>
       s.title === 'Equipo' ? { ...s, items: s.items.filter((i) => i.label === 'Vendedores') } : s,
     );
-    const menu = visibleMenu(sinEquipo, { enabledModules: TODOS, isAdmin: false, canAdjustStock: false });
+    const menu = visibleMenu(sinEquipo, { enabledModules: TODOS, isAdmin: false, isOwner: false, canAdjustStock: false });
     expect(menu.map((s) => s.title)).not.toContain('Equipo');
   });
 

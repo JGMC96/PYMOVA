@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { code128Modules, code128Svg, code128Values } from '@/lib/barcode';
-import { normalizeTicketCode } from '@/lib/ticketCode';
+import { matchesStockagileNumber, normalizeTicketCode, pymovaTicketCode, stockagileTicketCode } from '@/lib/ticketCode';
 
 const START_B = '11010010000';
 const STOP = '1100011101011';
@@ -53,5 +53,43 @@ describe('normalizeTicketCode', () => {
     expect(normalizeTicketCode('')).toBeNull();
     expect(normalizeTicketCode('zueco')).toBeNull();
     expect(normalizeTicketCode('VTA-12A')).toBeNull();
+  });
+});
+
+describe('tickets de PYMOVA y de Stockagile', () => {
+  it('PYMOVA: solo ventas VTA-… y devoluciones DEV-…', () => {
+    expect(pymovaTicketCode("vta'000123")).toBe('VTA-000123');
+    expect(pymovaTicketCode('DEV-2')).toBe('DEV-000002');
+    expect(pymovaTicketCode('123')).toBe('VTA-000123');
+    // VT… es de Stockagile: no se convierte en «VT-2510383».
+    expect(normalizeTicketCode('VT2510383')).toBe('VT-2510383');
+    expect(pymovaTicketCode('VT2510383')).toBeNull();
+    expect(pymovaTicketCode('zueco')).toBeNull();
+  });
+
+  it('Stockagile: VT con año y número, o solo cifras en los antiguos', () => {
+    expect(stockagileTicketCode('VT2510383')).toBe('VT2510383');
+    expect(stockagileTicketCode(' vt259995 ')).toBe('VT259995');
+    expect(stockagileTicketCode("VT'2510383")).toBe('VT2510383');
+    expect(stockagileTicketCode('VT-25-10383')).toBe('VT2510383');
+    expect(stockagileTicketCode('1043708')).toBe('1043708');
+  });
+
+  it('Stockagile: rechaza lo de PYMOVA, lo corto y lo que no es un ticket', () => {
+    expect(stockagileTicketCode('VTA-000123')).toBeNull();
+    expect(stockagileTicketCode('DEV-000002')).toBeNull();
+    expect(stockagileTicketCode('VT12')).toBeNull();
+    expect(stockagileTicketCode('123')).toBeNull();
+    expect(stockagileTicketCode('zueco')).toBeNull();
+    expect(stockagileTicketCode('')).toBeNull();
+  });
+
+  it('al escribir, filtra los tickets de Stockagile por parte del número', () => {
+    expect(matchesStockagileNumber('VT2510383', 'vt2510')).toBe(true);
+    expect(matchesStockagileNumber('VT2510383', '10383')).toBe(true);
+    expect(matchesStockagileNumber('VT2510383', "VT'2510383")).toBe(true);
+    expect(matchesStockagileNumber('VT2510383', 'VTA-000123')).toBe(false);
+    expect(matchesStockagileNumber(null, '123')).toBe(false);
+    expect(matchesStockagileNumber(null, '  ')).toBe(true);
   });
 });

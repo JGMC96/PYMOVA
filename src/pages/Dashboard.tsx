@@ -19,6 +19,7 @@ import { LabelsPanel } from "@/components/labels/LabelsPanel";
 import { RETAIL_HOME } from "@/lib/dashboardMenu";
 import Marketing from "@/pages/dashboard/Marketing";
 import Hr from "@/pages/dashboard/Hr";
+import Informes from "@/pages/dashboard/Informes";
 import Integrations from "@/pages/dashboard/Integrations";
 import Settings from "@/pages/dashboard/Settings";
 import LockedModulePage from "@/pages/dashboard/LockedModulePage";
@@ -65,6 +66,7 @@ const Dashboard = () => {
               <Route path="retail/*" element={<Navigate to={RETAIL_HOME} replace />} />
               <Route path="marketing/*" element={<Marketing />} />
               <Route path="hr/*" element={<Hr />} />
+              <Route path="informes/*" element={<Informes />} />
               <Route path="integrations/*" element={<Integrations />} />
               <Route path="ai/*" element={
 

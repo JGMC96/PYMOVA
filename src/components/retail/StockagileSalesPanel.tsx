@@ -1,6 +1,8 @@
 // Retail › Historial: ventas de la tienda hechas en Stockagile (0046), solo para consultar.
 // No son ventas de PYMOVA: no se devuelven aquí, pero se puede imprimir un duplicado.
-import { Fragment, useCallback, useState } from 'react';
+// El buscador es el de «Ventas en PYMOVA»: al escribir filtra los tickets cargados y con Intro
+// (o el lector) busca en todos; lo encontrado llega en `found`.
+import { Fragment, useCallback, useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { ChevronDown, ChevronRight, Loader2, Printer, RefreshCw, Store } from 'lucide-react';
@@ -9,18 +11,31 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useBusiness } from '@/contexts/BusinessContext';
-import { useStockagileSales } from '@/hooks/useStockagileSales';
+import { STOCKAGILE_SEARCH_LIMIT, useStockagileSales, type StockagileSale } from '@/hooks/useStockagileSales';
 import { eur } from '@/lib/clientHistory';
+import { matchesStockagileNumber } from '@/lib/ticketCode';
 import { STOCKAGILE_PILOT_BUSINESS_ID } from '../../../supabase/functions/_shared/stockagile-core.ts';
 import { StockagileReprintDialog } from './StockagileReprintDialog';
 
-export function StockagileSalesPanel() {
+interface StockagileSalesPanelProps {
+  /** Lo que se está escribiendo en el buscador de Historial. */
+  query?: string;
+  /** Tickets encontrados al buscar en todos (Intro o lector); null sin búsqueda. */
+  found?: StockagileSale[] | null;
+  onClearSearch?: () => void;
+}
+
+export function StockagileSalesPanel({ query = '', found = null, onClearSearch }: StockagileSalesPanelProps) {
   const { activeBusinessId } = useBusiness();
   const enabled = activeBusinessId === STOCKAGILE_PILOT_BUSINESS_ID;
   const { sales, hasMore, isLoading, isSyncing, loadMore, syncNow } = useStockagileSales(enabled);
   const [open, setOpen] = useState<string | null>(null);
   const [reprintId, setReprintId] = useState<string | null>(null);
   const closeReprint = useCallback(() => setReprintId(null), []);
+  const visible = useMemo(
+    () => found ?? (query.trim() ? sales.filter((s) => matchesStockagileNumber(s.number, query)) : sales),
+    [found, query, sales],
+  );
 
   if (!enabled) return null;
 
@@ -43,8 +58,27 @@ export function StockagileSalesPanel() {
         </Button>
       </CardHeader>
       <CardContent>
-        {sales.length === 0 && !isLoading ? (
+        {found && (
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <Badge variant="secondary">
+              {found.length === 1 ? 'Ticket encontrado' : `${found.length} tickets encontrados`} en Stockagile
+            </Badge>
+            {found.length >= STOCKAGILE_SEARCH_LIMIT && (
+              <span className="text-xs text-muted-foreground">Los más recientes; escribe más cifras para afinar.</span>
+            )}
+            {onClearSearch && (
+              <Button variant="ghost" size="sm" onClick={onClearSearch}>
+                Ver todos
+              </Button>
+            )}
+          </div>
+        )}
+        {sales.length === 0 && !isLoading && !found ? (
           <p className="text-sm text-muted-foreground">Aún no hay ventas de Stockagile copiadas.</p>
+        ) : visible.length === 0 && !isLoading ? (
+          <p className="text-sm text-muted-foreground">
+            Ningún ticket cargado coincide. Pulsa Intro en el buscador de arriba para buscarlo entre todos.
+          </p>
         ) : (
           <Table>
             <TableHeader>
@@ -59,7 +93,7 @@ export function StockagileSalesPanel() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sales.map((s) => {
+              {visible.map((s) => {
                 const isOpen = open === s.id;
                 return (
                   <Fragment key={s.id}>
@@ -118,7 +152,7 @@ export function StockagileSalesPanel() {
             </TableBody>
           </Table>
         )}
-        {(hasMore || isLoading) && (
+        {!found && (hasMore || isLoading) && (
           <div className="mt-4 flex justify-center">
             <Button variant="ghost" size="sm" onClick={() => void loadMore()} disabled={isLoading}>
               {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
