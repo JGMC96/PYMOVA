@@ -18,23 +18,37 @@ export function formatSessionDate(date: string): string {
   return `${d}/${m}/${y}`;
 }
 
-export function sessionStatusLabel(r: MonthlyReportRow): string {
-  return r.needs_review ? 'Pendiente de revisión' : r.correction_reason ? 'Corregida' : r.status === 'open' ? 'Abierta' : 'Cerrada';
+const OLVIDO_MS = 12 * 3600_000;
+
+/** Abierta hace más de 12 h: se olvidó fichar la salida (la misma regla que clock_action). */
+export function isMissingClockOut(r: MonthlyReportRow, now: Date = new Date()): boolean {
+  return r.status === 'open' && now.getTime() - new Date(r.clock_in_at).getTime() > OLVIDO_MS;
 }
 
-export function monthlyTotals(rows: MonthlyReportRow[]): { worked: number; breaks: number; pending: number } {
+export function sessionStatusLabel(r: MonthlyReportRow, now: Date = new Date()): string {
+  if (r.needs_review) return 'Pendiente de revisión';
+  if (r.correction_reason) return 'Corregida';
+  if (isMissingClockOut(r, now)) return 'Sin salida';
+  return r.status === 'open' ? 'Abierta' : 'Cerrada';
+}
+
+/** `pending`: jornadas pendientes de revisión o sin salida, que no cuentan horas. */
+export function monthlyTotals(
+  rows: MonthlyReportRow[],
+  now: Date = new Date(),
+): { worked: number; breaks: number; pending: number } {
   return rows.reduce(
     (t, r) => ({
       worked: t.worked + r.worked_seconds,
       breaks: t.breaks + r.break_seconds,
-      pending: t.pending + (r.needs_review ? 1 : 0),
+      pending: t.pending + (r.needs_review || isMissingClockOut(r, now) ? 1 : 0),
     }),
     { worked: 0, breaks: 0, pending: 0 },
   );
 }
 
 /** CSV del mes. Entrada y salida van en la hora local del navegador, como en la pantalla. */
-export function buildMonthlyCsv(rows: MonthlyReportRow[]): string {
+export function buildMonthlyCsv(rows: MonthlyReportRow[], now: Date = new Date()): string {
   const header = csvRow(['Fecha', 'Entrada', 'Salida', 'Trabajado(h)', 'Pausas(h)', 'Estado', 'Motivo de corrección']);
   const lines = rows.map((r) =>
     csvRow([
@@ -43,7 +57,7 @@ export function buildMonthlyCsv(rows: MonthlyReportRow[]): string {
       r.clock_out_at ? format(new Date(r.clock_out_at), 'HH:mm') : '',
       (r.worked_seconds / 3600).toFixed(2),
       (r.break_seconds / 3600).toFixed(2),
-      sessionStatusLabel(r),
+      sessionStatusLabel(r, now),
       r.correction_reason ?? '',
     ]),
   );

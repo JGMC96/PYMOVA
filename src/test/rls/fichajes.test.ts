@@ -2,7 +2,7 @@
 // A4 de docs/AUDITORIA.md: fichajes solo por RPC, día en la zona horaria del
 // negocio, jornada partida, olvidos y correcciones con motivo.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { asAnon, asUser, createTestDb, createUser, RLS_DB_URL, type Sql, type TestDb } from './harness';
+import { asAnon, asUser, createTestDb, createUser, RLS_DB_URL, type Sql, type TestDb, type Tx } from './harness';
 
 const PERMISO_DENEGADO = { code: '42501' };
 type Fichaje = 'clock_in' | 'break_start' | 'break_end' | 'clock_out';
@@ -32,14 +32,23 @@ describe.skipIf(!RLS_DB_URL)('RLS · fichajes solo por RPC (A4)', () => {
   const sesiones = (empleado: string) =>
     sql`SELECT * FROM hr_work_sessions WHERE employee_id = ${empleado} ORDER BY clock_in_at`;
 
+  /** Preparación de datos sin triggers (solo en tests): desde la 0056 los fichajes no se cambian ni se borran. */
+  const mantenimiento = (fn: (tx: Tx) => Promise<unknown>) =>
+    sql.begin(async (tx) => {
+      await tx`SET LOCAL session_replication_role = replica`;
+      await fn(tx);
+    });
+
   /** Retrasa la sesión abierta (y sus fichajes) para simular el paso del tiempo. */
   async function retrasar(empleado: string, horas: number, cambiarDia = false) {
-    await sql`
-      UPDATE hr_work_sessions
-      SET clock_in_at = clock_in_at - make_interval(hours => ${horas}),
-          session_date = CASE WHEN ${cambiarDia} THEN session_date - 1 ELSE session_date END
-      WHERE employee_id = ${empleado} AND status = 'open'`;
-    await sql`UPDATE hr_time_entries SET occurred_at = occurred_at - make_interval(hours => ${horas}) WHERE employee_id = ${empleado}`;
+    await mantenimiento(async (tx) => {
+      await tx`
+        UPDATE hr_work_sessions
+        SET clock_in_at = clock_in_at - make_interval(hours => ${horas}),
+            session_date = CASE WHEN ${cambiarDia} THEN session_date - 1 ELSE session_date END
+        WHERE employee_id = ${empleado} AND status = 'open'`;
+      await tx`UPDATE hr_time_entries SET occurred_at = occurred_at - make_interval(hours => ${horas}) WHERE employee_id = ${empleado}`;
+    });
   }
 
   beforeAll(async () => {
@@ -187,7 +196,7 @@ describe.skipIf(!RLS_DB_URL)('RLS · fichajes solo por RPC (A4)', () => {
     await fichar(gema, 'clock_in');
     await fichar(gema, 'clock_out');
     const emp = await empleadoDe(gema);
-    await sql`DELETE FROM hr_work_sessions WHERE employee_id = ${emp}`;
+    await mantenimiento((tx) => tx`DELETE FROM hr_work_sessions WHERE employee_id = ${emp}`);
     const [olvidada] = await sql<{ id: string }[]>`
       INSERT INTO hr_work_sessions (business_id, employee_id, session_date, clock_in_at, status, needs_review)
       VALUES (${negocio}, ${emp}, '2026-10-14', '2026-10-14 09:00+00', 'closed', true) RETURNING id`;

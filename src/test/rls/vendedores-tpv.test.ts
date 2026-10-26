@@ -213,6 +213,9 @@ describe.skipIf(!RLS_DB_URL)('RLS · vendedores en el TPV', () => {
     await expect(vender(staff, s3)).rejects.toThrow(/sesión de vendedor/i);
     expect((await empezar(staff, ana, '1234')).error).toBe('PIN incorrecto');
     await asUser(sql, admin, (tx) => tx`SELECT public.upsert_pos_employee(${negocio}, ${ana}, 'Ana López', true)`);
+    // Desde la 0056 la baja borra el PIN: al volver hay que ponerle uno.
+    expect((await empezar(staff, ana, '1234')).error).toBe('PIN incorrecto');
+    await asUser(sql, admin, (tx) => tx`SELECT public.set_employee_pin(${negocio}, ${ana}, '1234')`);
     expect((await empezar(staff, ana, '1234')).name).toBe('Ana López');
   });
 
