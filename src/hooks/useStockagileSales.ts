@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useBusiness } from '@/contexts/BusinessContext';
+import { stockagileTicketCode } from '@/lib/ticketCode';
 
 export interface StockagileSaleItem {
   id: string;
@@ -25,6 +26,35 @@ export interface StockagileSale {
 }
 
 const PAGE = 50;
+const SALE_COLUMNS =
+  'id, number, sold_at, total, is_return, payment_methods, customer_name, client_id, clients(name), stockagile_sale_items(id, product_name, quantity, total)';
+/** Tope de tickets que devuelve una búsqueda por el principio del número. */
+export const STOCKAGILE_SEARCH_LIMIT = 20;
+
+/**
+ * Tickets de Stockagile cuyo número empieza por lo escrito o escaneado (en toda la copia, no
+ * solo en los cargados). En los antiguos sin «VT», el número es el id de Stockagile, que
+ * también se mira por si el código de barras del ticket lo lleva.
+ */
+export async function findStockagileTickets(businessId: string, input: string): Promise<StockagileSale[] | null> {
+  const code = stockagileTicketCode(input);
+  if (!code) return [];
+  // `code` solo tiene letras y cifras: se puede poner tal cual en el filtro. Solo cifras
+  // puede ser un ticket antiguo, su id o un «VT…» escrito sin las letras.
+  const filter = /^\d+$/.test(code)
+    ? `number.like.${code}*,number.like.VT${code}*,external_id.eq.${code}`
+    : `number.like.${code}*`;
+  const { data, error } = await supabase
+    .from('stockagile_sales' as never)
+    .select(SALE_COLUMNS)
+    .eq('business_id', businessId)
+    .eq('deleted', false)
+    .or(filter)
+    .order('sold_at', { ascending: false })
+    .limit(STOCKAGILE_SEARCH_LIMIT);
+  if (error) return null;
+  return (data ?? []) as unknown as StockagileSale[];
+}
 
 /** Mensaje de error de una edge function (el cuerpo trae `{ error }`). */
 export async function functionError(error: unknown, fallback: string): Promise<string> {
@@ -54,7 +84,7 @@ export function useStockagileSales(enabled: boolean) {
       // Tablas de la 0046: `as never` hasta que se regenere types.ts.
       const { data, error } = await supabase
         .from('stockagile_sales' as never)
-        .select('id, number, sold_at, total, is_return, payment_methods, customer_name, client_id, clients(name), stockagile_sale_items(id, product_name, quantity, total)')
+        .select(SALE_COLUMNS)
         .eq('business_id', activeBusinessId)
         .eq('deleted', false)
         .order('sold_at', { ascending: false })
