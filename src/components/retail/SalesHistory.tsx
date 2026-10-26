@@ -4,7 +4,7 @@ import { es } from 'date-fns/locale';
 import { Receipt, CreditCard, Banknote, Mail, Printer, RefreshCw, RotateCcw, ScanLine, UserRoundPen, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
-import { normalizeTicketCode } from '@/lib/ticketCode';
+import { normalizeTicketCode, pymovaTicketCode, stockagileTicketCode } from '@/lib/ticketCode';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -33,11 +33,23 @@ import { useRoleAccess } from '@/hooks/useRoleAccess';
 const ALL_SELLERS = '__all__';
 const NO_SELLER = '__none__';
 
-export function SalesHistory() {
+interface SalesHistoryProps {
+  /** Lo que se escribe en el buscador, para filtrar también otros historiales (Stockagile). */
+  onQueryChange?: (query: string) => void;
+  /** Busca el ticket en otro historial si no es de PYMOVA; true si lo encuentra. */
+  searchElsewhere?: (query: string) => Promise<boolean>;
+}
+
+export function SalesHistory({ onQueryChange, searchElsewhere }: SalesHistoryProps = {}) {
   const { sales, isLoading, refreshSales, findSaleByTicket } = useRetailSales();
-  const [query, setQuery] = useState('');
+  const [query, setQueryState] = useState('');
   const [found, setFound] = useState<SaleWithClient | null>(null);
+  const [foundElsewhere, setFoundElsewhere] = useState(false);
   const [searching, setSearching] = useState(false);
+  const setQuery = (q: string) => {
+    setQueryState(q);
+    onQueryChange?.(q);
+  };
   const { employees } = useSellerSession();
   const { isAdmin } = useRoleAccess('admin');
   const [sellerFilter, setSellerFilter] = useState(ALL_SELLERS);
@@ -61,32 +73,47 @@ export function SalesHistory() {
     return bySeller.filter((s) => s.sale_number.includes(q) || (code !== null && s.sale_number === code));
   }, [sales, query, found, sellerFilter]);
 
+  // Primero en PYMOVA (VTA-…, DEV-…); si no está o es un número de Stockagile (VT…), allí.
   const searchTicket = async () => {
-    const code = normalizeTicketCode(query);
-    if (!code) {
+    const code = pymovaTicketCode(query);
+    const other = searchElsewhere ? stockagileTicketCode(query) : null;
+    if (!code && !other) {
       toast.error('No es un número de ticket válido');
       return;
     }
-    const local = sales.find((s) => s.sale_number === code);
-    if (local) {
-      setFound(local);
-      setQuery(code);
-      return;
+    setFoundElsewhere(false);
+    if (code) {
+      const local = sales.find((s) => s.sale_number === code);
+      if (local) {
+        setFound(local);
+        setQuery(code);
+        return;
+      }
+      setSearching(true);
+      const sale = await findSaleByTicket(code);
+      setSearching(false);
+      if (sale) {
+        setFound(sale);
+        setQuery(code);
+        return;
+      }
     }
-    setSearching(true);
-    const sale = await findSaleByTicket(code);
-    setSearching(false);
-    if (sale) {
-      setFound(sale);
-      setQuery(code);
-    } else {
-      toast.error(`No se encuentra el ticket ${code}`);
+    if (other && searchElsewhere) {
+      setSearching(true);
+      const ok = await searchElsewhere(query);
+      setSearching(false);
+      if (ok) {
+        setFoundElsewhere(true);
+        return;
+      }
     }
+    toast.error(`No se encuentra el ticket ${code ?? other}`);
   };
 
   const clearSearch = () => {
     setQuery('');
     setFound(null);
+    setFoundElsewhere(false);
   };
   const { fetchReturns } = useSaleReturns();
   const [returns, setReturns] = useState<SaleReturn[]>([]);
@@ -158,6 +185,7 @@ export function SalesHistory() {
             onChange={(e) => {
               setQuery(e.target.value);
               setFound(null);
+              setFoundElsewhere(false);
             }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
@@ -167,7 +195,11 @@ export function SalesHistory() {
                 clearSearch();
               }
             }}
-            placeholder="Escanea el código del ticket o escribe su número (VTA-000123)"
+            placeholder={
+              searchElsewhere
+                ? 'Escanea el ticket o escribe su número (VTA-000123 o, de Stockagile, VT2510383)'
+                : 'Escanea el código del ticket o escribe su número (VTA-000123)'
+            }
             className="pl-9 pr-9"
             aria-label="Buscar ticket"
             disabled={searching}
@@ -207,7 +239,13 @@ export function SalesHistory() {
         ) : visibleSales.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             <Receipt className="w-12 h-12 mx-auto mb-4 opacity-50" />
-            <p>{query ? 'Ningún ticket coincide. Pulsa Intro para buscarlo entre todos.' : 'No hay ventas registradas'}</p>
+            <p>
+              {foundElsewhere
+                ? 'No es un ticket de PYMOVA: está en «Ventas de la tienda en Stockagile», más abajo.'
+                : query
+                  ? 'Ningún ticket coincide. Pulsa Intro para buscarlo entre todos.'
+                  : 'No hay ventas registradas'}
+            </p>
           </div>
         ) : (
           <Table>
