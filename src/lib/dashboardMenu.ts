@@ -4,6 +4,7 @@
 // - sin el permiso → no se ve (un dependiente solo ve lo que usa);
 // - un área sin entradas visibles no se pinta.
 import {
+  BarChart3,
   ClipboardList,
   CreditCard,
   FileText,
@@ -27,6 +28,7 @@ import type { ModuleKey } from '@/types/database';
 export interface MenuAccess {
   enabledModules: ModuleKey[];
   isAdmin: boolean;
+  isOwner: boolean;
   canAdjustStock: boolean;
 }
 
@@ -56,6 +58,7 @@ export interface VisibleMenuSection {
 }
 
 const adminOnly = (a: MenuAccess) => a.isAdmin;
+const ownerOnly = (a: MenuAccess) => a.isOwner;
 
 export const MENU_SECTIONS: MenuSection[] = [
   { items: [{ icon: LayoutDashboard, label: 'Inicio', path: '/dashboard' }] },
@@ -110,6 +113,13 @@ export const MENU_SECTIONS: MenuSection[] = [
         moduleKey: 'retail',
         allowed: adminOnly,
       },
+    ],
+  },
+  {
+    title: 'Informes',
+    items: [
+      // Solo el propietario: lo comprueba cada RPC (`has_business_role(..., 'owner')`).
+      { icon: BarChart3, label: 'Informes', path: '/dashboard/informes', allowed: ownerOnly },
     ],
   },
   { items: [{ icon: MessageSquare, label: 'Asesor IA', path: '/dashboard/ai', moduleKey: 'ai_advisor' }] },
