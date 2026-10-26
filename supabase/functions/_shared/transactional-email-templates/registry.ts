@@ -1,4 +1,5 @@
 // deno-lint-ignore-file no-explicit-any
+/* eslint-disable @typescript-eslint/no-explicit-any -- cada plantilla tiene sus propias props: el registro las guarda sin tipar, como indica la línea de deno-lint de arriba */
 import { template as teamInvitation } from './team-invitation.tsx'
 import { template as saleReceipt } from './sale-receipt.tsx'
 

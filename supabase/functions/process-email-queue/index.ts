@@ -157,7 +157,7 @@ Deno.serve(async (req) => {
     const messageIds = Array.from(
       new Set(
         messages
-          .map((msg: any) =>
+          .map((msg: { message?: { message_id?: unknown } } | null) =>
             msg?.message?.message_id && typeof msg.message.message_id === 'string'
               ? msg.message.message_id
               : null
