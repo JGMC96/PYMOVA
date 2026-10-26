@@ -386,6 +386,13 @@
       "when": 1792963586046,
       "tag": "0054_0054_prueba_con_todos_los_modulos",
       "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1793003324743,
+      "tag": "0055_0055_informe_ventas",
+      "breakpoints": true
     }
   ]
 }
