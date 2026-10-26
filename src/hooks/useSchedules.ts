@@ -22,13 +22,13 @@ export function useSchedules(monthDate: Date) {
     try {
       const start = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
       const end = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
-      const { data, error } = await (supabase
-        .from('hr_schedules' as any)
+      const { data, error } = await supabase
+        .from('hr_schedules')
         .select('*')
         .eq('business_id', activeBusinessId)
         .gte('shift_date', start.toISOString().slice(0, 10))
         .lte('shift_date', end.toISOString().slice(0, 10))
-        .order('shift_date', { ascending: true }) as any);
+        .order('shift_date', { ascending: true });
       if (reqId !== requestIdRef.current) return;
       if (error) throw error;
       setSchedules((data || []) as HrSchedule[]);
@@ -47,20 +47,20 @@ export function useSchedules(monthDate: Date) {
     async (employee_id: string, shift_date: string, start_time: string, end_time: string, notes?: string) => {
       if (!activeBusinessId) return false;
       try {
-        const { error } = await (supabase.from('hr_schedules' as any).insert({
+        const { error } = await supabase.from('hr_schedules').insert({
           business_id: activeBusinessId,
           employee_id,
           shift_date,
           start_time,
           end_time,
           notes: notes || null,
-        }) as any);
+        });
         if (error) throw error;
         toast({ title: 'Turno asignado' });
         await fetchAll();
         return true;
-      } catch (err: any) {
-        toast({ title: 'Error', description: err?.message, variant: 'destructive' });
+      } catch (err) {
+        toast({ title: 'Error', description: (err as { message?: string } | null)?.message, variant: 'destructive' });
         return false;
       }
     },
@@ -70,12 +70,12 @@ export function useSchedules(monthDate: Date) {
   const deleteSchedule = useCallback(
     async (id: string) => {
       try {
-        const { error } = await (supabase.from('hr_schedules' as any).delete().eq('id', id) as any);
+        const { error } = await supabase.from('hr_schedules').delete().eq('id', id);
         if (error) throw error;
         toast({ title: 'Turno eliminado' });
         await fetchAll();
-      } catch (err: any) {
-        toast({ title: 'Error', description: err?.message, variant: 'destructive' });
+      } catch (err) {
+        toast({ title: 'Error', description: (err as { message?: string } | null)?.message, variant: 'destructive' });
       }
     },
     [fetchAll, toast]
