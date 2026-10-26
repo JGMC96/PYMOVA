@@ -4425,6 +4425,10 @@ export type Database = {
           sales_total: number
         }[]
       }
+      get_sales_report: {
+        Args: { _business_id: string; _from: string; _to: string }
+        Returns: Json
+      }
       get_security_audit_log: {
         Args: { _business_id: string; _limit?: number; _offset?: number }
         Returns: {
