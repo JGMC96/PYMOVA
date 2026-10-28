@@ -393,6 +393,13 @@
       "when": 1793003324743,
       "tag": "0055_0055_informe_ventas",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1793221659503,
+      "tag": "0056_0056_rrhh_fichajes_conservacion",
+      "breakpoints": true
     }
   ]
 }
