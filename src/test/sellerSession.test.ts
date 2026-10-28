@@ -132,6 +132,8 @@ describe('permisos por persona', () => {
     expect(hasPermission(perm({}), 'discount', 10.01)).toBe(false);
     expect(hasPermission(perm({}), 'return')).toBe(false);
     expect(hasPermission(perm({ can_close_register: true }), 'close_register')).toBe(true);
+    expect(hasPermission(perm({}), 'adjust_stock')).toBe(false);
+    expect(hasPermission(perm({ can_adjust_stock: true }), 'adjust_stock')).toBe(true);
     expect(hasPermission(null, 'discount', 0)).toBe(false);
   });
 

@@ -105,7 +105,8 @@ export function isSellerSessionError(message: string | null | undefined): boolea
 // Permisos por persona (0030)
 // ---------------------------------------------------------------------------
 
-export type PosAction = 'discount' | 'return' | 'close_register';
+/** adjust_stock (0057): en los negocios con PIN, todo ajuste de stock lleva el de quien lo hace. */
+export type PosAction = 'discount' | 'return' | 'close_register' | 'adjust_stock';
 
 export interface PosPermission {
   employee_id: string;
@@ -134,6 +135,7 @@ export function hasPermission(p: PosPermission | null | undefined, action: PosAc
   if (!p) return false;
   if (action === 'discount') return Number(p.max_discount_pct) >= amount;
   if (action === 'return') return p.can_return;
+  if (action === 'adjust_stock') return p.can_adjust_stock;
   return p.can_close_register;
 }
 
