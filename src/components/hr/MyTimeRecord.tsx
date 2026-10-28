@@ -3,7 +3,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
 import { Download } from 'lucide-react';
 import { format } from 'date-fns';
 import { useHrReports } from '@/hooks/useHrReports';
@@ -16,6 +15,7 @@ import {
   monthlyTotals,
   reportYears,
 } from '@/lib/hrReport';
+import { SessionStatusBadge } from './SessionStatusBadge';
 
 /**
  * Registro de jornada del propio trabajador (art. 34.9 ET): sus sesiones del mes,
@@ -81,8 +81,8 @@ export function MyTimeRecord({ employeeId }: { employeeId: string | null }) {
             {totals.pending > 0 && (
               <p className="text-sm text-amber-500">
                 {totals.pending === 1
-                  ? 'Tienes 1 jornada pendiente de revisión: olvidaste fichar la salida y no cuenta horas. Avisa a un responsable para que la corrija.'
-                  : `Tienes ${totals.pending} jornadas pendientes de revisión: olvidaste fichar la salida y no cuentan horas. Avisa a un responsable para que las corrija.`}
+                  ? 'Tienes 1 jornada sin salida o pendiente de revisión: no cuenta horas. Avisa a un responsable para que la corrija.'
+                  : `Tienes ${totals.pending} jornadas sin salida o pendientes de revisión: no cuentan horas. Avisa a un responsable para que las corrija.`}
               </p>
             )}
             <div className="grid grid-cols-2 gap-3">
@@ -121,13 +121,7 @@ export function MyTimeRecord({ employeeId }: { employeeId: string | null }) {
                       <TableCell className="font-mono">{formatSeconds(r.worked_seconds)}</TableCell>
                       <TableCell className="font-mono">{formatSeconds(r.break_seconds)}</TableCell>
                       <TableCell>
-                        {r.needs_review ? (
-                          <Badge variant="destructive">Pendiente de revisión</Badge>
-                        ) : r.correction_reason ? (
-                          <Badge variant="secondary">Corregida</Badge>
-                        ) : r.status === 'open' ? (
-                          <Badge variant="outline">Abierta</Badge>
-                        ) : null}
+                        <SessionStatusBadge session={r} />
                       </TableCell>
                       {hasCorrections && (
                         <TableCell className="text-sm text-muted-foreground">{r.correction_reason ?? ''}</TableCell>

@@ -4,7 +4,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Download, Pencil } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { useHrEmployees } from '@/hooks/useHrEmployees';
 import { useHrReports, type MonthlyReportRow } from '@/hooks/useHrReports';
@@ -18,6 +17,7 @@ import {
   reportYears,
 } from '@/lib/hrReport';
 import { CorrectSessionDialog } from './CorrectSessionDialog';
+import { SessionStatusBadge } from './SessionStatusBadge';
 
 export function MonthlyReport() {
   const { employees } = useHrEmployees();
@@ -89,8 +89,8 @@ export function MonthlyReport() {
             {pendientes > 0 && (
               <p className="text-sm text-amber-500">
                 {pendientes === 1
-                  ? 'Hay 1 sesión pendiente de revisión: se olvidó fichar la salida y no cuenta horas hasta que la corrijas.'
-                  : `Hay ${pendientes} sesiones pendientes de revisión: se olvidó fichar la salida y no cuentan horas hasta que las corrijas.`}
+                  ? 'Hay 1 jornada sin salida o pendiente de revisión: no cuenta horas hasta que la corrijas.'
+                  : `Hay ${pendientes} jornadas sin salida o pendientes de revisión: no cuentan horas hasta que las corrijas.`}
               </p>
             )}
             <div className="grid grid-cols-2 gap-3">
@@ -129,13 +129,7 @@ export function MonthlyReport() {
                     <TableCell className="font-mono">{formatSeconds(r.worked_seconds)}</TableCell>
                     <TableCell className="font-mono">{formatSeconds(r.break_seconds)}</TableCell>
                     <TableCell>
-                      {r.needs_review ? (
-                        <Badge variant="destructive">Pendiente de revisión</Badge>
-                      ) : r.correction_reason ? (
-                        <Badge variant="secondary">Corregida</Badge>
-                      ) : r.status === 'open' ? (
-                        <Badge variant="outline">Abierta</Badge>
-                      ) : null}
+                      <SessionStatusBadge session={r} />
                     </TableCell>
                     {hasCorrections && (
                       <TableCell className="text-sm text-muted-foreground">{r.correction_reason ?? ''}</TableCell>

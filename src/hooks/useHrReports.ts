@@ -22,6 +22,19 @@ export interface SessionCorrection {
   reason: string;
 }
 
+/** Corrige o cierra una sesión (solo admins). El motivo queda en la auditoría. */
+export async function correctWorkSession(sessionId: string, c: SessionCorrection): Promise<string | null> {
+  // RPC de la 0020: `as never` hasta que se regenere types.ts.
+  const { error } = await supabase.rpc('correct_work_session' as never, {
+    _session_id: sessionId,
+    _clock_in_at: c.clockInAt.toISOString(),
+    _clock_out_at: c.clockOutAt.toISOString(),
+    _break_seconds: c.breakSeconds,
+    _reason: c.reason,
+  } as never);
+  return error ? error.message : null;
+}
+
 export function useHrReports(employeeId: string | null, year: number, month: number) {
   const { activeBusinessId } = useBusiness();
   const { toast } = useToast();
@@ -61,16 +74,9 @@ export function useHrReports(employeeId: string | null, year: number, month: num
   /** Corrige una sesión (solo admins). El motivo queda en la auditoría. */
   const correctSession = useCallback(
     async (sessionId: string, c: SessionCorrection): Promise<boolean> => {
-      // RPC nueva de la 0020: `as never` hasta que se regenere types.ts.
-      const { error } = await supabase.rpc('correct_work_session' as never, {
-        _session_id: sessionId,
-        _clock_in_at: c.clockInAt.toISOString(),
-        _clock_out_at: c.clockOutAt.toISOString(),
-        _break_seconds: c.breakSeconds,
-        _reason: c.reason,
-      } as never);
+      const error = await correctWorkSession(sessionId, c);
       if (error) {
-        toast({ title: 'No se pudo corregir', description: error.message, variant: 'destructive' });
+        toast({ title: 'No se pudo corregir', description: error, variant: 'destructive' });
         return false;
       }
       toast({ title: 'Fichaje corregido' });

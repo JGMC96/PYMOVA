@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Clock, CalendarDays, Users, CalendarRange, FileText, Timer, ListChecks } from 'lucide-react';
+import { Clock, CalendarDays, Users, CalendarRange, FileText, Timer, ListChecks, AlertTriangle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { RequireModule } from '@/components/auth/RequireModule';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { useTimeClock } from '@/hooks/useTimeClock';
+import { useHrPendingReviews } from '@/hooks/useHrPendingReviews';
 import { TimeClockCard } from '@/components/hr/TimeClockCard';
 import { TimeEntriesList } from '@/components/hr/TimeEntriesList';
 import { MyTimeRecord } from '@/components/hr/MyTimeRecord';
@@ -16,6 +18,7 @@ import { EmployeesTable } from '@/components/hr/EmployeesTable';
 import { TeamAbsenceCalendar } from '@/components/hr/TeamAbsenceCalendar';
 import { ScheduleCalendar } from '@/components/hr/ScheduleCalendar';
 import { MonthlyReport } from '@/components/hr/MonthlyReport';
+import { PendingReviewsCard } from '@/components/hr/PendingReviewsCard';
 import { MonthlyPermissionsSummary } from '@/components/hr/MonthlyPermissionsSummary';
 
 function HrInner() {
@@ -23,6 +26,7 @@ function HrInner() {
   const isAdmin = userRole === 'admin' || userRole === 'owner';
   const { dashboard, todayEntries } = useTimeClock();
   const [tab, setTab] = useState('clock');
+  const pending = useHrPendingReviews(isAdmin);
 
   return (
     <div className="space-y-6">
@@ -30,6 +34,20 @@ function HrInner() {
         <h1 className="text-3xl font-display font-bold">Recursos Humanos</h1>
         <p className="text-muted-foreground">Fichaje, vacaciones, permisos y planificación</p>
       </div>
+
+      {isAdmin && pending.rows.length > 0 && tab !== 'reports' && (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-destructive/50 p-3 text-sm">
+          <AlertTriangle className="w-4 h-4 text-destructive shrink-0" />
+          <span className="flex-1">
+            {pending.rows.length === 1
+              ? 'Hay 1 jornada sin salida por revisar.'
+              : `Hay ${pending.rows.length} jornadas sin salida por revisar.`}
+          </span>
+          <Button size="sm" variant="outline" onClick={() => setTab('reports')}>
+            Revisar
+          </Button>
+        </div>
+      )}
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList
@@ -114,6 +132,7 @@ function HrInner() {
               <ScheduleCalendar />
             </TabsContent>
             <TabsContent value="reports" className="mt-6 space-y-6">
+              <PendingReviewsCard rows={pending.rows} onClose={pending.closeSession} />
               <MonthlyReport />
               <MonthlyPermissionsSummary />
             </TabsContent>
