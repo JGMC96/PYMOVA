@@ -3274,6 +3274,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           delta: number
+          employee_id: string | null
           id: string
           note: string | null
           product_id: string | null
@@ -3287,6 +3288,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           delta: number
+          employee_id?: string | null
           id?: string
           note?: string | null
           product_id?: string | null
@@ -3300,6 +3302,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           delta?: number
+          employee_id?: string | null
           id?: string
           note?: string | null
           product_id?: string | null
@@ -3314,6 +3317,13 @@ export type Database = {
             columns: ["business_id"]
             isOneToOne: false
             referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_movements_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "hr_employees"
             referencedColumns: ["id"]
           },
           {
@@ -3852,6 +3862,19 @@ export type Database = {
         }
         Returns: number
       }
+      adjust_stock_batch: {
+        Args: {
+          _authorization_id?: string
+          _business_id: string
+          _lines: Json
+          _product_id: string
+          _reason: string
+        }
+        Returns: {
+          changed: number
+          to_stockagile: boolean
+        }[]
+      }
       admin_update_subscription: {
         Args: {
           _business_id: string
@@ -3878,6 +3901,18 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      apply_manual_stock_change: {
+        Args: {
+          _batch: string
+          _business_id: string
+          _employee_id?: string
+          _new_quantity: number
+          _note: string
+          _product_id: string
+          _variant_id: string
+        }
+        Returns: number
       }
       apply_online_order_stock: {
         Args: { _direction: number; _order_id: string }
@@ -4477,6 +4512,27 @@ export type Database = {
           is_default: boolean
           location_gid: string
           location_name: string
+        }[]
+      }
+      get_stock_movements: {
+        Args: {
+          _business_id: string
+          _limit?: number
+          _product_id?: string
+          _source?: string
+        }
+        Returns: {
+          created_at: string
+          delta: number
+          id: string
+          note: string
+          product_id: string
+          product_name: string
+          source: string
+          stock_after: number
+          variant_id: string
+          variant_name: string
+          who: string
         }[]
       }
       get_store_voucher: {
