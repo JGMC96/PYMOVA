@@ -203,9 +203,8 @@ export function VariantsDialog({
                           onClick={() =>
                             setAdjustTarget({
                               productId,
-                              variantId: v.id,
                               name: `${productName} · ${v.name}`,
-                              current: v.stock_quantity,
+                              rows: [{ variantId: v.id, name: v.name, current: v.stock_quantity }],
                             })
                           }
                         >

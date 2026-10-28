@@ -22,6 +22,17 @@ import { labelDataFor } from '@/lib/labels';
 import { needsCodes } from '@/lib/catalogCodes';
 import { GenerateCodesDialog } from './GenerateCodesDialog';
 
+/** Un producto sin tallas se ajusta solo; uno con tallas, todas en la rejilla. */
+function adjustTargetFor(product: ProductWithStock): StockAdjustTarget {
+  return {
+    productId: product.id,
+    name: product.name,
+    rows: product.variants.length
+      ? product.variants.map((v) => ({ variantId: v.id, name: v.name, current: v.stock_quantity }))
+      : [{ variantId: null, name: product.name, current: product.stock_quantity }],
+  };
+}
+
 export function InventoryView() {
   const { products, isLoading, isUpdating, toggleTracking, refreshProducts } = useInventory();
   // 0031: ajustar stock y cambiar el control de stock, con su permiso.
@@ -100,30 +111,23 @@ export function InventoryView() {
                       <span className="text-muted-foreground">—</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-right">${product.price.toFixed(2)}</TableCell>
+                  <TableCell className="text-right">{product.price.toFixed(2)} €</TableCell>
                   <TableCell>
                     {product.track_inventory ? (
                       <div className="flex items-center justify-center gap-2">
                         <Badge
                           variant={product.stock_quantity > 10 ? 'secondary' : product.stock_quantity > 0 ? 'outline' : 'destructive'}
-                          title={product.variants.length > 0 ? 'Suma de las variantes: se ajusta en cada variante' : undefined}
+                          title={product.variants.length > 0 ? 'Suma de las tallas' : undefined}
                         >
                           {product.stock_quantity}
                         </Badge>
-                        {canAdjustStock && product.variants.length === 0 && (
+                        {canAdjustStock && (
                           <Button
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7"
-                            title="Ajustar stock"
-                            onClick={() =>
-                              setAdjustTarget({
-                                productId: product.id,
-                                variantId: null,
-                                name: product.name,
-                                current: product.stock_quantity,
-                              })
-                            }
+                            title={product.variants.length > 0 ? 'Ajustar el stock de las tallas' : 'Ajustar stock'}
+                            onClick={() => setAdjustTarget(adjustTargetFor(product))}
                           >
                             <Edit2 className="w-3 h-3" />
                           </Button>
