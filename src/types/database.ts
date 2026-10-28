@@ -123,7 +123,7 @@ export interface HrDashboard {
 
 // Marketing calendar
 export type MarketingContentType = 'story' | 'post' | 'reel';
-export type MarketingChannel = 'instagram' | 'facebook';
+export type MarketingChannel = 'instagram' | 'tiktok' | 'pinterest' | 'facebook';
 export type MarketingStatus = 'idea' | 'draft' | 'scheduled' | 'published' | 'cancelled';
 
 export interface MarketingPost {

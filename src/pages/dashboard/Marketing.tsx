@@ -34,8 +34,8 @@ export default function Marketing() {
     setDialogOpen(true);
   };
 
+  // El personal también abre la ficha, en solo lectura.
   const handleSelect = (post: MarketingPost) => {
-    if (!isAdmin) return; // staff: read-only, no dialog
     setEditingPost(post);
     setDefaultDate(null);
     setDialogOpen(true);
@@ -86,18 +86,17 @@ export default function Marketing() {
           </TabsContent>
         </Tabs>
 
-        {isAdmin && (
-          <PostFormDialog
-            open={dialogOpen}
-            onOpenChange={setDialogOpen}
-            post={editingPost}
-            defaultDate={defaultDate}
-            teamMembers={teamMembers}
-            onSubmit={handleSubmit}
-            onDelete={deletePost}
-            isSubmitting={isSubmitting}
-          />
-        )}
+        <PostFormDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          post={editingPost}
+          defaultDate={defaultDate}
+          teamMembers={teamMembers}
+          onSubmit={handleSubmit}
+          onDelete={isAdmin ? deletePost : undefined}
+          isSubmitting={isSubmitting}
+          readOnly={!isAdmin}
+        />
       </div>
     </RequireModule>
   );
