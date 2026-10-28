@@ -1,4 +1,4 @@
-import { Image, Film, Camera, Instagram, Facebook } from 'lucide-react';
+import { Image, Film, Camera, Instagram, Facebook, Music2, Pin, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type {
   MarketingContentType,
@@ -20,9 +20,19 @@ export const STATUS_LABEL: Record<MarketingStatus, string> = {
   cancelled: 'Cancelado',
 };
 
+// El orden es el de los selectores y casillas (Instagram primero: es la red principal).
 export const CHANNEL_LABEL: Record<MarketingChannel, string> = {
   instagram: 'Instagram',
+  tiktok: 'TikTok',
+  pinterest: 'Pinterest',
   facebook: 'Facebook',
+};
+
+const CHANNEL_ICON: Record<MarketingChannel, LucideIcon> = {
+  instagram: Instagram,
+  tiktok: Music2,
+  pinterest: Pin,
+  facebook: Facebook,
 };
 
 const CONTENT_TYPE_CLASSES: Record<MarketingContentType, string> = {
@@ -45,8 +55,8 @@ export function ContentTypeIcon({ type, className }: { type: MarketingContentTyp
 }
 
 export function ChannelIcon({ channel, className }: { channel: MarketingChannel; className?: string }) {
-  const Icon = channel === 'instagram' ? Instagram : Facebook;
-  return <Icon className={cn('w-3.5 h-3.5', className)} />;
+  const Icon = CHANNEL_ICON[channel] ?? Image;
+  return <Icon className={cn('w-3.5 h-3.5', className)} aria-label={CHANNEL_LABEL[channel] ?? channel} />;
 }
 
 export function TypeBadge({ type }: { type: MarketingContentType }) {

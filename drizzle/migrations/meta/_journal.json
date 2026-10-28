@@ -400,6 +400,13 @@
       "when": 1793221659503,
       "tag": "0056_0056_rrhh_fichajes_conservacion",
       "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1793225482044,
+      "tag": "0057_0057_stock_edicion",
+      "breakpoints": true
     }
   ]
 }
