@@ -37,7 +37,9 @@ const schema = z.object({
   title: z.string().trim().min(1, 'El título es requerido').max(200),
   copy: z.string().max(2000).optional(),
   content_type: z.enum(['story', 'post', 'reel']),
-  channels: z.array(z.enum(['instagram', 'facebook'])).min(1, 'Selecciona al menos un canal'),
+  channels: z
+    .array(z.enum(['instagram', 'tiktok', 'pinterest', 'facebook']))
+    .min(1, 'Selecciona al menos un canal'),
   status: z.enum(['idea', 'draft', 'scheduled', 'published', 'cancelled']),
   scheduled_at: z.string().optional(),
   assignee_id: z.string().optional(),
@@ -63,7 +65,12 @@ interface PostFormDialogProps {
   onSubmit: (data: MarketingPostFormData) => Promise<boolean>;
   onDelete?: (id: string) => Promise<boolean>;
   isSubmitting: boolean;
+  /** Personal: ve la publicación entera pero no la cambia (la RLS solo deja escribir a admin). */
+  readOnly?: boolean;
 }
+
+// Hora por defecto al crear desde un día del calendario (el día llega a las 00:00).
+const DEFAULT_HOUR = 10;
 
 // Convert ISO timestamp to <input type="datetime-local"> value
 function toLocalInputValue(iso: string | null | undefined): string {
@@ -83,6 +90,7 @@ export function PostFormDialog({
   onSubmit,
   onDelete,
   isSubmitting,
+  readOnly = false,
 }: PostFormDialogProps) {
   const isEditing = !!post;
 
@@ -118,8 +126,12 @@ export function PostFormDialog({
         notes: post.notes ?? '',
       });
     } else {
-      const baseDate = defaultDate ?? null;
-      const scheduled = baseDate ? toLocalInputValue(baseDate.toISOString()) : '';
+      let scheduled = '';
+      if (defaultDate) {
+        const base = new Date(defaultDate);
+        base.setHours(DEFAULT_HOUR, 0, 0, 0);
+        scheduled = toLocalInputValue(base.toISOString());
+      }
       form.reset({
         title: '',
         copy: '',
@@ -162,14 +174,23 @@ export function PostFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[560px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{isEditing ? 'Editar publicación' : 'Nueva publicación'}</DialogTitle>
+          <DialogTitle>
+            {readOnly ? 'Publicación' : isEditing ? 'Editar publicación' : 'Nueva publicación'}
+          </DialogTitle>
           <DialogDescription>
-            Planifica el contenido y compártelo con tu equipo.
+            {readOnly
+              ? 'Solo un administrador puede cambiarla.'
+              : 'Planifica el contenido y compártelo con tu equipo.'}
           </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+            {/* En solo lectura los campos se ven a opacidad normal: hay que poder leerlos bien. */}
+            <fieldset
+              disabled={readOnly}
+              className="space-y-4 [&_:disabled]:!cursor-default [&_:disabled]:!opacity-100"
+            >
             <FormField
               control={form.control}
               name="title"
@@ -244,7 +265,7 @@ export function PostFormDialog({
               render={() => (
                 <FormItem>
                   <FormLabel>Canales *</FormLabel>
-                  <div className="flex gap-4">
+                  <div className="flex flex-wrap gap-x-4 gap-y-2">
                     {(Object.keys(CHANNEL_LABEL) as MarketingChannel[]).map((c) => (
                       <FormField
                         key={c}
@@ -363,6 +384,16 @@ export function PostFormDialog({
                   <FormControl>
                     <Input placeholder="https://drive.google.com/..." {...field} />
                   </FormControl>
+                  {readOnly && field.value && (
+                    <a
+                      href={field.value}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-primary underline-offset-4 hover:underline"
+                    >
+                      Abrir enlace
+                    </a>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}
@@ -387,30 +418,40 @@ export function PostFormDialog({
               )}
             />
 
-            <DialogFooter className="gap-2 sm:gap-2">
-              {isEditing && onDelete && (
+            </fieldset>
+
+            {readOnly ? (
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                  Cerrar
+                </Button>
+              </DialogFooter>
+            ) : (
+              <DialogFooter className="gap-2 sm:gap-2">
+                {isEditing && onDelete && (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    onClick={handleDelete}
+                    disabled={isSubmitting}
+                    className="mr-auto"
+                  >
+                    Eliminar
+                  </Button>
+                )}
                 <Button
                   type="button"
-                  variant="destructive"
-                  onClick={handleDelete}
+                  variant="outline"
+                  onClick={() => onOpenChange(false)}
                   disabled={isSubmitting}
-                  className="mr-auto"
                 >
-                  Eliminar
+                  Cancelar
                 </Button>
-              )}
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                disabled={isSubmitting}
-              >
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? 'Guardando...' : isEditing ? 'Guardar' : 'Crear'}
-              </Button>
-            </DialogFooter>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? 'Guardando...' : isEditing ? 'Guardar' : 'Crear'}
+                </Button>
+              </DialogFooter>
+            )}
           </form>
         </Form>
       </DialogContent>
