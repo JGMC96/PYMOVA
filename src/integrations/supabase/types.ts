@@ -4314,6 +4314,22 @@ export type Database = {
           vacation_days_used: number
         }[]
       }
+      get_hr_pending_reviews: {
+        Args: { _business_id: string }
+        Returns: {
+          break_seconds: number
+          clock_in_at: string
+          clock_out_at: string
+          correction_reason: string
+          employee_id: string
+          employee_name: string
+          id: string
+          needs_review: boolean
+          session_date: string
+          status: Database["public"]["Enums"]["work_session_status"]
+          worked_seconds: number
+        }[]
+      }
       get_my_permissions: {
         Args: { _business_id: string }
         Returns: {
@@ -4500,6 +4516,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      hr_retention_start: { Args: never; Returns: string }
       is_member_of_business: {
         Args: { _business_id: string }
         Returns: boolean
