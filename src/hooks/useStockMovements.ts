@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useBusiness } from '@/contexts/BusinessContext';
 
 export type StockMovementSource =
   | 'sale'
@@ -9,6 +10,7 @@ export type StockMovementSource =
   | 'import'
   | 'manual'
   | 'initial'
+  | 'purchase'
   | 'other';
 
 export const STOCK_SOURCE_LABEL: Record<StockMovementSource, string> = {
@@ -17,73 +19,69 @@ export const STOCK_SOURCE_LABEL: Record<StockMovementSource, string> = {
   online_order: 'Pedido online',
   shopify: 'Shopify',
   import: 'Importación',
-  manual: 'Ajuste manual',
+  manual: 'Ajuste',
   initial: 'Alta',
+  purchase: 'Compra',
   other: 'Otro',
 };
 
 export interface StockMovement {
   id: string;
+  created_at: string;
+  product_id: string | null;
+  product_name: string | null;
+  variant_id: string | null;
+  variant_name: string | null;
   delta: number;
   stock_after: number | null;
   source: StockMovementSource;
   note: string | null;
-  created_at: string;
-  variant_id: string | null;
-  variant_name: string | null;
+  /** La persona del PIN o la cuenta; null si lo hizo Shopify, Stockagile o una tarea. */
+  who: string | null;
 }
 
-interface MovementRow extends Omit<StockMovement, 'variant_name'> {
-  product_variants: { name: string } | null;
-}
-
-type MovementsResult = Promise<{ data: MovementRow[] | null; error: { message: string } | null }>;
-interface MovementsQuery {
-  select(columns: string): MovementsQuery;
-  eq(column: string, value: string): MovementsQuery;
-  order(column: string, options: { ascending: boolean }): MovementsQuery;
-  limit(count: number): MovementsResult;
-}
-
-// `stock_movements` llega con la migración 0024; types.ts se regenera después.
-const fromMovements = () =>
-  (supabase.from.bind(supabase) as unknown as (table: string) => MovementsQuery)('stock_movements');
-
-/** Últimos movimientos de stock de un producto (y de sus variantes). Solo lectura. */
-export function useStockMovements(productId: string | null, limit = 50) {
+/**
+ * Últimos movimientos de stock del negocio (get_stock_movements, 0057), de un producto si se
+ * indica y de un origen si se filtra. Solo lectura, para los miembros del negocio.
+ * `reloadKey`: al cambiar, se vuelve a cargar (tras un ajuste, por ejemplo).
+ */
+export function useStockMovements(
+  productId: string | null,
+  source: StockMovementSource | null = null,
+  { limit = 50, reloadKey = 0 }: { limit?: number; reloadKey?: number } = {},
+) {
+  const { activeBusinessId } = useBusiness();
   const [movements, setMovements] = useState<StockMovement[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const requestId = useRef(0);
 
   const fetchMovements = useCallback(async () => {
-    if (!productId) {
-      setMovements([]);
-      return;
-    }
+    if (!activeBusinessId) return;
+    const id = ++requestId.current;
     setIsLoading(true);
     setError(null);
-    const { data, error: queryError } = await fromMovements()
-      .select('id, delta, stock_after, source, note, created_at, variant_id, product_variants(name)')
-      .eq('product_id', productId)
-      .order('created_at', { ascending: false })
-      .limit(limit);
-    if (queryError) {
-      setError(queryError.message);
+    // RPC nueva de la 0057: `as never` hasta que se regenere types.ts.
+    const { data, error: rpcError } = await supabase.rpc('get_stock_movements' as never, {
+      _business_id: activeBusinessId,
+      _product_id: productId,
+      _source: source,
+      _limit: limit,
+    } as never);
+    if (id !== requestId.current) return;
+    setIsLoading(false);
+    if (rpcError) {
+      setError(rpcError.message);
       setMovements([]);
     } else {
-      setMovements(
-        (data ?? []).map(({ product_variants, ...row }) => ({
-          ...row,
-          variant_name: product_variants?.name ?? null,
-        })),
-      );
+      setMovements((data ?? []) as StockMovement[]);
     }
-    setIsLoading(false);
-  }, [productId, limit]);
+  }, [activeBusinessId, productId, source, limit]);
 
+  // reloadKey solo fuerza una carga nueva.
   useEffect(() => {
-    fetchMovements();
-  }, [fetchMovements]);
+    void fetchMovements();
+  }, [fetchMovements, reloadKey]);
 
   return { movements, isLoading, error, refresh: fetchMovements };
 }

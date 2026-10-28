@@ -393,6 +393,7 @@ const ACTION_TEXT: Record<PosAction, (amount: number) => string> = {
     `El descuento es del ${amount.toFixed(2).replace('.', ',')} %, por encima del máximo de quien vende. Lo autoriza alguien con un máximo igual o mayor.`,
   return: () => 'Quien hace la devolución no tiene ese permiso. La autoriza alguien que pueda hacer devoluciones.',
   close_register: () => 'Quien cierra no tiene ese permiso. Lo autoriza alguien que pueda cerrar la caja.',
+  adjust_stock: () => 'Cada ajuste de stock lleva el PIN de quien lo hace. Tiene que tener el permiso «Ajustar stock».',
 };
 
 function AuthorizeStep({
