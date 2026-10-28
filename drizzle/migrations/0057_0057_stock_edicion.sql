@@ -9,13 +9,144 @@
 --   El alta con stock inicial no va a Stockagile: en TUILUS viene de Shopify, que ya lo tiene.
 -- - adjust_stock_batch: varias tallas de un producto con un motivo, todo o nada. Cada línea
 --   lleva el stock que se vio en pantalla; si ha cambiado (una venta mientras se editaba), no
---   se guarda nada. Mismo permiso que adjust_stock (member_can 'adjust_stock').
--- - adjust_stock: mismo comportamiento, ahora por apply_manual_stock_change.
+--   se guarda nada.
+-- - PIN: en los negocios con dependientes con PIN (business_requires_seller), cada guardado
+--   pide el PIN de quien ajusta, también a propietarios y administradores. authorize_action
+--   acepta la acción 'adjust_stock' (permiso can_adjust_stock de esa persona, no de la cuenta,
+--   que en el TPV es compartida) y da un pase de un solo uso de 2 minutos, que gasta
+--   adjust_stock_batch. Tras 5 PIN fallidos, 5 minutos de bloqueo (verify_employee_pin, como en
+--   el TPV). Sin dependientes con PIN, como hasta ahora: el permiso de la cuenta.
+-- - adjust_stock (una talla): sin PIN, igual que antes; con PIN, no se puede usar.
+-- - stock_movements.employee_id: quién lo hizo (la persona del PIN), además de la cuenta.
 -- - recompute_local_stock: un ajuste que aún no ha llegado a Stockagile cuenta como pendiente,
 --   para que un aviso de Shopify con la cifra anterior no lo deshaga.
 -- - get_shopify_problems: el movimiento de Stockagile se ve con su signo ((+2) o (-1)).
+-- - get_stock_movements: historial para la pantalla de stock, con el artículo y quién; lo leen
+--   los miembros, como stock_movements.
 -- Prueba del 28/10/2026: Stockagile acepta cantidades negativas en POST /stock/move.
 -- Migración idempotente, sin secretos.
+
+-- 0. Quién hizo cada movimiento ------------------------------------------------------------
+ALTER TABLE public.stock_movements
+  ADD COLUMN IF NOT EXISTS employee_id uuid REFERENCES public.hr_employees(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS stock_movements_business_idx ON public.stock_movements (business_id, created_at DESC);
+
+-- Registro de movimientos (cuerpo de la 0024 más la persona, marca app.stock_employee).
+CREATE OR REPLACE FUNCTION public.log_stock_movement()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+DECLARE
+  _delta integer;
+  _source text;
+  _ref uuid;
+  _employee uuid;
+  _product uuid;
+  _variant uuid;
+BEGIN
+  IF TG_OP = 'UPDATE' THEN
+    IF NEW.stock_quantity IS NOT DISTINCT FROM OLD.stock_quantity THEN RETURN NULL; END IF;
+    _delta := COALESCE(NEW.stock_quantity, 0) - COALESCE(OLD.stock_quantity, 0);
+  ELSE
+    IF COALESCE(NEW.stock_quantity, 0) = 0 THEN RETURN NULL; END IF;
+    _delta := NEW.stock_quantity;
+  END IF;
+
+  IF TG_TABLE_NAME = 'product_variants' THEN
+    _product := NEW.product_id;
+    _variant := NEW.id;
+  ELSE
+    -- Un producto con variantes vale la suma de ellas: el movimiento ya queda en la variante.
+    IF EXISTS (SELECT 1 FROM product_variants v WHERE v.product_id = NEW.id) THEN RETURN NULL; END IF;
+    _product := NEW.id;
+  END IF;
+
+  _source := NULLIF(current_setting('app.stock_source', true), '');
+  IF _source IS NULL THEN
+    _source := CASE
+      WHEN TG_OP = 'INSERT' THEN 'initial'
+      WHEN current_setting('role', true) = 'service_role' THEN 'import'
+      ELSE 'manual'
+    END;
+  END IF;
+  BEGIN
+    _ref := NULLIF(current_setting('app.stock_ref', true), '')::uuid;
+  EXCEPTION WHEN OTHERS THEN
+    _ref := NULL;
+  END;
+  BEGIN
+    _employee := NULLIF(current_setting('app.stock_employee', true), '')::uuid;
+  EXCEPTION WHEN OTHERS THEN
+    _employee := NULL;
+  END;
+
+  INSERT INTO stock_movements (business_id, product_id, variant_id, delta, stock_after, source, reference_id, note, created_by, employee_id)
+  VALUES (NEW.business_id, _product, _variant, _delta, NEW.stock_quantity, _source, _ref,
+          NULLIF(current_setting('app.stock_note', true), ''), auth.uid(), _employee);
+  RETURN NULL;
+END;
+$$;
+
+-- Autorizar con PIN también los ajustes de stock (cuerpo de la 0030, permisos por persona).
+ALTER TABLE public.pos_authorizations DROP CONSTRAINT IF EXISTS pos_authorizations_action_check;
+ALTER TABLE public.pos_authorizations ADD CONSTRAINT pos_authorizations_action_check
+  CHECK (action IN ('discount', 'return', 'close_register', 'adjust_stock'));
+
+CREATE OR REPLACE FUNCTION public.authorize_action(
+  _business_id uuid,
+  _employee_id uuid,
+  _pin text,
+  _action text,
+  _amount numeric DEFAULT NULL
+)
+RETURNS TABLE(ok boolean, error text, locked_seconds integer, authorization_id uuid, name text)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+DECLARE
+  _check record;
+  _perm record;
+  _allowed boolean;
+  _id uuid;
+BEGIN
+  IF NOT is_member_of_business(_business_id) THEN
+    RAISE EXCEPTION 'No tienes acceso a este negocio' USING ERRCODE = '42501';
+  END IF;
+  IF _action IS NULL OR _action NOT IN ('discount', 'return', 'close_register', 'adjust_stock') THEN
+    RAISE EXCEPTION 'Acción no válida' USING ERRCODE = '22023';
+  END IF;
+
+  SELECT * INTO _check FROM verify_employee_pin(_business_id, _employee_id, _pin);
+  IF NOT _check.ok THEN
+    RETURN QUERY SELECT false, _check.error, _check.locked_seconds, NULL::uuid, NULL::text;
+    RETURN;
+  END IF;
+
+  SELECT * INTO _perm FROM employee_effective_permissions(_employee_id);
+  _allowed := CASE _action
+    WHEN 'discount' THEN COALESCE(_perm.max_discount_pct, 0) >= COALESCE(_amount, 100)
+    WHEN 'return' THEN COALESCE(_perm.can_return, false)
+    WHEN 'close_register' THEN COALESCE(_perm.can_close_register, false)
+    WHEN 'adjust_stock' THEN COALESCE(_perm.can_adjust_stock, false)
+  END;
+  IF NOT _allowed THEN
+    RETURN QUERY SELECT false, public.employee_display_name(_employee_id) || ' no tiene permiso para autorizarlo', 0, NULL::uuid, NULL::text;
+    RETURN;
+  END IF;
+
+  DELETE FROM pos_authorizations a WHERE a.business_id = _business_id AND a.expires_at < now() - interval '1 day';
+  INSERT INTO pos_authorizations (business_id, action, employee_id, max_amount, requested_by)
+  VALUES (_business_id, _action, _employee_id, _amount, auth.uid())
+  RETURNING id INTO _id;
+
+  RETURN QUERY SELECT true, NULL::text, 0, _id, public.employee_display_name(_employee_id);
+END;
+$$;
+REVOKE ALL ON FUNCTION public.authorize_action(uuid, uuid, text, text, numeric) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.authorize_action(uuid, uuid, text, text, numeric) TO authenticated, service_role;
 
 -- 1. Aplicar un ajuste ya validado (interna) ------------------------------------------------
 -- La fila ya está bloqueada y comprobada por quien llama. Devuelve el delta.
@@ -25,7 +156,8 @@ CREATE OR REPLACE FUNCTION public.apply_manual_stock_change(
   _variant_id uuid,
   _new_quantity integer,
   _note text,
-  _batch uuid
+  _batch uuid,
+  _employee_id uuid DEFAULT NULL
 )
 RETURNS integer
 LANGUAGE plpgsql
@@ -53,6 +185,7 @@ BEGIN
   PERFORM set_config('app.stock_source', 'manual', true);
   PERFORM set_config('app.stock_note', _note, true);
   PERFORM set_config('app.stock_ref', _batch::text, true);
+  PERFORM set_config('app.stock_employee', COALESCE(_employee_id::text, ''), true);
   IF _variant_id IS NOT NULL THEN
     UPDATE product_variants SET stock_quantity = _new_quantity, updated_at = now() WHERE id = _variant_id;
   ELSE
@@ -61,6 +194,7 @@ BEGIN
   PERFORM set_config('app.stock_source', '', true);
   PERFORM set_config('app.stock_note', '', true);
   PERFORM set_config('app.stock_ref', '', true);
+  PERFORM set_config('app.stock_employee', '', true);
 
   -- El movimiento que acaba de dejar log_stock_movement: identifica el ajuste en las colas.
   SELECT s.id INTO _movement FROM stock_movements s
@@ -87,10 +221,11 @@ BEGIN
   RETURN _delta;
 END;
 $$;
-REVOKE ALL ON FUNCTION public.apply_manual_stock_change(uuid, uuid, uuid, integer, text, uuid)
+REVOKE ALL ON FUNCTION public.apply_manual_stock_change(uuid, uuid, uuid, integer, text, uuid, uuid)
   FROM PUBLIC, anon, authenticated;
 
 -- 2. Ajuste de una talla o de un producto sin tallas (cuerpo de la 0030) ---------------------
+-- En un negocio con PIN no sirve: el ajuste lleva el PIN de quien lo hace (adjust_stock_batch).
 CREATE OR REPLACE FUNCTION public.adjust_stock(
   _business_id uuid,
   _product_id uuid,
@@ -109,6 +244,9 @@ DECLARE
 BEGIN
   IF NOT public.member_can(_business_id, 'adjust_stock') THEN
     RAISE EXCEPTION 'No tienes permiso para ajustar el stock' USING ERRCODE = '42501';
+  END IF;
+  IF public.business_requires_seller(_business_id) THEN
+    RAISE EXCEPTION 'Necesita autorización: el ajuste lleva el PIN de quien lo hace' USING ERRCODE = '42501';
   END IF;
   IF length(_clean_reason) < 3 THEN
     RAISE EXCEPTION 'Indica el motivo del ajuste' USING ERRCODE = '22023';
@@ -154,11 +292,14 @@ GRANT EXECUTE ON FUNCTION public.adjust_stock(uuid, uuid, uuid, integer, text) T
 -- _lines: [{ "variant_id": uuid | null, "expected": stock visto, "new_quantity": cantidad nueva }]
 -- (variant_id null solo en un producto sin tallas). Devuelve cuántas líneas cambiaron y si
 -- los cambios van a Stockagile (para que la app lo envíe al momento) o a Shopify.
+-- Con dependientes con PIN, _authorization_id es el pase de authorize_action('adjust_stock')
+-- de quien ajusta (de un solo uso, de esta cuenta y de menos de 2 minutos).
 CREATE OR REPLACE FUNCTION public.adjust_stock_batch(
   _business_id uuid,
   _product_id uuid,
   _lines jsonb,
-  _reason text
+  _reason text,
+  _authorization_id uuid DEFAULT NULL
 )
 RETURNS TABLE(changed integer, to_stockagile boolean)
 LANGUAGE plpgsql
@@ -176,8 +317,15 @@ DECLARE
   _current integer;
   _name text;
   _changed integer := 0;
+  _employee uuid;
 BEGIN
-  IF NOT public.member_can(_business_id, 'adjust_stock') THEN
+  IF public.business_requires_seller(_business_id) THEN
+    -- Decide el permiso de la persona del PIN, no el de la cuenta (la del TPV es compartida).
+    IF NOT public.is_member_of_business(_business_id) THEN
+      RAISE EXCEPTION 'No tienes permiso para ajustar el stock' USING ERRCODE = '42501';
+    END IF;
+    _employee := consume_authorization(_business_id, _authorization_id, 'adjust_stock', NULL);
+  ELSIF NOT public.member_can(_business_id, 'adjust_stock') THEN
     RAISE EXCEPTION 'No tienes permiso para ajustar el stock' USING ERRCODE = '42501';
   END IF;
   IF length(_clean_reason) < 3 THEN
@@ -240,7 +388,7 @@ BEGIN
         USING ERRCODE = '40001';
     END IF;
 
-    IF apply_manual_stock_change(_business_id, _product_id, _line.variant_id, _line.new_quantity, _clean_reason, _batch) <> 0 THEN
+    IF apply_manual_stock_change(_business_id, _product_id, _line.variant_id, _line.new_quantity, _clean_reason, _batch, _employee) <> 0 THEN
       _changed := _changed + 1;
     END IF;
   END LOOP;
@@ -249,8 +397,8 @@ BEGIN
     EXISTS (SELECT 1 FROM stockagile_connections c WHERE c.business_id = _business_id AND c.enabled);
 END;
 $$;
-REVOKE ALL ON FUNCTION public.adjust_stock_batch(uuid, uuid, jsonb, text) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.adjust_stock_batch(uuid, uuid, jsonb, text) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.adjust_stock_batch(uuid, uuid, jsonb, text, uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.adjust_stock_batch(uuid, uuid, jsonb, text, uuid) TO authenticated, service_role;
 
 -- 4. Stock de la tienda: los ajustes que aún no han llegado a Stockagile cuentan ------------
 -- (cuerpo de la 0040). Solo los ajustes (origen stock_movements): las devoluciones y compras
@@ -433,3 +581,58 @@ END;
 $$;
 REVOKE ALL ON FUNCTION public.get_shopify_problems(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.get_shopify_problems(uuid) TO authenticated, service_role;
+
+-- 7. Historial para la pantalla de stock ---------------------------------------------------
+-- Últimos movimientos del negocio (o de un producto, o de un origen), con el artículo y quién:
+-- la persona del PIN o, si no hay, el nombre de la cuenta. Sin quién: Shopify, Stockagile o
+-- una tarea automática. Lo leen los miembros, como stock_movements.
+CREATE OR REPLACE FUNCTION public.get_stock_movements(
+  _business_id uuid,
+  _product_id uuid DEFAULT NULL,
+  _source text DEFAULT NULL,
+  _limit integer DEFAULT 50
+)
+RETURNS TABLE(
+  id uuid,
+  created_at timestamptz,
+  product_id uuid,
+  product_name text,
+  variant_id uuid,
+  variant_name text,
+  delta integer,
+  stock_after integer,
+  source text,
+  note text,
+  who text
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+BEGIN
+  IF NOT (is_member_of_business(_business_id) OR is_super_admin()) THEN
+    RAISE EXCEPTION 'No tienes acceso a este negocio' USING ERRCODE = '42501';
+  END IF;
+
+  RETURN QUERY
+  SELECT s.id, s.created_at, s.product_id, p.name::text, s.variant_id, v.name::text, s.delta, s.stock_after,
+         s.source, s.note,
+         COALESCE(
+           CASE WHEN s.employee_id IS NOT NULL THEN employee_display_name(s.employee_id) END,
+           NULLIF(btrim(pr.full_name), ''),
+           CASE WHEN s.created_by IS NOT NULL THEN 'Cuenta sin nombre' END
+         )::text
+  FROM stock_movements s
+  LEFT JOIN products p ON p.id = s.product_id
+  LEFT JOIN product_variants v ON v.id = s.variant_id
+  LEFT JOIN profiles pr ON pr.id = s.created_by
+  WHERE s.business_id = _business_id
+    AND (_product_id IS NULL OR s.product_id = _product_id)
+    AND (_source IS NULL OR s.source = _source)
+  ORDER BY s.created_at DESC
+  LIMIT GREATEST(LEAST(COALESCE(_limit, 50), 200), 1);
+END;
+$$;
+REVOKE ALL ON FUNCTION public.get_stock_movements(uuid, uuid, text, integer) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.get_stock_movements(uuid, uuid, text, integer) TO authenticated, service_role;

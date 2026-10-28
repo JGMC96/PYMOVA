@@ -206,4 +206,126 @@ describe.skipIf(!RLS_DB_URL)('RLS · edición de stock por tallas y a Stockagile
       SELECT reference FROM public.get_shopify_problems(${tienda}) WHERE kind = 'stockagile'`);
     expect(avisos.map((a) => a.reference)).toContain(`Zueco ${numero} · 38 (-2)`);
   });
+
+  it('historial: quién y qué artículo, filtrado por producto, solo para miembros', async () => {
+    const { producto, tallas } = await zueco(otra);
+    await lote(admin, otra, producto, [{ variant_id: tallas[1], expected: 3, new_quantity: 1 }], 'Rotura o defecto: suela');
+    const filas = await asUser(sql, staff, (tx) => tx<{ product_name: string; variant_name: string; delta: number; stock_after: number; source: string; note: string; who: string | null }[]>`
+      SELECT product_name, variant_name, delta, stock_after, source, note, who FROM public.get_stock_movements(${otra}, ${producto})`);
+    expect(filas[0]).toMatchObject({
+      product_name: `Zueco ${numero}`, variant_name: '39', delta: -2, stock_after: 1, source: 'manual', note: 'Rotura o defecto: suela',
+    });
+    expect(filas[0].who).toBeTruthy();
+    // Las altas de las tallas, sin quién (las hizo la prueba como superusuario).
+    expect(filas.filter((f) => f.source === 'initial').every((f) => f.who === null)).toBe(true);
+
+    const soloAjustes = await asUser(sql, staff, (tx) => tx<{ source: string }[]>`
+      SELECT source FROM public.get_stock_movements(${otra}, null, 'manual', 10)`);
+    expect(soloAjustes.length).toBeGreaterThan(0);
+    expect(soloAjustes.every((f) => f.source === 'manual')).toBe(true);
+
+    const ajeno = await createUser(sql, 'curioso@ejemplo.test');
+    await expect(
+      asUser(sql, ajeno, (tx) => tx`SELECT * FROM public.get_stock_movements(${otra})`),
+    ).rejects.toMatchObject(PERMISO_DENEGADO);
+  });
+
+  describe('con dependientes con PIN: cada guardado lleva el PIN de quien ajusta', () => {
+    let conPin: string;
+    let tpv: string; // cuenta de personal compartida, sin permiso propio de stock
+    let empOwner: string;
+    let luis: string; // encargado con permiso de ajustar stock
+    let ana: string; // dependienta sin permiso
+
+    const autorizar = async (employee: string, pin: string, accion = 'adjust_stock', user = tpv) => {
+      const [r] = await asUser(sql, user, (tx) => tx<{ ok: boolean; error: string | null; locked_seconds: number; authorization_id: string | null }[]>`
+        SELECT * FROM public.authorize_action(${conPin}, ${employee}, ${pin}, ${accion}, null)`);
+      return r;
+    };
+    const loteCon = (autorizacion: string | null, producto: string, lineas: Linea[], user = tpv) =>
+      asUser(sql, user, (tx) => tx<{ changed: number }[]>`
+        SELECT * FROM public.adjust_stock_batch(${conPin}, ${producto}, ${sql.json(lineas as never)}::jsonb, 'Recuento', ${autorizacion})`);
+
+    beforeAll(async () => {
+      tpv = await createUser(sql, 'tienda@ejemplo.test');
+      const [b] = await asUser(sql, owner, (tx) => tx<{ id: string }[]>`SELECT public.create_business('Con PIN', null) AS id`);
+      conPin = b.id;
+      await sql`INSERT INTO business_members (business_id, user_id, role, is_active) VALUES (${conPin}, ${tpv}, 'staff', true)`;
+      await sql`
+        INSERT INTO shopify_connections (business_id, shop_domain, default_location_gid, stock_push_enabled)
+        VALUES (${conPin}, 'con-pin.myshopify.com', ${TIENDA}, true)`;
+      const [eo] = await asUser(sql, owner, (tx) => tx<{ id: string }[]>`SELECT public.ensure_hr_employee(${conPin}) AS id`);
+      empOwner = eo.id;
+      await asUser(sql, owner, (tx) => tx`SELECT public.set_employee_pin(${conPin}, ${empOwner}, '9999')`);
+      const [l] = await asUser(sql, owner, (tx) => tx<{ id: string }[]>`SELECT public.upsert_pos_employee(${conPin}, null, 'Luis') AS id`);
+      luis = l.id;
+      const [a] = await asUser(sql, owner, (tx) => tx<{ id: string }[]>`SELECT public.upsert_pos_employee(${conPin}, null, 'Ana') AS id`);
+      ana = a.id;
+      await asUser(sql, owner, (tx) => tx`SELECT public.set_employee_pin(${conPin}, ${luis}, '2222')`);
+      await asUser(sql, owner, (tx) => tx`SELECT public.set_employee_pin(${conPin}, ${ana}, '1111')`);
+      await asUser(sql, owner, (tx) => tx`
+        SELECT public.set_employee_permissions(${conPin}, ${luis}, 10, false, false, false, false, true)`);
+    });
+
+    it('sin PIN no se guarda, ni siendo propietario; adjust_stock tampoco sirve', async () => {
+      const { producto, tallas } = await zueco(conPin);
+      const linea = { variant_id: tallas[0], expected: 5, new_quantity: 4 };
+      await expect(loteCon(null, producto, [linea], owner)).rejects.toMatchObject({
+        code: '42501', message: expect.stringMatching(/autorizaci/i),
+      });
+      await expect(
+        asUser(sql, owner, (tx) => tx`SELECT public.adjust_stock(${conPin}, ${producto}, ${tallas[0]}, 4, 'Recuento')`),
+      ).rejects.toMatchObject({ code: '42501', message: expect.stringMatching(/PIN/) });
+      expect(await stock(tallas[0])).toBe(5);
+    });
+
+    it('con el PIN de alguien con permiso, la cuenta compartida guarda y queda quién fue', async () => {
+      const { producto, tallas } = await zueco(conPin);
+      const pase = await autorizar(luis, '2222');
+      expect(pase.ok).toBe(true);
+      const [r] = await loteCon(pase.authorization_id, producto, [{ variant_id: tallas[0], expected: 5, new_quantity: 2 }]);
+      expect(r.changed).toBe(1);
+      const [m] = await sql`SELECT employee_id, created_by, delta FROM stock_movements WHERE variant_id = ${tallas[0]} AND source = 'manual'`;
+      expect(m).toEqual({ employee_id: luis, created_by: tpv, delta: -3 });
+      const [h] = await asUser(sql, tpv, (tx) => tx<{ who: string }[]>`
+        SELECT who FROM public.get_stock_movements(${conPin}, ${producto}, 'manual')`);
+      expect(h.who).toBe('Luis');
+
+      // El pase es de un solo uso.
+      await expect(
+        loteCon(pase.authorization_id, producto, [{ variant_id: tallas[1], expected: 3, new_quantity: 1 }]),
+      ).rejects.toMatchObject(PERMISO_DENEGADO);
+    });
+
+    it('el propietario también pone su PIN; sin permiso, de otra cuenta o de otra acción, no vale', async () => {
+      const { producto, tallas } = await zueco(conPin);
+      const delOwner = await autorizar(empOwner, '9999', 'adjust_stock', owner);
+      const [r] = await loteCon(delOwner.authorization_id, producto, [{ variant_id: tallas[2], expected: 0, new_quantity: 6 }], owner);
+      expect(r.changed).toBe(1);
+
+      const sinPermiso = await autorizar(ana, '1111');
+      expect(sinPermiso).toMatchObject({ ok: false, authorization_id: null });
+      expect(sinPermiso.error).toMatch(/Ana no tiene permiso/);
+
+      const deOtraCuenta = await autorizar(luis, '2222', 'adjust_stock', owner);
+      await expect(
+        loteCon(deOtraCuenta.authorization_id, producto, [{ variant_id: tallas[0], expected: 5, new_quantity: 1 }]),
+      ).rejects.toMatchObject(PERMISO_DENEGADO);
+      const deDevolver = await autorizar(empOwner, '9999', 'return');
+      await expect(
+        loteCon(deDevolver.authorization_id, producto, [{ variant_id: tallas[0], expected: 5, new_quantity: 1 }]),
+      ).rejects.toMatchObject(PERMISO_DENEGADO);
+      expect(await stock(tallas[0])).toBe(5);
+    });
+
+    it('tras 5 PIN fallidos, 5 minutos de bloqueo', async () => {
+      for (let i = 0; i < 4; i++) expect((await autorizar(luis, '0000')).ok).toBe(false);
+      const quinto = await autorizar(luis, '0000');
+      expect(quinto.ok).toBe(false);
+      expect(quinto.locked_seconds).toBeGreaterThan(0);
+      const bloqueado = await autorizar(luis, '2222');
+      expect(bloqueado.ok).toBe(false);
+      expect(bloqueado.locked_seconds).toBeGreaterThan(0);
+    });
+  });
 });

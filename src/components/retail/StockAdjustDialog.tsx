@@ -82,7 +82,8 @@ export function StockAdjustDialog({ target, onClose, onDone }: StockAdjustDialog
     }
     const result = await adjustLines(target.productId, preview.lines, text);
     // Si el stock cambió mientras se editaba, se recarga para volver a empezar con lo de ahora.
-    if (result !== 'error') {
+    // Sin PIN (cancelado) o con error, la ventana sigue abierta con lo escrito.
+    if (result === 'ok' || result === 'conflict') {
       onDone?.();
       onClose();
     }
@@ -95,8 +96,8 @@ export function StockAdjustDialog({ target, onClose, onDone }: StockAdjustDialog
           <DialogTitle>{single ? 'Ajustar stock' : 'Ajustar stock por tallas'}</DialogTitle>
           <DialogDescription>
             {target?.name}
-            {single ? `: stock actual ${rows[0]?.current}.` : '.'} El ajuste queda en el historial con tu usuario y
-            se manda a la tienda online.
+            {single ? `: stock actual ${rows[0]?.current}.` : '.'} El ajuste queda en el historial con quién lo hizo
+            y se manda a la tienda online.
           </DialogDescription>
         </DialogHeader>
 

@@ -16,6 +16,7 @@ import { useStoreProfile } from '@/hooks/useStoreProfile';
 import { useRoleAccess } from '@/hooks/useRoleAccess';
 import { useMyPermissions } from '@/hooks/useMyPermissions';
 import { StockAdjustDialog, type StockAdjustTarget } from './StockAdjustDialog';
+import { useCanAdjustStock } from '@/hooks/useStockAdjust';
 
 interface VariantsDialogProps {
   open: boolean;
@@ -30,7 +31,8 @@ export function VariantsDialog({
   open, onOpenChange, productId, productName, basePrice, onChanged,
 }: VariantsDialogProps) {
   // 0031: dar de alta o de baja tallas, con permiso de catálogo; costes y stock, con los suyos.
-  const { canEditCatalog, canSeeCosts, canAdjustStock } = useMyPermissions();
+  const { canEditCatalog, canSeeCosts } = useMyPermissions();
+  const canAdjustStock = useCanAdjustStock();
   const { variants, isLoading, isSaving, createVariant, deleteVariant, refreshVariants } =
     useProductVariants(productId, { withCosts: canSeeCosts });
   const { profile } = useStoreProfile();
