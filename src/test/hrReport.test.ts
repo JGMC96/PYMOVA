@@ -4,6 +4,7 @@ import {
   buildMonthlyCsv,
   formatSeconds,
   formatSessionDate,
+  isMissingClockOut,
   monthName,
   monthlyTotals,
   reportYears,
@@ -39,23 +40,42 @@ describe('formatSessionDate', () => {
   });
 });
 
+// Mismo día que las filas, a las 15:00: una sesión abierta a las 9:00 lleva 6 h.
+const HOY = new Date(2026, 9, 1, 15, 0);
+const MANANA = new Date(2026, 9, 2, 9, 0);
+
+describe('isMissingClockOut', () => {
+  it('solo las abiertas hace más de 12 h', () => {
+    const abierta = fila({ status: 'open', clock_out_at: null });
+    expect(isMissingClockOut(abierta, HOY)).toBe(false);
+    expect(isMissingClockOut(abierta, MANANA)).toBe(true);
+    expect(isMissingClockOut(fila(), MANANA)).toBe(false);
+  });
+});
+
 describe('sessionStatusLabel', () => {
-  it('prioriza la revisión pendiente, después la corrección y después el estado', () => {
-    expect(sessionStatusLabel(fila())).toBe('Cerrada');
-    expect(sessionStatusLabel(fila({ status: 'open', clock_out_at: null }))).toBe('Abierta');
-    expect(sessionStatusLabel(fila({ correction_reason: 'Olvidó la salida' }))).toBe('Corregida');
-    expect(sessionStatusLabel(fila({ needs_review: true, correction_reason: 'x' }))).toBe('Pendiente de revisión');
+  it('prioriza la revisión pendiente, después la corrección, la salida olvidada y el estado', () => {
+    const abierta = fila({ status: 'open', clock_out_at: null });
+    expect(sessionStatusLabel(fila(), HOY)).toBe('Cerrada');
+    expect(sessionStatusLabel(abierta, HOY)).toBe('Abierta');
+    expect(sessionStatusLabel(abierta, MANANA)).toBe('Sin salida');
+    expect(sessionStatusLabel(fila({ correction_reason: 'Olvidó la salida' }), HOY)).toBe('Corregida');
+    expect(sessionStatusLabel(fila({ needs_review: true, correction_reason: 'x' }), HOY)).toBe('Pendiente de revisión');
   });
 });
 
 describe('monthlyTotals', () => {
-  it('suma horas, pausas y sesiones pendientes', () => {
-    const t = monthlyTotals([
-      fila(),
-      fila({ id: 's2', worked_seconds: 3600, break_seconds: 0 }),
-      fila({ id: 's3', worked_seconds: 0, break_seconds: 0, needs_review: true }),
-    ]);
-    expect(t).toEqual({ worked: 6 * 3600, breaks: 30 * 60, pending: 1 });
+  it('suma horas, pausas y jornadas pendientes o sin salida', () => {
+    const t = monthlyTotals(
+      [
+        fila(),
+        fila({ id: 's2', worked_seconds: 3600, break_seconds: 0 }),
+        fila({ id: 's3', worked_seconds: 0, break_seconds: 0, needs_review: true }),
+        fila({ id: 's4', worked_seconds: 0, break_seconds: 0, status: 'open', clock_out_at: null }),
+      ],
+      MANANA,
+    );
+    expect(t).toEqual({ worked: 6 * 3600, breaks: 30 * 60, pending: 2 });
   });
 
   it('da ceros sin filas', () => {
@@ -65,7 +85,7 @@ describe('monthlyTotals', () => {
 
 describe('buildMonthlyCsv', () => {
   it('escribe la cabecera y una línea por sesión', () => {
-    const csv = buildMonthlyCsv([fila(), fila({ id: 's2', status: 'open', clock_out_at: null })]);
+    const csv = buildMonthlyCsv([fila(), fila({ id: 's2', status: 'open', clock_out_at: null })], HOY);
     const [cabecera, primera, segunda] = csv.split('\n');
     expect(cabecera).toBe('"Fecha","Entrada","Salida","Trabajado(h)","Pausas(h)","Estado","Motivo de corrección"');
     expect(primera).toBe('"2026-10-01","09:00","14:30","5.00","0.50","Cerrada",""');
