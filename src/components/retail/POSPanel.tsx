@@ -38,6 +38,13 @@ import { VoucherDialog, type AppliedVoucher } from './VoucherDialog';
 import { voucherApplied } from '@/lib/vales';
 import { matchesVarios } from '@/lib/varios';
 import { findByCode, POS_SEARCH_LIMIT, searchPosProducts, type PosSearchHit } from '@/lib/posSearch';
+import { useFitToViewport } from '@/hooks/useFitToViewport';
+
+// Desde `xl` (dos columnas), carrito y recibo ocupan lo que queda de ventana y «Cobrar» va
+// debajo del recibo, siempre a la vista. Por debajo, «Cobrar» se queda pegado abajo.
+const XL = 1280;
+const PAGE_BOTTOM_PADDING = 24; // p-6 de <main> en Dashboard
+const MIN_POS_HEIGHT = 360;
 
 const PAYMENT_ICONS: Record<string, typeof Banknote> = {
   cash: Banknote,
@@ -73,6 +80,12 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
   const [ticket, setTicket] = useState<TicketData | null>(null);
   const [ticketOpen, setTicketOpen] = useState(false);
   const barcodeRef = useRef<HTMLInputElement>(null);
+  const layoutRef = useRef<HTMLDivElement>(null);
+  const fitHeight = useFitToViewport(layoutRef, {
+    below: PAGE_BOTTOM_PADDING,
+    minHeight: MIN_POS_HEIGHT,
+    minWidth: XL,
+  });
 
   const taxRate = settings?.tax_rate ?? DEFAULT_TAX_RATE;
   // Método con el que empieza cada venta (el primero del perfil: efectivo).
@@ -449,9 +462,13 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-4 xl:h-[calc(100vh-300px)]">
+      <div
+        ref={layoutRef}
+        className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_340px] xl:grid-rows-[minmax(0,1fr)_auto]"
+        style={fitHeight ? { height: fitHeight } : undefined}
+      >
         {/* Ticket lines */}
-        <Card className="flex flex-col overflow-hidden min-h-[420px]">
+        <Card className="flex flex-col overflow-hidden min-h-[420px] xl:min-h-0 xl:row-span-2">
           <div className="grid grid-cols-[72px_1fr_110px_100px_40px] items-center gap-2 px-4 py-3 border-b text-xs font-medium text-muted-foreground">
             <span>Uds.</span>
             <span>Producto</span>
@@ -619,8 +636,8 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
           </div>
         </Card>
 
-        {/* Receipt summary */}
-        <div className="flex flex-col gap-3">
+        {/* Receipt summary: si no cabe, hace scroll el recibo y no la página. */}
+        <div className="flex flex-col gap-3 xl:min-h-0 xl:overflow-y-auto">
           <Card className="p-4">
             <div className="flex items-baseline justify-between">
               <h3 className="text-lg font-semibold">Recibo</h3>
@@ -818,23 +835,23 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
             )}
           </Card>
         </div>
-      </div>
 
-      {/* Cobro: un solo botón con el método elegido. */}
-      <div className="mt-4">
-        <Button
-          size="lg"
-          className="h-14 w-full text-base"
-          disabled={cart.length === 0 || isCreating || (isCash && (!openSession || cashShortfall))}
-          onClick={() => void handleCheckout()}
-        >
-          <PayIcon className="w-5 h-5 mr-2" />
-          {isCreating
-            ? 'Procesando...'
-            : paidByVoucher
-              ? `Cobrar con vale · ${voucherAmount.toFixed(2)} €`
-              : `Cobrar ${dueTotal.toFixed(2)} € · ${PAYMENT_LABELS[selectedPayment] ?? selectedPayment}`}
-        </Button>
+        {/* Cobro: un solo botón con el método elegido, siempre a la vista. */}
+        <div className="sticky bottom-0 z-20 -mt-4 bg-background/95 py-3 backdrop-blur-sm xl:mt-0 xl:py-0">
+          <Button
+            size="lg"
+            className="h-14 w-full text-base"
+            disabled={cart.length === 0 || isCreating || (isCash && (!openSession || cashShortfall))}
+            onClick={() => void handleCheckout()}
+          >
+            <PayIcon className="w-5 h-5 mr-2" />
+            {isCreating
+              ? 'Procesando...'
+              : paidByVoucher
+                ? `Cobrar con vale · ${voucherAmount.toFixed(2)} €`
+                : `Cobrar ${dueTotal.toFixed(2)} € · ${PAYMENT_LABELS[selectedPayment] ?? selectedPayment}`}
+          </Button>
+        </div>
       </div>
 
       <VoucherDialog
