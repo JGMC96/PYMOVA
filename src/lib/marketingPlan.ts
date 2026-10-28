@@ -1,6 +1,6 @@
-// Lógica pura de campañas y objetivos de marketing (franjas del calendario y avance).
+// Lógica pura del plan de marketing: franjas de campañas, avance de objetivos y tareas.
 import { formatMoney } from '@/lib/money';
-import type { MarketingCampaign, MarketingGoal, MarketingGoalMetric } from '@/types/database';
+import type { MarketingCampaign, MarketingGoal, MarketingGoalMetric, MarketingTask } from '@/types/database';
 
 export const GOAL_METRIC_LABEL: Record<MarketingGoalMetric, string> = {
   sales: 'Ventas',
@@ -47,3 +47,29 @@ export function campaignTiming(c: Pick<MarketingCampaign, 'starts_on' | 'ends_on
   if (c.starts_on > today) return 'upcoming';
   return 'current';
 }
+
+/** Estado de una tarea respecto a hoy (AAAA-MM-DD). */
+export type TaskState = 'done' | 'overdue' | 'today' | 'pending';
+
+export function taskState(t: Pick<MarketingTask, 'done_at' | 'due_on'>, today: string): TaskState {
+  if (t.done_at) return 'done';
+  if (t.due_on && t.due_on < today) return 'overdue';
+  if (t.due_on === today) return 'today';
+  return 'pending';
+}
+
+/** Orden de la lista: vencidas, de hoy, pendientes por fecha (sin fecha al final) y hechas. */
+export function sortTasks<T extends Pick<MarketingTask, 'done_at' | 'due_on' | 'created_at'>>(tasks: T[], today: string): T[] {
+  const rank: Record<TaskState, number> = { overdue: 0, today: 1, pending: 2, done: 3 };
+  return [...tasks].sort((a, b) => {
+    const r = rank[taskState(a, today)] - rank[taskState(b, today)];
+    if (r) return r;
+    if (a.done_at && b.done_at) return b.done_at.localeCompare(a.done_at);
+    if (a.due_on !== b.due_on) return (a.due_on ?? '9999').localeCompare(b.due_on ?? '9999');
+    return a.created_at.localeCompare(b.created_at);
+  });
+}
+
+/** Una tarea la puede marcar su responsable o un administrador (lo comprueba también la RPC). */
+export const canToggleTask = (t: Pick<MarketingTask, 'assignee_id'>, userId: string | null, isAdmin: boolean) =>
+  isAdmin || (!!userId && t.assignee_id === userId);

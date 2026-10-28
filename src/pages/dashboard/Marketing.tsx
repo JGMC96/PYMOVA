@@ -8,10 +8,15 @@ import { PostFormDialog } from '@/components/marketing/PostFormDialog';
 import { MarketingCampaigns } from '@/components/marketing/MarketingCampaigns';
 import { CampaignFormDialog } from '@/components/marketing/CampaignFormDialog';
 import { GoalFormDialog } from '@/components/marketing/GoalFormDialog';
+import { MarketingIdeas } from '@/components/marketing/MarketingIdeas';
+import { MarketingTasks } from '@/components/marketing/MarketingTasks';
+import { TaskFormDialog } from '@/components/marketing/TaskFormDialog';
+import { useBusiness } from '@/contexts/BusinessContext';
 import { useMarketingPosts } from '@/hooks/useMarketingPosts';
 import { useMarketingCampaigns } from '@/hooks/useMarketingCampaigns';
+import { useMarketingTasks } from '@/hooks/useMarketingTasks';
 import { useRoleAccess } from '@/hooks/useRoleAccess';
-import type { MarketingCampaign, MarketingGoal, MarketingPost } from '@/types/database';
+import type { MarketingCampaign, MarketingGoal, MarketingPost, MarketingTask } from '@/types/database';
 
 export default function Marketing() {
   const {
@@ -27,13 +32,21 @@ export default function Marketing() {
   } = useMarketingPosts();
   const { campaigns, goals, saveCampaign, deleteCampaign, addKeyDates, saveGoal, deleteGoal } =
     useMarketingCampaigns();
+  const { tasks, saveTask, deleteTask, setDone } = useMarketingTasks();
   const { isAdmin } = useRoleAccess('admin');
+  const { user } = useBusiness();
+  const userId = user?.id ?? null;
 
   // Campaña o objetivo abierto: null = cerrado, 'new' = nuevo.
   const [openCampaign, setOpenCampaign] = useState<MarketingCampaign | 'new' | null>(null);
   const [openGoal, setOpenGoal] = useState<MarketingGoal | 'new' | null>(null);
   const editingCampaign = openCampaign === 'new' ? null : openCampaign;
   const editingGoal = openGoal === 'new' ? null : openGoal;
+  const [openTask, setOpenTask] = useState<MarketingTask | 'new' | null>(null);
+  const editingTask = openTask === 'new' ? null : openTask;
+
+  const myPendingTasks = tasks.filter((t) => !t.done_at && t.assignee_id === userId).length;
+  const ideaCount = posts.filter((p) => p.status === 'idea').length;
 
   // Al borrar una campaña sus publicaciones se quedan sin ella: se vuelven a leer.
   const handleDeleteCampaign = async (id: string) => {
@@ -54,12 +67,22 @@ export default function Marketing() {
     setDialogOpen(true);
   };
 
-  // El personal también abre la ficha, en solo lectura.
+  // Nueva idea: cualquiera del equipo (el personal, solo en estado «Idea»).
+  const handleNewIdea = () => {
+    setEditingPost(null);
+    setDefaultDate(null);
+    setDialogOpen(true);
+  };
+
+  // El personal también abre la ficha: edita sus ideas y ve lo demás en solo lectura.
   const handleSelect = (post: MarketingPost) => {
     setEditingPost(post);
     setDefaultDate(null);
     setDialogOpen(true);
   };
+
+  const ownIdea = !!editingPost && editingPost.status === 'idea' && editingPost.created_by === userId;
+  const ideaOnly = !isAdmin && (editingPost ? ownIdea : true);
 
   const handleSubmit = async (data: Parameters<typeof createPost>[0]) => {
     setIsSubmitting(true);
@@ -86,6 +109,18 @@ export default function Marketing() {
           <TabsList>
             <TabsTrigger value="calendar">Calendario</TabsTrigger>
             <TabsTrigger value="list">Lista</TabsTrigger>
+            <TabsTrigger value="ideas">Ideas{ideaCount > 0 && ` (${ideaCount})`}</TabsTrigger>
+            <TabsTrigger value="tasks">
+              Tareas
+              {myPendingTasks > 0 && (
+                <span
+                  className="ml-1.5 rounded-full bg-primary px-1.5 text-[10px] font-semibold leading-4 text-primary-foreground"
+                  aria-label={`${myPendingTasks} tareas tuyas pendientes`}
+                >
+                  {myPendingTasks}
+                </span>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="campaigns">Campañas y objetivos</TabsTrigger>
           </TabsList>
           <TabsContent value="calendar" className="mt-4">
@@ -105,6 +140,27 @@ export default function Marketing() {
               teamMembers={teamMembers}
               onSelect={handleSelect}
               canEdit={isAdmin}
+            />
+          </TabsContent>
+          <TabsContent value="ideas" className="mt-4">
+            <MarketingIdeas
+              posts={posts}
+              teamMembers={teamMembers}
+              campaigns={campaigns}
+              onNew={handleNewIdea}
+              onSelect={handleSelect}
+            />
+          </TabsContent>
+          <TabsContent value="tasks" className="mt-4">
+            <MarketingTasks
+              tasks={tasks}
+              teamMembers={teamMembers}
+              campaigns={campaigns}
+              currentUserId={userId}
+              isAdmin={isAdmin}
+              onNew={() => setOpenTask('new')}
+              onSelect={setOpenTask}
+              onToggle={setDone}
             />
           </TabsContent>
           <TabsContent value="campaigns" className="mt-4">
@@ -130,9 +186,10 @@ export default function Marketing() {
           teamMembers={teamMembers}
           campaigns={campaigns}
           onSubmit={handleSubmit}
-          onDelete={isAdmin ? deletePost : undefined}
+          onDelete={isAdmin || ownIdea ? deletePost : undefined}
           isSubmitting={isSubmitting}
-          readOnly={!isAdmin}
+          readOnly={!isAdmin && !ideaOnly}
+          ideaOnly={ideaOnly}
         />
 
         <CampaignFormDialog
@@ -152,6 +209,18 @@ export default function Marketing() {
           campaigns={campaigns}
           onSubmit={(data) => saveGoal(data, editingGoal?.id)}
           onDelete={isAdmin ? deleteGoal : undefined}
+          readOnly={!isAdmin}
+        />
+
+        <TaskFormDialog
+          open={openTask !== null}
+          onOpenChange={(open) => !open && setOpenTask(null)}
+          task={editingTask}
+          teamMembers={teamMembers}
+          campaigns={campaigns}
+          posts={posts}
+          onSubmit={(data) => saveTask(data, editingTask?.id)}
+          onDelete={isAdmin ? deleteTask : undefined}
           readOnly={!isAdmin}
         />
       </div>
