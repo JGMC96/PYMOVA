@@ -15,12 +15,15 @@ import { es } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import type { MarketingPost } from '@/types/database';
+import { campaignColor, campaignsOnDay } from '@/lib/marketingPlan';
+import type { MarketingCampaign, MarketingPost } from '@/types/database';
 import { ContentTypeIcon, ChannelsBadges } from './PostBadge';
 
 interface MarketingCalendarProps {
   posts: MarketingPost[];
+  campaigns?: MarketingCampaign[];
   onSelectPost: (post: MarketingPost) => void;
+  onSelectCampaign?: (campaign: MarketingCampaign) => void;
   onSelectDay: (date: Date) => void;
   canEdit: boolean;
 }
@@ -29,11 +32,18 @@ const CONTENT_TYPE_DOT: Record<MarketingPost['content_type'], string> = {
   story: 'bg-accent text-accent-foreground',
   post: 'bg-primary text-primary-foreground',
   reel: 'bg-secondary text-secondary-foreground border border-border',
+  carousel: 'bg-primary/80 text-primary-foreground',
+  email: 'bg-amber-500 text-white',
 };
+
+// Franjas de campaña por día (las demás se resumen en «+n»).
+const MAX_BANDS = 2;
 
 export function MarketingCalendar({
   posts,
+  campaigns = [],
   onSelectPost,
+  onSelectCampaign,
   onSelectDay,
   canEdit,
 }: MarketingCalendarProps) {
@@ -96,6 +106,9 @@ export function MarketingCalendar({
           {days.map((day) => {
             const key = format(day, 'yyyy-MM-dd');
             const dayPosts = postsByDay.get(key) || [];
+            const dayCampaigns = campaignsOnDay(campaigns, key);
+            // El nombre se escribe donde empieza la franja y al principio de cada semana.
+            const isWeekStart = day.getDay() === 1;
             const inMonth = isSameMonth(day, cursor);
             const isToday = isSameDay(day, today);
 
@@ -119,6 +132,30 @@ export function MarketingCalendar({
                     {format(day, 'd')}
                   </span>
                 </div>
+                {dayCampaigns.length > 0 && (
+                  <div className="space-y-0.5">
+                    {dayCampaigns.slice(0, MAX_BANDS).map((c) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSelectCampaign?.(c);
+                        }}
+                        className="block w-full truncate rounded-sm px-1 text-left text-[10px] font-medium leading-4 text-white hover:opacity-90"
+                        style={{ backgroundColor: campaignColor(c) }}
+                        title={c.name}
+                      >
+                        {c.starts_on === key || isWeekStart ? c.name : ' '}
+                      </button>
+                    ))}
+                    {dayCampaigns.length > MAX_BANDS && (
+                      <div className="text-[10px] text-muted-foreground px-1">
+                        +{dayCampaigns.length - MAX_BANDS} campañas
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div className="space-y-1 overflow-hidden">
                   {dayPosts.slice(0, 3).map((p) => (
                     <button

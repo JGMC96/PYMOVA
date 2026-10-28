@@ -122,8 +122,8 @@ export interface HrDashboard {
 }
 
 // Marketing calendar
-export type MarketingContentType = 'story' | 'post' | 'reel';
-export type MarketingChannel = 'instagram' | 'tiktok' | 'pinterest' | 'facebook';
+export type MarketingContentType = 'story' | 'post' | 'reel' | 'carousel' | 'email';
+export type MarketingChannel = 'instagram' | 'tiktok' | 'pinterest' | 'facebook' | 'email';
 export type MarketingStatus = 'idea' | 'draft' | 'scheduled' | 'published' | 'cancelled';
 
 export interface MarketingPost {
@@ -139,9 +139,42 @@ export interface MarketingPost {
   reference_url: string | null;
   hashtags: string | null;
   notes: string | null;
+  campaign_id: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
+}
+
+// Campañas y fechas clave (key_date: Black Friday, Rebajas…), pintadas como franjas.
+export type MarketingCampaignKind = 'campaign' | 'key_date';
+
+export interface MarketingCampaign {
+  id: string;
+  business_id: string;
+  name: string;
+  kind: MarketingCampaignKind;
+  starts_on: string; // AAAA-MM-DD
+  ends_on: string;
+  color: string | null;
+  goal: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export type MarketingGoalMetric = 'sales' | 'followers' | 'reach' | 'engagement' | 'email_subscribers' | 'other';
+
+export interface MarketingGoal {
+  id: string;
+  business_id: string;
+  title: string;
+  metric: MarketingGoalMetric;
+  target: number;
+  current: number;
+  starts_on: string;
+  ends_on: string;
+  campaign_id: string | null;
+  notes: string | null;
+  created_at: string;
 }
 
 // Plan keys for type safety (maps to plans.key in DB)
