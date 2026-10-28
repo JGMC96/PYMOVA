@@ -21,6 +21,10 @@ const PAGES: Record<string, { title: string; description?: string }> = {
     description: 'Pedidos a proveedor y recepción de la mercancía. Al recibir, el stock sube en la ubicación de la compra.',
   },
   '/dashboard/stock/labels': { title: 'Etiquetas', description: 'Diseño e impresión de etiquetas con código de barras.' },
+  '/dashboard/stock/codes': {
+    title: 'Códigos con problemas',
+    description: 'SKU repetidos o vacíos y tallas sin código de barras.',
+  },
   '/dashboard/team/sellers': { title: 'Vendedores', description: 'Quién vende en el TPV, sus PIN y sus permisos.' },
 };
 

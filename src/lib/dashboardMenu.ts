@@ -13,6 +13,7 @@ import {
   MessageSquare,
   Package,
   Receipt,
+  ScanBarcode,
   ShoppingCart,
   Tag,
   Truck,
@@ -30,6 +31,8 @@ export interface MenuAccess {
   isAdmin: boolean;
   isOwner: boolean;
   canAdjustStock: boolean;
+  /** Permiso «Productos y precios» (0031). */
+  canEditCatalog?: boolean;
 }
 
 export interface MenuItem {
@@ -84,6 +87,13 @@ export const MENU_SECTIONS: MenuSection[] = [
         allowed: (a) => a.canAdjustStock,
       },
       { icon: Tag, label: 'Etiquetas', path: '/dashboard/stock/labels', moduleKey: 'retail' },
+      {
+        icon: ScanBarcode,
+        label: 'Códigos',
+        path: '/dashboard/stock/codes',
+        moduleKey: 'retail',
+        allowed: (a) => !!a.canEditCatalog,
+      },
     ],
   },
   {

@@ -20,8 +20,8 @@ export const DashboardSidebar = ({ isOpen, onToggle }: DashboardSidebarProps) =>
   const { enabledModules, activeBusiness } = useBusiness();
   const { isSuperAdmin } = useSuperAdmin();
   const { isAdmin, isOwner } = useRoleAccess("admin");
-  const { canAdjustStock } = useMyPermissions();
-  const sections = visibleMenu(MENU_SECTIONS, { enabledModules, isAdmin, isOwner, canAdjustStock });
+  const { canAdjustStock, canEditCatalog } = useMyPermissions();
+  const sections = visibleMenu(MENU_SECTIONS, { enabledModules, isAdmin, isOwner, canAdjustStock, canEditCatalog });
 
   return (
     <motion.aside

@@ -31,6 +31,14 @@ describe('menú por áreas', () => {
     expect(menu.map(([title]) => title)).not.toContain('Facturación');
   });
 
+  it('«Códigos» solo con el permiso «Productos y precios»', () => {
+    const stock = (access: MenuAccess) => etiquetas(access).find(([title]) => title === 'Productos y stock')?.[1];
+    expect(stock({ enabledModules: TODOS, isAdmin: true, isOwner: true, canAdjustStock: true, canEditCatalog: true }))
+      .toEqual(['Productos', 'Inventario', 'Compras', 'Etiquetas', 'Códigos']);
+    expect(stock({ enabledModules: TODOS, isAdmin: false, isOwner: false, canAdjustStock: false, canEditCatalog: false }))
+      .not.toContain('Códigos');
+  });
+
   it('Informes solo lo ve el propietario: ni el administrador ni el personal', () => {
     const titulos = (access: MenuAccess) => etiquetas(access).map(([title]) => title);
     expect(titulos({ enabledModules: TODOS, isAdmin: true, isOwner: true, canAdjustStock: true })).toContain('Informes');

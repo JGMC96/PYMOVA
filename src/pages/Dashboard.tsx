@@ -16,6 +16,7 @@ import { CashRegisterPanel } from "@/components/retail/CashRegisterPanel";
 import { EcommercePanel } from "@/components/retail/EcommercePanel";
 import { InventoryView } from "@/components/retail/InventoryView";
 import { LabelsPanel } from "@/components/labels/LabelsPanel";
+import { CodeProblemsPanel } from "@/components/inventory/CodeProblemsPanel";
 import { RETAIL_HOME } from "@/lib/dashboardMenu";
 import Marketing from "@/pages/dashboard/Marketing";
 import Hr from "@/pages/dashboard/Hr";
@@ -60,6 +61,7 @@ const Dashboard = () => {
                 <Route path="stock/inventory" element={<InventoryView />} />
                 <Route path="stock/purchases" element={<PurchasesPage />} />
                 <Route path="stock/labels" element={<LabelsPanel />} />
+                <Route path="stock/codes" element={<CodeProblemsPanel />} />
                 <Route path="team/sellers" element={<SellersPage />} />
               </Route>
               <Route path="sales" element={<Navigate to={RETAIL_HOME} replace />} />
