@@ -29,20 +29,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import type { MarketingPost, MarketingChannel } from '@/types/database';
+import type { MarketingCampaign, MarketingPost, MarketingChannel } from '@/types/database';
 import type { MarketingPostFormData, TeamMember } from '@/hooks/useMarketingPosts';
 import { CONTENT_TYPE_LABEL, STATUS_LABEL, CHANNEL_LABEL } from './PostBadge';
 
 const schema = z.object({
   title: z.string().trim().min(1, 'El título es requerido').max(200),
   copy: z.string().max(2000).optional(),
-  content_type: z.enum(['story', 'post', 'reel']),
+  content_type: z.enum(['story', 'post', 'reel', 'carousel', 'email']),
   channels: z
-    .array(z.enum(['instagram', 'tiktok', 'pinterest', 'facebook']))
+    .array(z.enum(['instagram', 'tiktok', 'pinterest', 'facebook', 'email']))
     .min(1, 'Selecciona al menos un canal'),
   status: z.enum(['idea', 'draft', 'scheduled', 'published', 'cancelled']),
   scheduled_at: z.string().optional(),
   assignee_id: z.string().optional(),
+  campaign_id: z.string().optional(),
   reference_url: z
     .string()
     .trim()
@@ -62,6 +63,7 @@ interface PostFormDialogProps {
   post?: MarketingPost | null;
   defaultDate?: Date | null;
   teamMembers: TeamMember[];
+  campaigns?: MarketingCampaign[];
   onSubmit: (data: MarketingPostFormData) => Promise<boolean>;
   onDelete?: (id: string) => Promise<boolean>;
   isSubmitting: boolean;
@@ -87,6 +89,7 @@ export function PostFormDialog({
   post,
   defaultDate,
   teamMembers,
+  campaigns = [],
   onSubmit,
   onDelete,
   isSubmitting,
@@ -104,6 +107,7 @@ export function PostFormDialog({
       status: 'idea',
       scheduled_at: '',
       assignee_id: '',
+      campaign_id: '',
       reference_url: '',
       hashtags: '',
       notes: '',
@@ -121,6 +125,7 @@ export function PostFormDialog({
         status: post.status,
         scheduled_at: toLocalInputValue(post.scheduled_at),
         assignee_id: post.assignee_id ?? '',
+        campaign_id: post.campaign_id ?? '',
         reference_url: post.reference_url ?? '',
         hashtags: post.hashtags ?? '',
         notes: post.notes ?? '',
@@ -140,6 +145,7 @@ export function PostFormDialog({
         status: 'idea',
         scheduled_at: scheduled,
         assignee_id: '',
+        campaign_id: '',
         reference_url: '',
         hashtags: '',
         notes: '',
@@ -156,6 +162,7 @@ export function PostFormDialog({
       status: values.status,
       scheduled_at: values.scheduled_at ? new Date(values.scheduled_at).toISOString() : null,
       assignee_id: values.assignee_id || null,
+      campaign_id: values.campaign_id || null,
       reference_url: values.reference_url || undefined,
       hashtags: values.hashtags || undefined,
       notes: values.notes || undefined,
@@ -341,6 +348,36 @@ export function PostFormDialog({
                 )}
               />
             </div>
+
+            {campaigns.length > 0 && (
+              <FormField
+                control={form.control}
+                name="campaign_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Campaña</FormLabel>
+                    <Select
+                      value={field.value || 'none'}
+                      onValueChange={(v) => field.onChange(v === 'none' ? '' : v)}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Ninguna" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">Ninguna</SelectItem>
+                        {campaigns.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormItem>
+                )}
+              />
+            )}
 
             <FormField
               control={form.control}

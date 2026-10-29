@@ -17,6 +17,7 @@ export interface MarketingPostFormData {
   status: MarketingStatus;
   scheduled_at?: string | null;
   assignee_id?: string | null;
+  campaign_id?: string | null;
   reference_url?: string;
   hashtags?: string;
   notes?: string;
@@ -162,6 +163,8 @@ export function useMarketingPosts(): UseMarketingPostsReturn {
     };
   }, [activeBusinessId]);
 
+  // `as never` en insert/update: campaign_id llega con la migración de campañas y aún no está
+  // en types.ts (se regenera al aplicarla).
   const normalize = (data: MarketingPostFormData) => ({
     title: data.title.trim(),
     copy: data.copy?.trim() || null,
@@ -170,6 +173,7 @@ export function useMarketingPosts(): UseMarketingPostsReturn {
     status: data.status,
     scheduled_at: data.scheduled_at || null,
     assignee_id: data.assignee_id || null,
+    campaign_id: data.campaign_id || null,
     reference_url: data.reference_url?.trim() || null,
     hashtags: data.hashtags?.trim() || null,
     notes: data.notes?.trim() || null,
@@ -186,7 +190,7 @@ export function useMarketingPosts(): UseMarketingPostsReturn {
           business_id: activeBusinessId,
           created_by: user.id,
           ...normalize(data),
-        });
+        } as never);
         if (insertError) throw insertError;
         toast({ title: 'Publicación creada', description: 'Se añadió al calendario' });
         await fetchPosts();
@@ -210,7 +214,7 @@ export function useMarketingPosts(): UseMarketingPostsReturn {
       try {
         const { error: updateError } = await supabase
           .from('marketing_posts')
-          .update(normalize(data))
+          .update(normalize(data) as never)
           .eq('id', id)
           .eq('business_id', activeBusinessId);
         if (updateError) throw updateError;

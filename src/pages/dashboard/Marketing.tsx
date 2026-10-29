@@ -5,9 +5,13 @@ import { MarketingHeader } from '@/components/marketing/MarketingHeader';
 import { MarketingCalendar } from '@/components/marketing/MarketingCalendar';
 import { MarketingList } from '@/components/marketing/MarketingList';
 import { PostFormDialog } from '@/components/marketing/PostFormDialog';
+import { MarketingCampaigns } from '@/components/marketing/MarketingCampaigns';
+import { CampaignFormDialog } from '@/components/marketing/CampaignFormDialog';
+import { GoalFormDialog } from '@/components/marketing/GoalFormDialog';
 import { useMarketingPosts } from '@/hooks/useMarketingPosts';
+import { useMarketingCampaigns } from '@/hooks/useMarketingCampaigns';
 import { useRoleAccess } from '@/hooks/useRoleAccess';
-import type { MarketingPost } from '@/types/database';
+import type { MarketingCampaign, MarketingGoal, MarketingPost } from '@/types/database';
 
 export default function Marketing() {
   const {
@@ -19,8 +23,24 @@ export default function Marketing() {
     createPost,
     updatePost,
     deletePost,
+    fetchPosts,
   } = useMarketingPosts();
+  const { campaigns, goals, saveCampaign, deleteCampaign, addKeyDates, saveGoal, deleteGoal } =
+    useMarketingCampaigns();
   const { isAdmin } = useRoleAccess('admin');
+
+  // Campaña o objetivo abierto: null = cerrado, 'new' = nuevo.
+  const [openCampaign, setOpenCampaign] = useState<MarketingCampaign | 'new' | null>(null);
+  const [openGoal, setOpenGoal] = useState<MarketingGoal | 'new' | null>(null);
+  const editingCampaign = openCampaign === 'new' ? null : openCampaign;
+  const editingGoal = openGoal === 'new' ? null : openGoal;
+
+  // Al borrar una campaña sus publicaciones se quedan sin ella: se vuelven a leer.
+  const handleDeleteCampaign = async (id: string) => {
+    const ok = await deleteCampaign(id);
+    if (ok) await fetchPosts();
+    return ok;
+  };
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingPost, setEditingPost] = useState<MarketingPost | null>(null);
@@ -66,11 +86,14 @@ export default function Marketing() {
           <TabsList>
             <TabsTrigger value="calendar">Calendario</TabsTrigger>
             <TabsTrigger value="list">Lista</TabsTrigger>
+            <TabsTrigger value="campaigns">Campañas y objetivos</TabsTrigger>
           </TabsList>
           <TabsContent value="calendar" className="mt-4">
             <MarketingCalendar
               posts={posts}
+              campaigns={campaigns}
               onSelectPost={handleSelect}
+              onSelectCampaign={setOpenCampaign}
               onSelectDay={handleNew}
               canEdit={isAdmin}
             />
@@ -84,6 +107,19 @@ export default function Marketing() {
               canEdit={isAdmin}
             />
           </TabsContent>
+          <TabsContent value="campaigns" className="mt-4">
+            <MarketingCampaigns
+              campaigns={campaigns}
+              goals={goals}
+              posts={posts}
+              canEdit={isAdmin}
+              onNewCampaign={() => setOpenCampaign('new')}
+              onSelectCampaign={setOpenCampaign}
+              onAddKeyDates={addKeyDates}
+              onNewGoal={() => setOpenGoal('new')}
+              onSelectGoal={setOpenGoal}
+            />
+          </TabsContent>
         </Tabs>
 
         <PostFormDialog
@@ -92,9 +128,30 @@ export default function Marketing() {
           post={editingPost}
           defaultDate={defaultDate}
           teamMembers={teamMembers}
+          campaigns={campaigns}
           onSubmit={handleSubmit}
           onDelete={isAdmin ? deletePost : undefined}
           isSubmitting={isSubmitting}
+          readOnly={!isAdmin}
+        />
+
+        <CampaignFormDialog
+          open={openCampaign !== null}
+          onOpenChange={(open) => !open && setOpenCampaign(null)}
+          campaign={editingCampaign}
+          postCount={editingCampaign ? posts.filter((p) => p.campaign_id === editingCampaign.id).length : 0}
+          onSubmit={(data) => saveCampaign(data, editingCampaign?.id)}
+          onDelete={isAdmin ? handleDeleteCampaign : undefined}
+          readOnly={!isAdmin}
+        />
+
+        <GoalFormDialog
+          open={openGoal !== null}
+          onOpenChange={(open) => !open && setOpenGoal(null)}
+          goal={editingGoal}
+          campaigns={campaigns}
+          onSubmit={(data) => saveGoal(data, editingGoal?.id)}
+          onDelete={isAdmin ? deleteGoal : undefined}
           readOnly={!isAdmin}
         />
       </div>

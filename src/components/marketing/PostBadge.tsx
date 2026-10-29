@@ -1,4 +1,15 @@
-import { Image, Film, Camera, Instagram, Facebook, Music2, Pin, type LucideIcon } from 'lucide-react';
+import {
+  Image,
+  Film,
+  Camera,
+  Instagram,
+  Facebook,
+  Music2,
+  Pin,
+  Mail,
+  GalleryHorizontalEnd,
+  type LucideIcon,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type {
   MarketingContentType,
@@ -10,6 +21,8 @@ export const CONTENT_TYPE_LABEL: Record<MarketingContentType, string> = {
   story: 'Historia',
   post: 'Post',
   reel: 'Reel',
+  carousel: 'Carrusel',
+  email: 'Email',
 };
 
 export const STATUS_LABEL: Record<MarketingStatus, string> = {
@@ -26,6 +39,7 @@ export const CHANNEL_LABEL: Record<MarketingChannel, string> = {
   tiktok: 'TikTok',
   pinterest: 'Pinterest',
   facebook: 'Facebook',
+  email: 'Email (Klaviyo)',
 };
 
 const CHANNEL_ICON: Record<MarketingChannel, LucideIcon> = {
@@ -33,12 +47,23 @@ const CHANNEL_ICON: Record<MarketingChannel, LucideIcon> = {
   tiktok: Music2,
   pinterest: Pin,
   facebook: Facebook,
+  email: Mail,
 };
 
 const CONTENT_TYPE_CLASSES: Record<MarketingContentType, string> = {
   story: 'bg-accent/15 text-accent border-accent/30',
   post: 'bg-primary/15 text-primary border-primary/30',
   reel: 'bg-secondary text-secondary-foreground border-border',
+  carousel: 'bg-primary/10 text-primary border-primary/20',
+  email: 'bg-amber-500/15 text-amber-600 border-amber-500/30',
+};
+
+const CONTENT_TYPE_ICON: Record<MarketingContentType, LucideIcon> = {
+  story: Camera,
+  post: Image,
+  reel: Film,
+  carousel: GalleryHorizontalEnd,
+  email: Mail,
 };
 
 const STATUS_CLASSES: Record<MarketingStatus, string> = {
@@ -50,7 +75,7 @@ const STATUS_CLASSES: Record<MarketingStatus, string> = {
 };
 
 export function ContentTypeIcon({ type, className }: { type: MarketingContentType; className?: string }) {
-  const Icon = type === 'story' ? Camera : type === 'reel' ? Film : Image;
+  const Icon = CONTENT_TYPE_ICON[type] ?? Image;
   return <Icon className={cn('w-3.5 h-3.5', className)} />;
 }
 

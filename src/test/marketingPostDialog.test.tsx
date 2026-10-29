@@ -23,6 +23,7 @@ const post: MarketingPost = {
   reference_url: 'https://drive.google.com/carpeta',
   hashtags: '#tuilus',
   notes: 'Grabar en la tienda',
+  campaign_id: null,
   created_by: 'u1',
   created_at: '2026-10-28T10:00:00.000Z',
   updated_at: '2026-10-28T10:00:00.000Z',
