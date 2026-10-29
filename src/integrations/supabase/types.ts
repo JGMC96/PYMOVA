@@ -1526,10 +1526,127 @@ export type Database = {
           },
         ]
       }
+      marketing_campaigns: {
+        Row: {
+          business_id: string
+          color: string | null
+          created_at: string
+          created_by: string | null
+          ends_on: string
+          goal: string | null
+          id: string
+          kind: string
+          name: string
+          notes: string | null
+          starts_on: string
+          updated_at: string
+        }
+        Insert: {
+          business_id: string
+          color?: string | null
+          created_at?: string
+          created_by?: string | null
+          ends_on: string
+          goal?: string | null
+          id?: string
+          kind?: string
+          name: string
+          notes?: string | null
+          starts_on: string
+          updated_at?: string
+        }
+        Update: {
+          business_id?: string
+          color?: string | null
+          created_at?: string
+          created_by?: string | null
+          ends_on?: string
+          goal?: string | null
+          id?: string
+          kind?: string
+          name?: string
+          notes?: string | null
+          starts_on?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_campaigns_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketing_goals: {
+        Row: {
+          business_id: string
+          campaign_id: string | null
+          created_at: string
+          created_by: string | null
+          current: number
+          ends_on: string
+          id: string
+          metric: string
+          notes: string | null
+          starts_on: string
+          target: number
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          business_id: string
+          campaign_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          current?: number
+          ends_on: string
+          id?: string
+          metric: string
+          notes?: string | null
+          starts_on: string
+          target: number
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          business_id?: string
+          campaign_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          current?: number
+          ends_on?: string
+          id?: string
+          metric?: string
+          notes?: string | null
+          starts_on?: string
+          target?: number
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_goals_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_goals_campaign_fk"
+            columns: ["campaign_id", "business_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_campaigns"
+            referencedColumns: ["id", "business_id"]
+          },
+        ]
+      }
       marketing_posts: {
         Row: {
           assignee_id: string | null
           business_id: string
+          campaign_id: string | null
           channels: string[]
           content_type: string
           copy: string | null
@@ -1547,6 +1664,7 @@ export type Database = {
         Insert: {
           assignee_id?: string | null
           business_id: string
+          campaign_id?: string | null
           channels?: string[]
           content_type: string
           copy?: string | null
@@ -1564,6 +1682,7 @@ export type Database = {
         Update: {
           assignee_id?: string | null
           business_id?: string
+          campaign_id?: string | null
           channels?: string[]
           content_type?: string
           copy?: string | null
@@ -1592,6 +1711,90 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "businesses"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_posts_campaign_fk"
+            columns: ["campaign_id", "business_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_campaigns"
+            referencedColumns: ["id", "business_id"]
+          },
+        ]
+      }
+      marketing_tasks: {
+        Row: {
+          assignee_id: string | null
+          business_id: string
+          campaign_id: string | null
+          created_at: string
+          created_by: string | null
+          done_at: string | null
+          done_by: string | null
+          due_on: string | null
+          id: string
+          notes: string | null
+          post_id: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          assignee_id?: string | null
+          business_id: string
+          campaign_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          done_at?: string | null
+          done_by?: string | null
+          due_on?: string | null
+          id?: string
+          notes?: string | null
+          post_id?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          assignee_id?: string | null
+          business_id?: string
+          campaign_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          done_at?: string | null
+          done_by?: string | null
+          due_on?: string | null
+          id?: string
+          notes?: string | null
+          post_id?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_tasks_assignee_id_fkey"
+            columns: ["assignee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_tasks_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketing_tasks_campaign_fk"
+            columns: ["campaign_id", "business_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_campaigns"
+            referencedColumns: ["id", "business_id"]
+          },
+          {
+            foreignKeyName: "marketing_tasks_post_fk"
+            columns: ["post_id", "business_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_posts"
+            referencedColumns: ["id", "business_id"]
           },
         ]
       }
@@ -4829,6 +5032,10 @@ export type Database = {
           _status: Database["public"]["Enums"]["invoice_status"]
         }
         Returns: Database["public"]["Enums"]["invoice_status"]
+      }
+      set_marketing_task_done: {
+        Args: { _done: boolean; _task_id: string }
+        Returns: undefined
       }
       set_online_order_status: {
         Args: {
