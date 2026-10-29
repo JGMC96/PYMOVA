@@ -407,6 +407,13 @@
       "when": 1793225482044,
       "tag": "0057_0057_stock_edicion",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1793264870946,
+      "tag": "0058_0058_marketing_campanas",
+      "breakpoints": true
     }
   ]
 }
