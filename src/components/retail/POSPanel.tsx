@@ -39,6 +39,7 @@ import { voucherApplied } from '@/lib/vales';
 import { matchesVarios } from '@/lib/varios';
 import { findByCode, POS_SEARCH_LIMIT, searchPosProducts, type PosSearchHit } from '@/lib/posSearch';
 import { useFitToViewport } from '@/hooks/useFitToViewport';
+import { finalPriceDiscount, lineDiscountAmount, lineDiscountPct, type LineDiscount } from '@/lib/lineDiscount';
 
 // Desde `xl` (dos columnas), carrito y recibo ocupan lo que queda de ventana y «Cobrar» va
 // debajo del recibo, siempre a la vista. Por debajo, «Cobrar» se queda pegado abajo.
@@ -66,7 +67,9 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [showCatalog, setShowCatalog] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [lineDiscounts, setLineDiscounts] = useState<Record<string, string>>({});
+  // Descuento de cada línea: en %, en € o por el precio final escrito (lib/lineDiscount).
+  const [lineDiscounts, setLineDiscounts] = useState<Record<string, LineDiscount>>({});
+  const [priceEdit, setPriceEdit] = useState<{ key: string; draft: string } | null>(null);
   const [selectedPayment, setSelectedPayment] = useState<string>(profile.paymentMethods[0] ?? 'cash');
   const [tipInput, setTipInput] = useState('');
   const [cashInput, setCashInput] = useState('');
@@ -183,6 +186,10 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
   };
 
   const updateQuantity = (key: string, delta: number) => {
+    // Un precio final escrito era para la cantidad de antes, y una línea que se quita no
+    // guarda su descuento: en los dos casos, fuera.
+    const line = cart.find((item) => (item.variant_id ?? item.product_id) === key);
+    if (line && (line.quantity + delta <= 0 || lineDiscounts[key]?.mode === 'price')) dropLineDiscount(key);
     setCart((prev) =>
       prev
         .map((item) => {
@@ -197,13 +204,27 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
     );
   };
 
-  const removeFromCart = (key: string) => {
-    setCart((prev) => prev.filter((item) => (item.variant_id ?? item.product_id) !== key));
+  function dropLineDiscount(key: string) {
     setLineDiscounts((prev) => {
       const next = { ...prev };
       delete next[key];
       return next;
     });
+  }
+
+  const setLineDiscount = (key: string, discount: LineDiscount | null) =>
+    discount ? setLineDiscounts((prev) => ({ ...prev, [key]: discount })) : dropLineDiscount(key);
+
+  /** Precio final escrito en la línea: queda como descuento sobre el precio del catálogo. */
+  const commitPriceEdit = (key: string, lineTotal: number) => {
+    if (!priceEdit || priceEdit.key !== key) return;
+    setLineDiscount(key, finalPriceDiscount(lineTotal, priceEdit.draft));
+    setPriceEdit(null);
+  };
+
+  const removeFromCart = (key: string) => {
+    setCart((prev) => prev.filter((item) => (item.variant_id ?? item.product_id) !== key));
+    dropLineDiscount(key);
   };
 
   const clearCart = () => {
@@ -218,11 +239,7 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
 
   const round2 = (n: number) => Math.round(n * 100) / 100;
 
-  const lineDiscountValue = (key: string, lineTotal: number) => {
-    const raw = parseFloat(lineDiscounts[key] ?? '');
-    if (isNaN(raw) || raw <= 0) return 0;
-    return round2((lineTotal * Math.min(raw, 100)) / 100);
-  };
+  const lineDiscountValue = (key: string, lineTotal: number) => lineDiscountAmount(lineTotal, lineDiscounts[key]);
 
   const grossSubtotal = cart.reduce((sum, item) => sum + item.total, 0);
   const discountValue = round2(
@@ -518,23 +535,76 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
                       </div>
 
                       <div className="flex items-center gap-1 justify-end">
-                        <Input
-                          type="number"
-                          min={0}
-                          max={100}
-                          placeholder="0"
-                          value={lineDiscounts[key] ?? ''}
-                          onChange={(e) =>
-                            setLineDiscounts((prev) => ({ ...prev, [key]: e.target.value }))
-                          }
-                          className="h-8 w-16 text-right"
-                        />
-                        <span className="text-xs text-muted-foreground">%</span>
+                        {lineDiscounts[key]?.mode === 'price' ? (
+                          <button
+                            type="button"
+                            className="text-xs tabular-nums text-muted-foreground hover:text-destructive"
+                            title="Quitar el precio final"
+                            onClick={() => dropLineDiscount(key)}
+                          >
+                            −{lineDiscountPct(item.total, disc).toFixed(2).replace('.', ',')} %
+                          </button>
+                        ) : (
+                          <>
+                            <Input
+                              inputMode="decimal"
+                              placeholder="0"
+                              aria-label={`Descuento de ${item.product_name}`}
+                              value={lineDiscounts[key]?.value ?? ''}
+                              onChange={(e) =>
+                                setLineDiscount(key, { mode: lineDiscounts[key]?.mode ?? 'pct', value: e.target.value })
+                              }
+                              className="h-8 w-16 text-right"
+                            />
+                            <button
+                              type="button"
+                              className="w-5 text-xs font-medium text-muted-foreground hover:text-foreground"
+                              title={lineDiscounts[key]?.mode === 'eur' ? 'Descuento en €: pasar a %' : 'Descuento en %: pasar a €'}
+                              onClick={() =>
+                                setLineDiscount(key, { mode: lineDiscounts[key]?.mode === 'eur' ? 'pct' : 'eur', value: '' })
+                              }
+                            >
+                              {lineDiscounts[key]?.mode === 'eur' ? '€' : '%'}
+                            </button>
+                          </>
+                        )}
                       </div>
 
-                      <p className="text-sm font-semibold text-right">
-                        {(item.total - disc).toFixed(2)} €
-                      </p>
+                      {priceEdit?.key === key ? (
+                        <Input
+                          autoFocus
+                          inputMode="decimal"
+                          aria-label={`Precio final de ${item.product_name}`}
+                          value={priceEdit.draft}
+                          onChange={(e) => setPriceEdit({ key, draft: e.target.value })}
+                          onFocus={(e) => e.target.select()}
+                          onBlur={() => commitPriceEdit(key, item.total)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              commitPriceEdit(key, item.total);
+                              barcodeRef.current?.focus();
+                            } else if (e.key === 'Escape') {
+                              setPriceEdit(null);
+                            }
+                          }}
+                          className="h-8 w-full text-right"
+                        />
+                      ) : (
+                        <button
+                          type="button"
+                          className="rounded px-1 text-right transition-colors duration-100 ease-smooth hover:bg-accent"
+                          title="Escribir el precio final de la línea"
+                          onClick={() => setPriceEdit({ key, draft: (item.total - disc).toFixed(2).replace('.', ',') })}
+                        >
+                          {disc > 0 && (
+                            <span className="block text-xs tabular-nums text-muted-foreground line-through">
+                              {item.total.toFixed(2)} €
+                            </span>
+                          )}
+                          <span className="text-sm font-semibold tabular-nums">{(item.total - disc).toFixed(2)} €</span>
+                        </button>
+                      )}
 
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
