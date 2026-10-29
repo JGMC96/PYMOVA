@@ -177,6 +177,21 @@ export interface MarketingGoal {
   created_at: string;
 }
 
+export interface MarketingTask {
+  id: string;
+  business_id: string;
+  title: string;
+  notes: string | null;
+  assignee_id: string | null;
+  due_on: string | null; // AAAA-MM-DD
+  done_at: string | null;
+  done_by: string | null;
+  campaign_id: string | null;
+  post_id: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
 // Plan keys for type safety (maps to plans.key in DB)
 export type PlanKey = 'free' | 'trial' | 'pro' | 'business';
 

@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { campaignsOnDay, campaignTiming, formatGoalValue, goalProgress } from './marketingPlan';
+import {
+  campaignsOnDay,
+  campaignTiming,
+  canToggleTask,
+  formatGoalValue,
+  goalProgress,
+  sortTasks,
+  taskState,
+} from './marketingPlan';
 import type { MarketingCampaign } from '@/types/database';
 
 const campana = (name: string, starts_on: string, ends_on: string): MarketingCampaign => ({
@@ -44,5 +52,36 @@ describe('plan de marketing', () => {
     expect(campaignTiming(bf, '2026-11-01')).toBe('upcoming');
     expect(campaignTiming(bf, '2026-11-30')).toBe('current');
     expect(campaignTiming(bf, '2026-12-01')).toBe('past');
+  });
+
+  it('sabe si una tarea está hecha, vencida, es de hoy o está pendiente', () => {
+    const hoy = '2026-11-20';
+    expect(taskState({ done_at: '2026-11-19T10:00:00Z', due_on: '2026-11-01' }, hoy)).toBe('done');
+    expect(taskState({ done_at: null, due_on: '2026-11-19' }, hoy)).toBe('overdue');
+    expect(taskState({ done_at: null, due_on: hoy }, hoy)).toBe('today');
+    expect(taskState({ done_at: null, due_on: '2026-11-21' }, hoy)).toBe('pending');
+    expect(taskState({ done_at: null, due_on: null }, hoy)).toBe('pending');
+  });
+
+  it('ordena las tareas: vencidas, de hoy, por fecha, sin fecha y hechas', () => {
+    const t = (id: string, due_on: string | null, done_at: string | null = null) => ({
+      id,
+      due_on,
+      done_at,
+      created_at: '2026-11-01T00:00:00Z',
+    });
+    const orden = sortTasks(
+      [t('hecha', '2026-11-10', '2026-11-10T09:00:00Z'), t('sin-fecha', null), t('luego', '2026-11-25'),
+        t('hoy', '2026-11-20'), t('vencida', '2026-11-18'), t('pronto', '2026-11-22')],
+      '2026-11-20',
+    ).map((x) => x.id);
+    expect(orden).toEqual(['vencida', 'hoy', 'pronto', 'luego', 'sin-fecha', 'hecha']);
+  });
+
+  it('una tarea la marca su responsable o un administrador', () => {
+    expect(canToggleTask({ assignee_id: 'u1' }, 'u1', false)).toBe(true);
+    expect(canToggleTask({ assignee_id: 'u1' }, 'u2', false)).toBe(false);
+    expect(canToggleTask({ assignee_id: null }, 'u2', false)).toBe(false);
+    expect(canToggleTask({ assignee_id: 'u1' }, 'u2', true)).toBe(true);
   });
 });

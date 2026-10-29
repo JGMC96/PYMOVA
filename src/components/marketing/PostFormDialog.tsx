@@ -69,6 +69,8 @@ interface PostFormDialogProps {
   isSubmitting: boolean;
   /** Personal: ve la publicación entera pero no la cambia (la RLS solo deja escribir a admin). */
   readOnly?: boolean;
+  /** Personal con una idea suya (o nueva): la edita, pero el estado se queda en «Idea». */
+  ideaOnly?: boolean;
 }
 
 // Hora por defecto al crear desde un día del calendario (el día llega a las 00:00).
@@ -94,8 +96,10 @@ export function PostFormDialog({
   onDelete,
   isSubmitting,
   readOnly = false,
+  ideaOnly = false,
 }: PostFormDialogProps) {
   const isEditing = !!post;
+  const noun = ideaOnly ? 'idea' : 'publicación';
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -159,7 +163,7 @@ export function PostFormDialog({
       copy: values.copy || undefined,
       content_type: values.content_type,
       channels: values.channels,
-      status: values.status,
+      status: ideaOnly ? 'idea' : values.status,
       scheduled_at: values.scheduled_at ? new Date(values.scheduled_at).toISOString() : null,
       assignee_id: values.assignee_id || null,
       campaign_id: values.campaign_id || null,
@@ -172,7 +176,7 @@ export function PostFormDialog({
 
   const handleDelete = async () => {
     if (!post || !onDelete) return;
-    if (!confirm('¿Eliminar esta publicación? Esta acción no se puede deshacer.')) return;
+    if (!confirm(`¿Eliminar esta ${noun}? Esta acción no se puede deshacer.`)) return;
     const ok = await onDelete(post.id);
     if (ok) onOpenChange(false);
   };
@@ -182,12 +186,14 @@ export function PostFormDialog({
       <DialogContent className="sm:max-w-[560px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {readOnly ? 'Publicación' : isEditing ? 'Editar publicación' : 'Nueva publicación'}
+            {readOnly ? 'Publicación' : isEditing ? `Editar ${noun}` : ideaOnly ? 'Nueva idea' : 'Nueva publicación'}
           </DialogTitle>
           <DialogDescription>
             {readOnly
               ? 'Solo un administrador puede cambiarla.'
-              : 'Planifica el contenido y compártelo con tu equipo.'}
+              : ideaOnly
+                ? 'Apunta tu idea. Un administrador la pondrá en fecha cuando toque.'
+                : 'Planifica el contenido y compártelo con tu equipo.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -246,7 +252,7 @@ export function PostFormDialog({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Estado *</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
+                    <Select value={field.value} onValueChange={field.onChange} disabled={ideaOnly}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue />
