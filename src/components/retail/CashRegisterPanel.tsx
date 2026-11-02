@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Wallet, Lock, Unlock, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,10 +10,14 @@ import { Separator } from '@/components/ui/separator';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
+import { useCashMovements } from '@/hooks/useCashMovements';
 import { useCashRegister } from '@/hooks/useCashRegister';
+import { useRoleAccess } from '@/hooks/useRoleAccess';
 import { useSellerSession } from '@/contexts/SellerSessionContext';
+import { movementTotals } from '@/lib/cashMovements';
 import { PAYMENT_LABELS } from '@/lib/storeProfiles';
 import { cn } from '@/lib/utils';
+import { CashMovementsCard, ClosedSessionMovementsDialog } from './CashMovements';
 import { CashRegisterStaleBanner } from './CashRegisterStaleBanner';
 
 const fmt = (n: number | null | undefined) => `${(n ?? 0).toFixed(2)} €`;
@@ -21,11 +25,23 @@ const fmtDate = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' }) : '—';
 
 export function CashRegisterPanel() {
-  const { sellers, employees, chooseSeller, can, authorize, dropSession } = useSellerSession();
+  const { sellers, employees, requiresSeller, chooseSeller, can, authorize, dropSession } = useSellerSession();
+  const { isAdmin } = useRoleAccess('admin');
   const {
-    openSession, history, summary, bySeller, expectedCash, cashRefunds, isBlind, isLoading, isWorking,
-    openRegister, closeRegister, refresh,
+    openSession, history, summary, bySeller, expectedCash: expectedBeforeMovements, cashRefunds, isBlind, isLoading, isWorking,
+    openRegister, closeRegister, refresh: refreshRegister,
   } = useCashRegister(sellers.map((s) => s.sessionId));
+  const {
+    movements, isSaving: isSavingMovement, refresh: refreshMovements, createMovement, voidMovement,
+  } = useCashMovements(openSession?.id);
+  const totals = movementTotals(movements);
+  const expectedCash = Math.round((expectedBeforeMovements + totals.net) * 100) / 100;
+  const [movementsOf, setMovementsOf] = useState<string | null>(null);
+  const closeMovementsOf = useCallback(() => setMovementsOf(null), []);
+  const refresh = () => {
+    void refreshRegister();
+    void refreshMovements();
+  };
   const personName = (id: string | null | undefined) =>
     id ? employees.find((e) => e.id === id)?.name ?? '—' : '—';
 
@@ -141,6 +157,24 @@ export function CashRegisterPanel() {
                       <span className="text-destructive">−{fmt(cashRefunds)}</span>
                     </div>
                   )}
+                  {!isBlind && totals.cashIn > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Entradas de cambio</span>
+                      <span>+{fmt(totals.cashIn)}</span>
+                    </div>
+                  )}
+                  {!isBlind && totals.expenses > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Gastos</span>
+                      <span className="text-destructive">−{fmt(totals.expenses)}</span>
+                    </div>
+                  )}
+                  {!isBlind && totals.withdrawals > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Retiradas al banco</span>
+                      <span className="text-destructive">−{fmt(totals.withdrawals)}</span>
+                    </div>
+                  )}
                   <Separator />
                   {isBlind ? (
                     <p className="text-muted-foreground">
@@ -189,7 +223,7 @@ export function CashRegisterPanel() {
                   <Textarea
                     id="notes"
                     rows={2}
-                    placeholder="Incidencias, retiradas de efectivo..."
+                    placeholder="Incidencias del turno..."
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                   />
@@ -256,6 +290,16 @@ export function CashRegisterPanel() {
         </Card>
       </div>
 
+      {openSession && (
+        <CashMovementsCard
+          movements={movements}
+          canMove={requiresSeller || isAdmin}
+          isSaving={isSavingMovement}
+          onCreate={createMovement}
+          onVoid={voidMovement}
+        />
+      )}
+
       {openSession && bySeller.length > 0 && (
         <Card>
           <CardHeader>
@@ -321,6 +365,7 @@ export function CashRegisterPanel() {
                   <TableHead className="text-right">Esperado</TableHead>
                   <TableHead className="text-right">Contado</TableHead>
                   <TableHead className="text-right">Diferencia</TableHead>
+                  <TableHead><span className="sr-only">Movimientos</span></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -348,6 +393,11 @@ export function CashRegisterPanel() {
                     >
                       {fmt(s.difference)}
                     </TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="sm" onClick={() => setMovementsOf(s.id)}>
+                        Movimientos
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -355,6 +405,7 @@ export function CashRegisterPanel() {
           )}
         </CardContent>
       </Card>
+      <ClosedSessionMovementsDialog sessionId={movementsOf} onClose={closeMovementsOf} />
     </div>
   );
 }

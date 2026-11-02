@@ -162,7 +162,8 @@ export function useCashRegister(sellerSessionIds: string[] = []) {
 
   // Arqueo a ciegas: el servidor no da importes a quien no puede cerrar caja.
   const isBlind = !!openSession && summary.some((s) => s.total_amount === null);
-  // Misma fórmula que close_register_session: fondo + ventas en efectivo − devoluciones en efectivo.
+  // Fondo + ventas en efectivo − devoluciones en efectivo. El arqueo (register_expected_cash, 0059)
+  // también cuenta los movimientos de caja: los suma CashRegisterPanel con useCashMovements.
   const cashRow = summary.find((s) => s.payment_method === 'cash');
   const cashRefunds = Number(cashRow?.refunds_amount ?? 0);
   const expectedCash =
