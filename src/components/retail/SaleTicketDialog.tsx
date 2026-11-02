@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button';
 import type { CartItem } from '@/hooks/useRetailSales';
 import { useTicketConfig } from '@/hooks/useTicketConfig';
-import { printTicket, type TicketDoc } from '@/lib/ticket';
+import type { TicketDoc } from '@/lib/ticket';
 import { TicketPreview } from './TicketPreview';
 import { SendReceiptDialog } from './SendReceiptDialog';
 
@@ -71,17 +71,19 @@ export function toTicketDoc(t: TicketData): TicketDoc {
 }
 
 export function SaleTicketDialog({ open, onOpenChange, ticket }: SaleTicketDialogProps) {
-  const { business, prefs } = useTicketConfig();
+  const { business, prefs, print, openDrawer } = useTicketConfig();
   const doc = useMemo(() => (ticket ? toTicketDoc(ticket) : null), [ticket]);
   const printedFor = useRef<string | null>(null);
   const [sendFor, setSendFor] = useState<{ id: string; number: string } | null>(null);
 
   useEffect(() => {
-    if (open && doc && prefs.autoPrint && printedFor.current !== doc.number) {
-      printedFor.current = doc.number;
-      printTicket(business, doc, prefs);
-    }
-  }, [open, doc, prefs, business]);
+    if (!open || !doc || printedFor.current === doc.number) return;
+    printedFor.current = doc.number;
+    // Una sola vez por venta; el botón «Imprimir ticket» ya no abre el cajón.
+    if (prefs.autoPrint) void print(doc, 'sale');
+    else void openDrawer(doc, 'sale');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, doc]);
 
   if (!doc) return null;
   const sendSale = ticket?.saleId ? { id: ticket.saleId, number: doc.number } : null;
@@ -113,7 +115,7 @@ export function SaleTicketDialog({ open, onOpenChange, ticket }: SaleTicketDialo
           )}
           <Button
             variant={ticket?.clientCanEmail ? 'outline' : 'default'}
-            onClick={() => printTicket(business, doc, prefs)}
+            onClick={() => void print(doc, 'reprint')}
             autoFocus={!ticket?.clientCanEmail}
           >
             <Printer className="w-4 h-4 mr-2" />

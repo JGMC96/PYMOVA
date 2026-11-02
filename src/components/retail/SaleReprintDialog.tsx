@@ -6,12 +6,12 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { supabase } from '@/integrations/supabase/client';
 import { useTicketConfig } from '@/hooks/useTicketConfig';
 import { saleTicketDoc, type StoredSaleRow } from '@/lib/saleTicket';
-import { printTicket, type TicketDoc } from '@/lib/ticket';
+import type { TicketDoc } from '@/lib/ticket';
 import { TicketPreview } from './TicketPreview';
 
 /** Reimprimir el ticket de una venta del historial. */
 export function SaleReprintDialog({ saleId, onClose }: { saleId: string | null; onClose: () => void }) {
-  const { business, prefs, taxRate } = useTicketConfig();
+  const { business, prefs, taxRate, print } = useTicketConfig();
   const [doc, setDoc] = useState<TicketDoc | null>(null);
 
   useEffect(() => {
@@ -66,7 +66,7 @@ export function SaleReprintDialog({ saleId, onClose }: { saleId: string | null; 
             <X className="w-4 h-4 mr-2" />
             Cerrar
           </Button>
-          <Button onClick={() => doc && printTicket(business, doc, prefs)} disabled={!doc} autoFocus>
+          <Button onClick={() => doc && void print(doc, 'duplicate')} disabled={!doc} autoFocus>
             <Printer className="w-4 h-4 mr-2" />
             Imprimir ticket
           </Button>

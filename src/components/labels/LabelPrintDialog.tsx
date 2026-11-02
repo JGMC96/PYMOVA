@@ -9,11 +9,13 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import { useBusiness } from '@/contexts/BusinessContext';
 import { useBusinessSettings } from '@/hooks/useBusinessSettings';
+import { printLabelsDirect } from '@/lib/ticketPrint';
 import { useLabelTemplates } from '@/hooks/useLabelTemplates';
 import { DEFAULT_TAX_RATE } from '@/lib/tax';
 import {
-  expandLabels, loadStartPosition, nextStartPosition, printLabels, saveStartPosition, sortLabelRows,
+  expandLabels, loadStartPosition, nextStartPosition, saveStartPosition, sortLabelRows,
   type LabelData, type LabelOrder,
 } from '@/lib/labels';
 import { LabelPreview } from './LabelPreview';
@@ -32,6 +34,7 @@ export function LabelPrintDialog({
 }) {
   const { templates } = useLabelTemplates();
   const { settings } = useBusinessSettings();
+  const { activeBusiness } = useBusiness();
   const taxRate = settings?.tax_rate ?? DEFAULT_TAX_RATE;
   const [templateKey, setTemplateKey] = useState('');
   const [startAt, setStartAt] = useState('1');
@@ -53,7 +56,7 @@ export function LabelPrintDialog({
   const count = labels.filter(Boolean).length;
   const missing = items.filter((i) => !i.data.barcode).reduce((s, i) => s + i.quantity, 0);
   const handlePrint = () => {
-    printLabels(config, labels, taxRate);
+    void printLabelsDirect(activeBusiness?.id, config, labels, taxRate);
     if (config.sheet.mode === 'sheet') {
       saveStartPosition(templateKey, nextStartPosition(start, count, config.sheet.rows * config.sheet.cols));
     }

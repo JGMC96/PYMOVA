@@ -44,3 +44,6 @@ verify_jwt = false
 # Códigos para productos nuevos: solo usuarios, con auth.getUser().
 [functions.catalog-codes]
 verify_jwt = false
+
+[functions.qz-sign]
+verify_jwt = false

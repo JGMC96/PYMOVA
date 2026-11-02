@@ -1,9 +1,10 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { useBusinessSettings } from '@/hooks/useBusinessSettings';
 import {
-  loadTerminalPrefs, saveTerminalPrefs, type TerminalTicketPrefs, type TicketBusiness,
+  isTerminalPrefsKey, loadTerminalPrefs, saveTerminalPrefs, type TerminalTicketPrefs, type TicketBusiness, type TicketDoc,
 } from '@/lib/ticket';
+import { openCashDrawer, printDocument, type PrintPurpose } from '@/lib/ticketPrint';
 
 /** Datos del negocio para el ticket + preferencias de impresión de este equipo. */
 export function useTicketConfig() {
@@ -14,6 +15,15 @@ export function useTicketConfig() {
   const setPrefs = useCallback((p: TerminalTicketPrefs) => {
     setPrefsState(p);
     saveTerminalPrefs(p);
+  }, []);
+
+  // Un TPV ya abierto también recoge lo que se cambie en Ajustes desde otra pestaña.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (isTerminalPrefsKey(e.key)) setPrefsState(loadTerminalPrefs());
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
   }, []);
 
   const s = bs.settings;
@@ -34,5 +44,10 @@ export function useTicketConfig() {
     returnPolicy: s?.ticket_return_policy,
   };
 
-  return { business, prefs, setPrefs, taxRate: bs.taxRate, settingsApi: bs };
+  const businessId = activeBusiness?.id;
+  const print = (doc: TicketDoc, purpose: PrintPurpose, biz: TicketBusiness = business) =>
+    printDocument(businessId, biz, doc, prefs, purpose);
+  const openDrawer = (doc: TicketDoc, purpose: PrintPurpose) => openCashDrawer(businessId, prefs, doc, purpose);
+
+  return { business, prefs, setPrefs, print, openDrawer, taxRate: bs.taxRate, settingsApi: bs };
 }

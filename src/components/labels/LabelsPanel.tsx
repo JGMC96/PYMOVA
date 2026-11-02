@@ -9,12 +9,14 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { useInventory, type ProductWithStock } from '@/hooks/useInventory';
+import { useBusiness } from '@/contexts/BusinessContext';
 import { useBusinessSettings } from '@/hooks/useBusinessSettings';
+import { printLabelsDirect } from '@/lib/ticketPrint';
 import { useMyPermissions } from '@/hooks/useMyPermissions';
 import { useLabelTemplates, BUILTIN_TEMPLATE, type LabelTemplate } from '@/hooks/useLabelTemplates';
 import { DEFAULT_TAX_RATE } from '@/lib/tax';
 import {
-  expandLabels, labelDataFor, labelSizeMm, loadStartPosition, nextStartPosition, printLabels, saveStartPosition,
+  expandLabels, labelDataFor, labelSizeMm, loadStartPosition, nextStartPosition, saveStartPosition,
   sortLabelRows, type LabelConfig, type LabelData, type LabelOrder,
 } from '@/lib/labels';
 import { LabelDesigner } from './LabelDesigner';
@@ -51,6 +53,7 @@ function rowsFor(p: ProductWithStock, quantity: (stock: number) => number): Row[
 export function LabelsPanel() {
   const { products } = useInventory();
   const { settings } = useBusinessSettings();
+  const { activeBusiness } = useBusiness();
   const { canAdjustStock } = useMyPermissions();
   const { templates, save, remove, isSaving } = useLabelTemplates();
   const taxRate = settings?.tax_rate ?? DEFAULT_TAX_RATE;
@@ -300,7 +303,7 @@ export function LabelsPanel() {
           <Button
             disabled={count === 0}
             onClick={() => {
-              printLabels(config, labels, taxRate);
+              void printLabelsDirect(activeBusiness?.id, config, labels, taxRate);
               if (config.sheet.mode === 'sheet') saveStartPosition(selectedId, nextStartPosition(start, count, perPage));
               setStartAt(String(loadStartPosition(selectedId)));
             }}

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useSaleReturns } from '@/hooks/useSaleReturns';
 import { useTicketConfig } from '@/hooks/useTicketConfig';
-import { printTicket, type TicketDoc } from '@/lib/ticket';
+import type { TicketDoc } from '@/lib/ticket';
 import { TicketPreview } from './TicketPreview';
 
 interface RefundTicketDialogProps {
@@ -17,7 +17,7 @@ interface RefundTicketDialogProps {
 
 /** Ticket de abono de una devolución: tras registrarla y para reimprimirla desde el historial. */
 export function RefundTicketDialog({ returnId, onClose, justCreated }: RefundTicketDialogProps) {
-  const { business, prefs, taxRate } = useTicketConfig();
+  const { business, prefs, taxRate, print, openDrawer } = useTicketConfig();
   const { fetchRefundTicket } = useSaleReturns();
   const [doc, setDoc] = useState<TicketDoc | null>(null);
   const printedFor = useRef<string | null>(null);
@@ -29,11 +29,12 @@ export function RefundTicketDialog({ returnId, onClose, justCreated }: RefundTic
   }, [returnId, taxRate, fetchRefundTicket]);
 
   useEffect(() => {
-    if (justCreated && doc && prefs.autoPrint && printedFor.current !== doc.number) {
-      printedFor.current = doc.number;
-      printTicket(business, doc, prefs);
-    }
-  }, [justCreated, doc, prefs, business]);
+    if (!justCreated || !doc || printedFor.current === doc.number) return;
+    printedFor.current = doc.number;
+    if (prefs.autoPrint) void print(doc, 'refund');
+    else void openDrawer(doc, 'refund');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [justCreated, doc]);
 
   return (
     <Dialog open={!!returnId} onOpenChange={(v) => !v && onClose()}>
@@ -58,7 +59,7 @@ export function RefundTicketDialog({ returnId, onClose, justCreated }: RefundTic
             <X className="w-4 h-4 mr-2" />
             Cerrar
           </Button>
-          <Button onClick={() => doc && printTicket(business, doc, prefs)} disabled={!doc} autoFocus>
+          <Button onClick={() => doc && void print(doc, 'reprint')} disabled={!doc} autoFocus>
             <Printer className="w-4 h-4 mr-2" />
             Imprimir abono
           </Button>

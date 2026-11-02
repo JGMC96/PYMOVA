@@ -250,9 +250,13 @@ export function renderLabelPages(config: LabelConfig, labels: (LabelData | null)
 }
 
 /** Imprime (o guarda en PDF) las etiquetas en un iframe oculto. */
-export function printLabels(config: LabelConfig, labels: (LabelData | null)[], taxRate: number) {
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Etiquetas</title>
+export function labelsHtml(config: LabelConfig, labels: (LabelData | null)[], taxRate: number) {
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Etiquetas</title>
     <style>${labelStyles(config)}</style></head><body>${renderLabelPages(config, labels, taxRate)}</body></html>`;
+}
+
+export function printLabels(config: LabelConfig, labels: (LabelData | null)[], taxRate: number) {
+  const html = labelsHtml(config, labels, taxRate);
   const iframe = document.createElement('iframe');
   iframe.setAttribute('aria-hidden', 'true');
   Object.assign(iframe.style, { position: 'fixed', right: '0', bottom: '0', width: '0', height: '0', border: '0' });
