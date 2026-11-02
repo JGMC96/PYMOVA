@@ -40,6 +40,20 @@ describe('cobros y reembolsos con vale de tienda', () => {
     expect(posSaleTransactions(50, null as never, 'Tarjeta')).toEqual([{ gateway: 'Tarjeta', amount: 50 }]);
   });
 
+  it('una venta de 0 € no lleva cobros: Shopify rechaza los de importe 0 (VTA-000022)', () => {
+    expect(posSaleTransactions(0, 0, 'Efectivo')).toEqual([]);
+    expect(posSaleTransactions(0, null as never, 'Efectivo')).toEqual([]);
+    // Un vale no puede pasar del total: tampoco aquí hay cobro.
+    expect(posSaleTransactions(0, 5, 'Efectivo')).toEqual([]);
+    expect(posSaleTransactions(0.004, 0, 'Efectivo')).toEqual([]);
+  });
+
+  it('devolver una venta de 0 €: importe 0 y sin cobros que reembolsar', () => {
+    const lineas = [{ quantity: 1, unit_price: 6, total: 0 }];
+    expect(refundAmountForReturn(lineas, 0, 0)).toBe(0);
+    expect(planRefundTransactions([], 0)).toEqual([]);
+  });
+
   it('reparte el reembolso: primero el dinero, después el vale, sin pasar de lo que queda', () => {
     const tx = (id: string, kind: string, gateway: string, amount: number, parent?: string) => ({
       id, kind, status: 'SUCCESS', gateway, amountSet: { shopMoney: { amount: amount.toFixed(2) } },

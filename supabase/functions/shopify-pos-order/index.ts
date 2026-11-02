@@ -191,10 +191,15 @@ async function processBusiness(admin: SupabaseClient, businessId: string): Promi
           seller ? `Atendido por ${seller}` : null,
           sale.notes,
         ].filter(Boolean).join(' — '),
-        // Lo pagado con vale de tienda va como cobro aparte; el resto, con el método de la venta.
-        transactions: posSaleTransactions(Number(sale.total), Number(sale.voucher_amount ?? 0), gateway)
-          .map((t) => ({ kind: 'SALE', status: 'SUCCESS', gateway: t.gateway, amountSet: money(t.amount) })),
       };
+      // Lo pagado con vale de tienda va como cobro aparte; el resto, con el método de la venta.
+      // Una venta de 0 € va sin cobros: queda como pagada solo con financialStatus.
+      const transactions = posSaleTransactions(Number(sale.total), Number(sale.voucher_amount ?? 0), gateway);
+      if (transactions.length > 0) {
+        order.transactions = transactions.map((t) => ({
+          kind: 'SALE', status: 'SUCCESS', gateway: t.gateway, amountSet: money(t.amount),
+        }));
+      }
       if (connection.default_location_gid) order.fulfillment = { locationId: connection.default_location_gid };
 
       const result = await shopifyGraphql<{
