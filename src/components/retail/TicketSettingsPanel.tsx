@@ -12,9 +12,10 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useTicketConfig } from '@/hooks/useTicketConfig';
 import { useRoleAccess } from '@/hooks/useRoleAccess';
-import { printTicket, type TicketDoc } from '@/lib/ticket';
+import type { TicketDoc } from '@/lib/ticket';
 import { TicketPreview } from './TicketPreview';
 import { TicketLogoUpload } from './TicketLogoUpload';
+import { QzPrinterSettings } from './QzPrinterSettings';
 
 type Form = {
   ticket_address: string; ticket_phone: string; ticket_website: string;
@@ -26,7 +27,7 @@ type Form = {
 };
 
 export function TicketSettingsPanel() {
-  const { business, prefs, setPrefs, taxRate, settingsApi } = useTicketConfig();
+  const { business, prefs, setPrefs, print, taxRate, settingsApi } = useTicketConfig();
   const { isAdmin } = useRoleAccess('admin');
   const { activeBusiness } = useBusiness();
   const s = settingsApi.settings;
@@ -144,7 +145,8 @@ export function TicketSettingsPanel() {
               <p>2. En el cuadro de impresión elige: márgenes «Ninguno», escala 100 % y desactiva «Encabezados y pies de página».</p>
               <p>3. En Chrome puedes saltarte ese cuadro abriendo Pymova con la opción <code>--kiosk-printing</code>.</p>
             </div>
-            <Button variant="outline" onClick={() => printTicket(liveBusiness, sample, prefs)}>
+            <QzPrinterSettings prefs={prefs} setPrefs={setPrefs} />
+            <Button variant="outline" onClick={() => void print(sample, 'test', liveBusiness)}>
               <Printer className="w-4 h-4 mr-2" />Imprimir ticket de prueba
             </Button>
           </CardContent>

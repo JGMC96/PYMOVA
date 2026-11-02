@@ -9,10 +9,21 @@ export interface TerminalTicketPrefs {
   autoPrint: boolean;
   feedLines: number;
   copies: number;
+  /** Imprimir con QZ Tray en este equipo. Apagado, todo sale por el navegador. */
+  qzEnabled: boolean;
+  /** Impresora por tipo de documento (nombre en Windows). Sin ella, el navegador. */
+  printers: { ticket?: string; refund?: string; duplicate?: string; label?: string };
+  /** Cortar el papel al acabar cada ticket. */
+  qzCut: boolean;
+  /** Hay cajón conectado a la impresora de tickets. */
+  qzDrawer: boolean;
 }
 
 const PREFS_KEY = 'pymova_ticket_terminal_prefs';
-export const DEFAULT_PREFS: TerminalTicketPrefs = { paperWidth: '80', autoPrint: false, feedLines: 3, copies: 1 };
+export const DEFAULT_PREFS: TerminalTicketPrefs = {
+  paperWidth: '80', autoPrint: false, feedLines: 3, copies: 1,
+  qzEnabled: false, printers: {}, qzCut: true, qzDrawer: false,
+};
 
 export function loadTerminalPrefs(): TerminalTicketPrefs {
   try {
@@ -26,6 +37,9 @@ export function loadTerminalPrefs(): TerminalTicketPrefs {
 export function saveTerminalPrefs(p: TerminalTicketPrefs) {
   localStorage.setItem(PREFS_KEY, JSON.stringify(p));
 }
+
+/** Para enterarse de los cambios hechos en otra pestaña de este equipo. */
+export const isTerminalPrefsKey = (key: string | null) => key === PREFS_KEY;
 
 export interface TicketBusiness {
   name: string;
@@ -189,10 +203,13 @@ export function renderTicketBody(biz: TicketBusiness, doc: TicketDoc): string {
   <div class="center sp">${multiline(biz.footer || '¡Gracias por su compra!')}</div>`;
 }
 
+/** Área imprimible real del papel, en mm. */
+export const printableWidthMm = (width: PaperWidth) => (width === '58' ? 48 : 72);
+
 export function ticketStyles(width: PaperWidth, feedLines: number, style: Pick<TicketBusiness, 'fontSize' | 'lineSpacing' | 'boldItems'> = {}) {
   const base = (width === '58' ? 10 : 12) * FONT_SCALE[style.fontSize ?? 'normal'];
   const lh = LINE_HEIGHT[style.lineSpacing ?? 'normal'];
-  const mm = width === '58' ? 48 : 72; // área imprimible real
+  const mm = printableWidthMm(width);
   return `
   *{box-sizing:border-box;margin:0;padding:0}
   @page{size:${width}mm auto;margin:0}
@@ -211,13 +228,17 @@ export function ticketStyles(width: PaperWidth, feedLines: number, style: Pick<T
   hr{border:none;border-top:1px dashed #000;margin:5px 0}`;
 }
 
-/** Imprime el ticket en un iframe oculto (sin ventanas emergentes). */
-export function printTicket(biz: TicketBusiness, doc: TicketDoc, prefs: TerminalTicketPrefs) {
+/** Documento HTML completo del ticket, con sus copias. */
+export function ticketHtml(biz: TicketBusiness, doc: TicketDoc, prefs: TerminalTicketPrefs, copies: number) {
   const body = renderTicketBody(biz, doc);
-  const copies = Math.max(1, Math.min(prefs.copies, 3));
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(doc.number)}</title>
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(doc.number)}</title>
     <style>${ticketStyles(prefs.paperWidth, prefs.feedLines, biz)} .ticket+.ticket{page-break-before:always}</style></head>
     <body>${Array.from({ length: copies }, () => `<div class="ticket">${body}</div>`).join('')}</body></html>`;
+}
+
+/** Imprime el ticket en un iframe oculto (sin ventanas emergentes). */
+export function printTicket(biz: TicketBusiness, doc: TicketDoc, prefs: TerminalTicketPrefs) {
+  const html = ticketHtml(biz, doc, prefs, Math.max(1, Math.min(prefs.copies, 3)));
 
   const iframe = document.createElement('iframe');
   iframe.setAttribute('aria-hidden', 'true');
