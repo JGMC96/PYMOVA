@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Printer, Check, X, Mail } from 'lucide-react';
+import { Gift, Printer, Check, X, Mail } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import type { CartItem } from '@/hooks/useRetailSales';
 import { useTicketConfig } from '@/hooks/useTicketConfig';
-import { printTicket, type TicketDoc } from '@/lib/ticket';
+import { printGiftTicket, printTicket, type TicketDoc } from '@/lib/ticket';
 import { TicketPreview } from './TicketPreview';
 import { SendReceiptDialog } from './SendReceiptDialog';
 
@@ -100,7 +100,7 @@ export function SaleTicketDialog({ open, onOpenChange, ticket }: SaleTicketDialo
 
         <TicketPreview business={business} doc={doc} prefs={prefs} className="max-h-[60vh]" />
 
-        <DialogFooter className="gap-2 sm:gap-2">
+        <DialogFooter className="gap-2 sm:gap-2 sm:flex-wrap">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             <X className="w-4 h-4 mr-2" />
             Cerrar
@@ -111,6 +111,10 @@ export function SaleTicketDialog({ open, onOpenChange, ticket }: SaleTicketDialo
               Enviar por correo
             </Button>
           )}
+          <Button variant="outline" onClick={() => printGiftTicket(business, doc, prefs)}>
+            <Gift className="w-4 h-4 mr-2" />
+            Ticket regalo
+          </Button>
           <Button
             variant={ticket?.clientCanEmail ? 'outline' : 'default'}
             onClick={() => printTicket(business, doc, prefs)}
