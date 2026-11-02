@@ -974,7 +974,8 @@ export const VOUCHER_GATEWAY = 'Vale de tienda';
 
 /**
  * Cobros del pedido de una venta de tienda: lo pagado con vale (si hay) y el resto con el
- * método de la venta. Sin importes a 0. El vale nunca pasa del total (lo exige la venta).
+ * método de la venta. Sin importes a 0: una venta de 0 € no tiene cobros, porque Shopify
+ * rechaza los de importe 0. El vale nunca pasa del total (lo exige la venta).
  */
 export function posSaleTransactions(
   total: number,
@@ -986,7 +987,7 @@ export function posSaleTransactions(
   const rest = Math.round((t - v) * 100) / 100;
   return [
     ...(v > 0 ? [{ gateway: VOUCHER_GATEWAY, amount: v }] : []),
-    ...(rest > 0 || v === 0 ? [{ gateway, amount: rest }] : []),
+    ...(rest > 0 ? [{ gateway, amount: rest }] : []),
   ];
 }
 
