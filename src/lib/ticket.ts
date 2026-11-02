@@ -60,7 +60,7 @@ export interface TicketLine {
 }
 
 export interface TicketDoc {
-  kind: 'sale' | 'refund' | 'test';
+  kind: 'sale' | 'refund' | 'test' | 'gift';
   number: string;
   createdAt: Date;
   lines: TicketLine[];
@@ -126,14 +126,63 @@ const multiline = (s?: string | null) =>
   s ? s.split('\n').map((l) => `<div>${esc(l)}</div>`).join('') : '';
 
 /** HTML interno del ticket (sin <html>), usado en vista previa e impresión. */
+/** Cabecera común: logo y datos del negocio. */
+const ticketHeader = (biz: TicketBusiness) => `
+  <div class="center">
+    ${biz.showLogo && biz.logoUrl ? `<img class="logo" src="${esc(biz.logoUrl)}" alt="" />` : ''}
+    <div class="xl bold">${esc(biz.name)}</div>
+    ${biz.legalName ? `<div>${esc(biz.legalName)}</div>` : ''}
+    ${biz.taxId ? `<div>NIF: ${esc(biz.taxId)}</div>` : ''}
+    ${multiline(biz.address)}
+    ${biz.phone ? `<div>Tel. ${esc(biz.phone)}</div>` : ''}
+    ${biz.website ? `<div>${esc(biz.website)}</div>` : ''}
+    ${biz.header ? `<div class="sp">${multiline(biz.header)}</div>` : ''}
+  </div>`;
+
+const ticketDate = (date: Date) => date.toLocaleString('es-ES', {
+  day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+});
+
+/**
+ * Ticket regalo de una venta: solo número, fecha y artículos. Importes, pago, cliente, vendedor y
+ * notas se quitan aquí, antes de dibujar, para que ninguno pueda acabar en el papel.
+ */
+export function giftTicketDoc(doc: TicketDoc): TicketDoc {
+  return {
+    kind: 'gift',
+    number: doc.number,
+    createdAt: doc.createdAt,
+    taxRate: 0,
+    total: 0,
+    lines: doc.lines.map((l) => ({ name: l.name, quantity: l.quantity, unitPrice: 0, total: 0 })),
+  };
+}
+
+function renderGiftBody(biz: TicketBusiness, doc: TicketDoc): string {
+  const lines = doc.lines
+    .map((l) => `<div class="item"><div class="iname">${esc(l.name)}</div><div>Cantidad: ${l.quantity}</div></div>`)
+    .join('');
+  return `${ticketHeader(biz)}
+  <hr/>
+  <div class="center bold xl">TICKET REGALO</div>
+  <div class="row"><span>Nº</span><span class="bold">${esc(doc.number)}</span></div>
+  <div class="row"><span>Fecha</span><span>${ticketDate(doc.createdAt)}</span></div>
+  <hr/>
+  ${lines}
+  <hr/>
+  ${ticketBarcode(doc.number)}
+  <div class="center ref">${esc(doc.number)}</div>
+  <div class="center small sp">${biz.returnPolicy ? multiline(biz.returnPolicy) : 'Para hacer un cambio, presenta este ticket.'}</div>
+  <div class="center sp">${multiline(biz.footer || '¡Que lo disfrutes!')}</div>`;
+}
+
 export function renderTicketBody(biz: TicketBusiness, doc: TicketDoc): string {
+  if (doc.kind === 'gift') return renderGiftBody(biz, doc);
   const sign = doc.kind === 'refund' ? -1 : 1;
   const { base, tax } = taxBreakdown(doc.total, doc.taxRate);
   const title =
     doc.kind === 'refund' ? 'TICKET DE ABONO' : doc.kind === 'test' ? 'TICKET DE PRUEBA' : 'FACTURA SIMPLIFICADA';
-  const date = doc.createdAt.toLocaleString('es-ES', {
-    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
-  });
+  const date = ticketDate(doc.createdAt);
 
   const lines = doc.lines
     .map((l) => {
@@ -148,17 +197,7 @@ export function renderTicketBody(biz: TicketBusiness, doc: TicketDoc): string {
   const tip = doc.tip && doc.tip > 0 ? doc.tip : 0;
   const grand = round2(doc.total + tip);
 
-  return `
-  <div class="center">
-    ${biz.showLogo && biz.logoUrl ? `<img class="logo" src="${esc(biz.logoUrl)}" alt="" />` : ''}
-    <div class="xl bold">${esc(biz.name)}</div>
-    ${biz.legalName ? `<div>${esc(biz.legalName)}</div>` : ''}
-    ${biz.taxId ? `<div>NIF: ${esc(biz.taxId)}</div>` : ''}
-    ${multiline(biz.address)}
-    ${biz.phone ? `<div>Tel. ${esc(biz.phone)}</div>` : ''}
-    ${biz.website ? `<div>${esc(biz.website)}</div>` : ''}
-    ${biz.header ? `<div class="sp">${multiline(biz.header)}</div>` : ''}
-  </div>
+  return `${ticketHeader(biz)}
   <hr/>
   <div class="center bold">${title}</div>
   ${doc.duplicateLabel ? `<div class="center bold">${esc(doc.duplicateLabel)}</div>` : ''}
@@ -235,4 +274,9 @@ export function printTicket(biz: TicketBusiness, doc: TicketDoc, prefs: Terminal
   const imgs = Array.from(d.images);
   if (imgs.length === 0) setTimeout(go, 50);
   else Promise.all(imgs.map((i) => (i.complete ? null : new Promise((r) => { i.onload = i.onerror = r; })))).then(go);
+}
+
+/** Ticket regalo de una venta: siempre una sola copia, aunque el equipo imprima varias. */
+export function printGiftTicket(biz: TicketBusiness, doc: TicketDoc, prefs: TerminalTicketPrefs) {
+  printTicket(biz, giftTicketDoc(doc), { ...prefs, copies: 1 });
 }

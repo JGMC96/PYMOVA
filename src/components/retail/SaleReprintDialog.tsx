@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Loader2, Printer, Receipt, X } from 'lucide-react';
+import { Gift, Loader2, Printer, Receipt, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useTicketConfig } from '@/hooks/useTicketConfig';
 import { saleTicketDoc, type StoredSaleRow } from '@/lib/saleTicket';
-import { printTicket, type TicketDoc } from '@/lib/ticket';
+import { printGiftTicket, printTicket, type TicketDoc } from '@/lib/ticket';
 import { TicketPreview } from './TicketPreview';
 
 /** Reimprimir el ticket de una venta del historial. */
@@ -65,6 +65,10 @@ export function SaleReprintDialog({ saleId, onClose }: { saleId: string | null; 
           <Button variant="outline" onClick={onClose}>
             <X className="w-4 h-4 mr-2" />
             Cerrar
+          </Button>
+          <Button variant="outline" onClick={() => doc && printGiftTicket(business, doc, prefs)} disabled={!doc}>
+            <Gift className="w-4 h-4 mr-2" />
+            Ticket regalo
           </Button>
           <Button onClick={() => doc && printTicket(business, doc, prefs)} disabled={!doc} autoFocus>
             <Printer className="w-4 h-4 mr-2" />
