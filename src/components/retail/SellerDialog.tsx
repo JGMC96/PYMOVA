@@ -394,6 +394,7 @@ const ACTION_TEXT: Record<PosAction, (amount: number) => string> = {
   return: () => 'Quien hace la devolución no tiene ese permiso. La autoriza alguien que pueda hacer devoluciones.',
   close_register: () => 'Quien cierra no tiene ese permiso. Lo autoriza alguien que pueda cerrar la caja.',
   adjust_stock: () => 'Cada ajuste de stock lleva el PIN de quien lo hace. Tiene que tener el permiso «Ajustar stock».',
+  cash_movement: () => 'Cada movimiento de caja lleva el PIN de quien lo hace. Tiene que tener el permiso «Cerrar caja».',
 };
 
 function AuthorizeStep({

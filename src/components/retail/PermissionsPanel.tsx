@@ -51,7 +51,7 @@ export function PermissionsPanel() {
         <CardDescription>
           En el TPV: si alguien intenta algo para lo que no tiene permiso (un descuento por encima de su máximo, una
           devolución o cerrar la caja), se pide el PIN de alguien que sí lo tenga y queda registrado quién lo autorizó;
-          quien no puede cerrar caja la cuenta a ciegas. En la gestión: «Productos y precios», «Ver costes» y «Ajustar
+          quien no puede cerrar caja la cuenta a ciegas. «Cerrar caja» también permite apuntar gastos, entradas y retiradas de caja. En la gestión: «Productos y precios», «Ver costes» y «Ajustar
           stock» se aplican a quien entra con su propia cuenta. Solo el propietario cambia los permisos.
         </CardDescription>
       </CardHeader>
