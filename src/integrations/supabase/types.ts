@@ -340,6 +340,86 @@ export type Database = {
         }
         Relationships: []
       }
+      cash_movements: {
+        Row: {
+          amount: number
+          business_id: string
+          category: string | null
+          created_at: string
+          created_by: string | null
+          employee_id: string | null
+          id: string
+          movement_type: string
+          reason: string
+          register_session_id: string
+          void_reason: string | null
+          voided_at: string | null
+          voided_by: string | null
+          voided_by_employee_id: string | null
+        }
+        Insert: {
+          amount: number
+          business_id: string
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          employee_id?: string | null
+          id?: string
+          movement_type: string
+          reason: string
+          register_session_id: string
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by?: string | null
+          voided_by_employee_id?: string | null
+        }
+        Update: {
+          amount?: number
+          business_id?: string
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          employee_id?: string | null
+          id?: string
+          movement_type?: string
+          reason?: string
+          register_session_id?: string
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by?: string | null
+          voided_by_employee_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cash_movements_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cash_movements_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "hr_employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cash_movements_register_session_id_fkey"
+            columns: ["register_session_id"]
+            isOneToOne: false
+            referencedRelation: "cash_register_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cash_movements_voided_by_employee_id_fkey"
+            columns: ["voided_by_employee_id"]
+            isOneToOne: false
+            referencedRelation: "hr_employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cash_register_sessions: {
         Row: {
           business_id: string
@@ -4153,6 +4233,10 @@ export type Database = {
         Args: { _business_id: string }
         Returns: boolean
       }
+      cash_movement_actor: {
+        Args: { _authorization_id: string; _business_id: string }
+        Returns: string
+      }
       catalog_codes_status: {
         Args: { _business_id: string }
         Returns: {
@@ -4309,6 +4393,17 @@ export type Database = {
       }
       create_business: {
         Args: { _industry?: string; _name: string }
+        Returns: string
+      }
+      create_cash_movement: {
+        Args: {
+          _amount: number
+          _authorization_id?: string
+          _category?: string
+          _reason?: string
+          _session_id: string
+          _type: string
+        }
         Returns: string
       }
       create_invoice_with_items: {
@@ -4480,6 +4575,21 @@ export type Database = {
           joined_at: string
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
+        }[]
+      }
+      get_cash_movements: {
+        Args: { _session_id: string }
+        Returns: {
+          amount: number
+          category: string
+          created_at: string
+          id: string
+          movement_type: string
+          reason: string
+          void_reason: string
+          voided_at: string
+          voided_who: string
+          who: string
         }[]
       }
       get_catalog_costs: {
@@ -4917,6 +5027,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      register_expected_cash: { Args: { _session_id: string }; Returns: number }
       remove_member: {
         Args: { _business_id: string; _user_id: string }
         Returns: undefined
@@ -5130,6 +5241,14 @@ export type Database = {
           locked_seconds: number
           ok: boolean
         }[]
+      }
+      void_cash_movement: {
+        Args: {
+          _authorization_id?: string
+          _movement_id: string
+          _reason?: string
+        }
+        Returns: undefined
       }
       void_store_voucher: {
         Args: { _business_id: string; _reason: string; _voucher_id: string }

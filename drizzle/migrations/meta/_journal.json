@@ -414,6 +414,13 @@
       "when": 1793264870946,
       "tag": "0058_0058_marketing_campanas",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1793725446232,
+      "tag": "0059_0059_caja_movimientos",
+      "breakpoints": true
     }
   ]
 }
