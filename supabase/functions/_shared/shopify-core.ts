@@ -1076,3 +1076,30 @@ export function productColor(node: Pick<ShopifyProductNode, 'colorField'>): stri
   const value = node.colorField?.value?.replace(/\s+/g, ' ').trim();
   return value ? value.slice(0, 120) : null;
 }
+
+/** Un envío de stock de la cola, para saber si frena el pedido o el movimiento que le sigue. */
+export interface QueuedPush {
+  source_id: string | null;
+  status: string;
+}
+
+/**
+ * Líneas cuyo envío de stock aún no ha llegado a Shopify. Su pedido o su movimiento a Stockagile
+ * tienen que esperar: Stockagile copia su cifra a Shopify y, si el envío llega después, se aplica
+ * dos veces. `done` y `skipped` (sin emparejar) no frenan.
+ */
+export function pushesStillOwed(pushes: QueuedPush[]): Set<string> {
+  return new Set(
+    pushes
+      .filter((p) => p.source_id && (p.status === 'pending' || p.status === 'failed'))
+      .map((p) => p.source_id as string),
+  );
+}
+
+/** Tiempo que un envío reclamado se considera en curso; después se puede reintentar. */
+export const PUSH_LEASE_MS = 2 * 60 * 1000;
+
+/** ¿Lo está enviando otra ejecución? Los que nunca se han intentado no lo están. */
+export function pushInFlight(row: { attempts: number; updated_at: string }, now: number): boolean {
+  return row.attempts > 0 && now - new Date(row.updated_at).getTime() < PUSH_LEASE_MS;
+}

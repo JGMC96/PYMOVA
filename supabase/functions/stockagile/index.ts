@@ -5,7 +5,9 @@
 //   Stockagile, comparando el stock de los dos lados.
 // - `push`: envía a Stockagile los movimientos pendientes de la cola stockagile_stock_moves
 //   (devoluciones con reposición, 0037) con `POST /stock/move`. Lo llama el TPV tras una
-//   devolución y la tarea «stockagile-devoluciones» cada 5 minutos (con ticket).
+//   devolución y la tarea «stockagile-devoluciones» cada 5 minutos (con ticket). Primero va el
+//   envío de stock a Shopify de esa misma línea: Stockagile copia su cifra y, si el envío llega
+//   detrás, Shopify suma dos veces.
 // - Ventas de la tienda (0046): copia de consulta de los tickets del TPV de Stockagile en
 //   stockagile_sales. La misma tarea trae los de los 2 últimos días; `import-sales` lo hace al
 //   momento y `import-sales-history` trae el historial completo por tandas. No mueven stock.
@@ -24,6 +26,7 @@ import {
   type StockagileWarehouse,
 } from '../_shared/stockagile-core.ts';
 import { consumeTicket, hasTicket } from '../_shared/scheduled-ticket.ts';
+import { flushStockPushes } from '../_shared/shopify-stock-push.ts';
 import { isStoreOrder, mapPosOrder, type StockagilePosOrder } from '../_shared/stockagile-sales.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
@@ -156,6 +159,8 @@ async function check(admin: SupabaseClient, stockagile: StockagileClient, busine
 
 interface MoveRow {
   id: string;
+  source_id: string | null;
+  attempts: number;
   local_product_id: string | null;
   local_variant_id: string | null;
   quantity: number;
@@ -189,8 +194,30 @@ async function push(admin: SupabaseClient, stockagile: StockagileClient, busines
     _limit: 20,
   });
   if (claimError) throw claimError;
-  const moves = (claimed ?? []) as MoveRow[];
-  if (moves.length === 0) return { sent: 0, failed: 0, review: 0 };
+  const claimedMoves = (claimed ?? []) as MoveRow[];
+  if (claimedMoves.length === 0) return { sent: 0, failed: 0, review: 0, held: 0 };
+
+  // Primero el stock en Shopify. Lo que no haya llegado espera a la siguiente ejecución: el
+  // movimiento vuelve a la cola tal como estaba, sin gastar intento.
+  const owed = await flushStockPushes(
+    admin,
+    businessId,
+    claimedMoves.map((m) => m.source_id).filter((id): id is string => !!id),
+  );
+  const moves: MoveRow[] = [];
+  let held = 0;
+  for (const m of claimedMoves) {
+    if (!m.source_id || !owed.has(m.source_id)) {
+      moves.push(m);
+      continue;
+    }
+    await admin
+      .from('stockagile_stock_moves')
+      .update({ status: 'pending', claimed_at: null, attempts: m.attempts - 1 })
+      .eq('id', m.id);
+    held++;
+  }
+  if (moves.length === 0) return { sent: 0, failed: 0, review: 0, held };
 
   const finish = async (id: string, patch: Record<string, unknown>) => {
     const { error } = await admin
@@ -215,7 +242,7 @@ async function push(admin: SupabaseClient, stockagile: StockagileClient, busines
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Error desconocido';
     for (const m of moves) await finish(m.id, { status: 'failed', last_error: message });
-    return { sent, failed: moves.length, review };
+    return { sent, failed: moves.length, review, held };
   }
   const warehouseFor = (m: MoveRow) =>
     m.location_gid ? pickWarehouse(warehouses, names.get(m.location_gid) ?? null) : defaultWarehouse;
@@ -293,7 +320,7 @@ async function push(admin: SupabaseClient, stockagile: StockagileClient, busines
       else failed++;
     }
   }
-  return { sent, failed, review };
+  return { sent, failed, review, held };
 }
 
 const SALES_PAGE_SIZE = 100;
