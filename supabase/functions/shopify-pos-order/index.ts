@@ -1,5 +1,7 @@
 // Crea en Shopify un pedido por cada venta de tienda (TPV) de Pymova.
-// El stock ya lo ajusta shopify-inventory-push, por eso el pedido se crea con inventoryBehaviour BYPASS.
+// El stock va aparte, por la cola de envíos, por eso el pedido se crea con inventoryBehaviour BYPASS.
+// Primero el stock y después el pedido: Stockagile ve el pedido, baja su stock y copia su cifra a
+// Shopify; si el envío llega detrás, Shopify resta dos veces. Una venta con el envío sin hacer espera.
 // Los pedidos llevan la etiqueta POS_TAG para que la traída de pedidos online los ignore.
 // Sin duplicados: orderCreate no admite clave de idempotencia, así que cada venta se reclama
 // antes (claim_pos_sales_for_shopify) y, antes de crear, se busca en Shopify si ya existe un
@@ -15,6 +17,7 @@ import {
 import { consumeTicket, hasTicket } from '../_shared/scheduled-ticket.ts';
 import { loadLevelsFor } from '../_shared/shopify-levels.ts';
 import { levelPages } from '../_shared/shopify-levels-db.ts';
+import { flushStockPushes } from '../_shared/shopify-stock-push.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
@@ -63,6 +66,7 @@ interface SaleRow {
   seller_employee_id: string | null;
   shopify_order_attempts: number;
   sale_items: Array<{
+    id: string;
     product_id: string | null;
     variant_id: string | null;
     product_name: string;
@@ -102,15 +106,30 @@ async function processBusiness(admin: SupabaseClient, businessId: string): Promi
   });
   if (claimError) throw claimError;
   const ids = ((claimed ?? []) as string[]).filter(Boolean);
-  if (ids.length === 0) return { status: 'ok', created: 0, linked: 0, failed: 0 };
+  if (ids.length === 0) return { status: 'ok', created: 0, linked: 0, failed: 0, held: 0 };
 
   const { data: salesData, error: salesError } = await admin
     .from('sales')
-    .select('id, sale_number, total, tip, voucher_amount, payment_method, notes, created_at, seller_employee_id, shopify_order_attempts, sale_items(product_id, variant_id, product_name, quantity, total)')
+    .select('id, sale_number, total, tip, voucher_amount, payment_method, notes, created_at, seller_employee_id, shopify_order_attempts, sale_items(id, product_id, variant_id, product_name, quantity, total)')
     .in('id', ids)
     .order('created_at', { ascending: true });
   if (salesError) throw salesError;
-  const sales = (salesData ?? []) as unknown as SaleRow[];
+  const claimedSales = (salesData ?? []) as unknown as SaleRow[];
+
+  // Primero el stock. Lo que no haya llegado a Shopify espera a la siguiente ejecución, sin gastar
+  // intentos: la venta vuelve a la cola tal como estaba.
+  const owed = await flushStockPushes(admin, businessId, claimedSales.flatMap((s) => s.sale_items.map((i) => i.id)));
+  const sales: SaleRow[] = [];
+  let held = 0;
+  for (const sale of claimedSales) {
+    if (!sale.sale_items.some((i) => owed.has(i.id))) {
+      sales.push(sale);
+      continue;
+    }
+    await admin.from('sales').update({ shopify_order_status: 'pending', shopify_order_claimed_at: null }).eq('id', sale.id);
+    held++;
+  }
+  if (sales.length === 0) return { status: 'ok', created: 0, linked: 0, failed: 0, held };
 
   // Solo los emparejamientos de los artículos de estas ventas (la tabla entera pasa de
   // las 1.000 filas y los que quedaban fuera salían como líneas sueltas sin variante).
@@ -222,7 +241,7 @@ async function processBusiness(admin: SupabaseClient, businessId: string): Promi
       failed++;
     }
   }
-  return { status: 'ok', created, linked, failed };
+  return { status: 'ok', created, linked, failed, held };
 }
 
 Deno.serve(async (req) => {
