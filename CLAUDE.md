@@ -92,6 +92,7 @@ Decidido por el usuario el 23/10/2026. Varios chats de Claude y Lovable trabajan
 - Caja (`open_register_session`, `close_register_session`), ventas (`create_sale_with_items`, trigger `decrement_stock_on_sale`), devoluciones (`create_sale_return`), cobros (`create_payment_and_recalc_invoice`), numeración (`generate_sale_number`, `generate_invoice_number`).
 - Fichajes (`clock_action`) y ausencias: tienen valor legal (registro de jornada).
 - Shopify: tokens en `shopify_app_tokens` (sin acceso de cliente), HMAC de webhooks, cola de stock y pedidos TPV. La integración es **de una sola tienda por despliegue** (`SHOPIFY_STORE_DOMAIN`).
+- Stock con Shopify y Stockagile: antes de tocar un camino que mueve stock, mira en `docs/STOCK.md` quién escribe la cifra de Shopify en cada caso. Stockagile copia su cifra entera, así que lo que mande PYMOVA tiene que llegar antes.
 
 ## Secretos
 
