@@ -2873,6 +2873,7 @@ export type Database = {
           quantity: number
           return_id: string
           sale_item_id: string | null
+          stockagile_line_key: string | null
           total: number
           unit_cost: number | null
           unit_price: number
@@ -2885,6 +2886,7 @@ export type Database = {
           quantity: number
           return_id: string
           sale_item_id?: string | null
+          stockagile_line_key?: string | null
           total?: number
           unit_cost?: number | null
           unit_price?: number
@@ -2897,6 +2899,7 @@ export type Database = {
           quantity?: number
           return_id?: string
           sale_item_id?: string | null
+          stockagile_line_key?: string | null
           total?: number
           unit_cost?: number | null
           unit_price?: number
@@ -2931,12 +2934,13 @@ export type Database = {
           register_session_id: string | null
           restock: boolean
           return_number: string
-          sale_id: string
+          sale_id: string | null
           seller_employee_id: string | null
           shopify_refund_attempts: number
           shopify_refund_error: string | null
           shopify_refund_gid: string | null
           shopify_refund_status: string
+          stockagile_sale_id: string | null
           total: number
         }
         Insert: {
@@ -2950,12 +2954,13 @@ export type Database = {
           register_session_id?: string | null
           restock?: boolean
           return_number: string
-          sale_id: string
+          sale_id?: string | null
           seller_employee_id?: string | null
           shopify_refund_attempts?: number
           shopify_refund_error?: string | null
           shopify_refund_gid?: string | null
           shopify_refund_status?: string
+          stockagile_sale_id?: string | null
           total?: number
         }
         Update: {
@@ -2969,12 +2974,13 @@ export type Database = {
           register_session_id?: string | null
           restock?: boolean
           return_number?: string
-          sale_id?: string
+          sale_id?: string | null
           seller_employee_id?: string | null
           shopify_refund_attempts?: number
           shopify_refund_error?: string | null
           shopify_refund_gid?: string | null
           shopify_refund_status?: string
+          stockagile_sale_id?: string | null
           total?: number
         }
         Relationships: [
@@ -3011,6 +3017,13 @@ export type Database = {
             columns: ["seller_employee_id"]
             isOneToOne: false
             referencedRelation: "hr_employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sale_returns_stockagile_sale_id_fkey"
+            columns: ["stockagile_sale_id"]
+            isOneToOne: false
+            referencedRelation: "stockagile_sales"
             referencedColumns: ["id"]
           },
         ]
@@ -3630,6 +3643,7 @@ export type Database = {
           business_id: string
           created_at: string
           enabled: boolean
+          returns_warehouse_name: string | null
           sales_history_imported_at: string | null
           sales_synced_at: string | null
         }
@@ -3637,6 +3651,7 @@ export type Database = {
           business_id: string
           created_at?: string
           enabled?: boolean
+          returns_warehouse_name?: string | null
           sales_history_imported_at?: string | null
           sales_synced_at?: string | null
         }
@@ -3644,6 +3659,7 @@ export type Database = {
           business_id?: string
           created_at?: string
           enabled?: boolean
+          returns_warehouse_name?: string | null
           sales_history_imported_at?: string | null
           sales_synced_at?: string | null
         }
@@ -4507,6 +4523,22 @@ export type Database = {
           sale_number: string
         }[]
       }
+      create_stockagile_return: {
+        Args: {
+          _authorization_id?: string
+          _business_id: string
+          _items: Json
+          _reason?: string
+          _refund_method?: string
+          _restock?: boolean
+          _sale_id: string
+          _seller_session_id?: string
+        }
+        Returns: {
+          return_id: string
+          return_number: string
+        }[]
+      }
       default_seller_employee: {
         Args: { _business_id: string }
         Returns: string
@@ -4848,6 +4880,10 @@ export type Database = {
           who: string
         }[]
       }
+      get_stockagile_returnable: {
+        Args: { _business_id: string; _sale_id: string }
+        Returns: Json
+      }
       get_store_voucher: {
         Args: { _business_id: string; _code: string }
         Returns: {
@@ -5187,7 +5223,36 @@ export type Database = {
           session_id: string
         }[]
       }
+      stockagile_line_key: {
+        Args: { _barcode: string; _name: string }
+        Returns: string
+      }
+      stockagile_normal_name: { Args: { _name: string }; Returns: string }
       stockagile_pending_work: { Args: never; Returns: boolean }
+      stockagile_return_blocked: {
+        Args: {
+          _ticket: Database["public"]["Tables"]["stockagile_sales"]["Row"]
+        }
+        Returns: string
+      }
+      stockagile_return_lines: {
+        Args: { _sale_id: string }
+        Returns: {
+          barcode: string
+          color: string
+          line_key: string
+          line_total: number
+          product_name: string
+          quantity: number
+          remaining: number
+          returned_pymova: number
+          returned_stockagile: number
+          size: string
+          variant_id: string
+          variant_match: string
+          variant_name: string
+        }[]
+      }
       transfer_ownership: {
         Args: {
           _business_id: string
