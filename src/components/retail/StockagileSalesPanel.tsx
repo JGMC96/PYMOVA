@@ -2,20 +2,24 @@
 // No son ventas de PYMOVA: no se devuelven aquí, pero se puede imprimir un duplicado.
 // El buscador es el de «Ventas en PYMOVA»: al escribir filtra los tickets cargados y con Intro
 // (o el lector) busca en todos; lo encontrado llega en `found`.
-import { Fragment, useCallback, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { ChevronDown, ChevronRight, Loader2, Printer, RefreshCw, Store } from 'lucide-react';
+import { ChevronDown, ChevronRight, Loader2, Printer, RefreshCw, RotateCcw, Store } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { STOCKAGILE_SEARCH_LIMIT, useStockagileSales, type StockagileSale } from '@/hooks/useStockagileSales';
+import { useStockagileReturn, type StockagileTicketReturn } from '@/hooks/useStockagileReturn';
 import { eur } from '@/lib/clientHistory';
+import { canOfferReturn } from '@/lib/stockagileReturn';
 import { matchesStockagileNumber } from '@/lib/ticketCode';
 import { STOCKAGILE_PILOT_BUSINESS_ID } from '../../../supabase/functions/_shared/stockagile-core.ts';
+import { RefundTicketDialog } from './RefundTicketDialog';
 import { StockagileReprintDialog } from './StockagileReprintDialog';
+import { StockagileReturnDialog } from './StockagileReturnDialog';
 
 interface StockagileSalesPanelProps {
   /** Lo que se está escribiendo en el buscador de Historial. */
@@ -32,6 +36,18 @@ export function StockagileSalesPanel({ query = '', found = null, onClearSearch }
   const [open, setOpen] = useState<string | null>(null);
   const [reprintId, setReprintId] = useState<string | null>(null);
   const closeReprint = useCallback(() => setReprintId(null), []);
+  const { fetchTicketReturns } = useStockagileReturn();
+  const [returnId, setReturnId] = useState<string | null>(null);
+  const closeReturn = useCallback(() => setReturnId(null), []);
+  const [refundTicket, setRefundTicket] = useState<{ id: string; justCreated: boolean } | null>(null);
+  const [ticketReturns, setTicketReturns] = useState<StockagileTicketReturn[]>([]);
+  const loadTicketReturns = useCallback(() => {
+    void fetchTicketReturns().then(setTicketReturns);
+  }, [fetchTicketReturns]);
+  useEffect(() => {
+    if (enabled) loadTicketReturns();
+  }, [enabled, loadTicketReturns]);
+  const returnsOf = (saleId: string) => ticketReturns.filter((r) => r.stockagile_sale_id === saleId);
   const visible = useMemo(
     () => found ?? (query.trim() ? sales.filter((s) => matchesStockagileNumber(s.number, query)) : sales),
     [found, query, sales],
@@ -49,7 +65,7 @@ export function StockagileSalesPanel({ query = '', found = null, onClearSearch }
           </CardTitle>
           <CardDescription>
             Copia para consultar de los tickets hechos en Stockagile. Se actualiza sola cada 5 minutos y no mueve stock.
-            Se puede imprimir un duplicado; las devoluciones de estos tickets aún se hacen en Stockagile.
+            Se puede imprimir un duplicado y, en los de la tienda de los últimos 180 días, devolver o cambiar.
           </CardDescription>
         </div>
         <Button variant="outline" size="sm" onClick={() => void syncNow()} disabled={isSyncing}>
@@ -89,7 +105,7 @@ export function StockagileSalesPanel({ query = '', found = null, onClearSearch }
                 <TableHead>Cliente</TableHead>
                 <TableHead>Pago</TableHead>
                 <TableHead className="text-right">Total</TableHead>
-                <TableHead className="w-10" />
+                <TableHead className="w-20" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -108,6 +124,9 @@ export function StockagileSalesPanel({ query = '', found = null, onClearSearch }
                             {Number(s.total) > 0 ? 'Cambio' : 'Devolución'}
                           </Badge>
                         )}
+                        {returnsOf(s.id).length > 0 && (
+                          <Badge variant="outline" className="ml-2">Devuelto en PYMOVA</Badge>
+                        )}
                       </TableCell>
                       <TableCell>{format(new Date(s.sold_at), "d MMM yyyy, HH:mm", { locale: es })}</TableCell>
                       <TableCell>
@@ -115,7 +134,22 @@ export function StockagileSalesPanel({ query = '', found = null, onClearSearch }
                       </TableCell>
                       <TableCell className="text-muted-foreground">{s.payment_methods ?? '—'}</TableCell>
                       <TableCell className="text-right font-semibold tabular-nums">{eur(s.total)}</TableCell>
-                      <TableCell>
+                      <TableCell className="whitespace-nowrap text-right">
+                        {canOfferReturn(s.sold_at, s.stockagile_sale_items) && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            aria-label={`Devolver o cambiar el ticket ${s.number ?? ''}`}
+                            title="Devolver o cambiar"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setReturnId(s.id);
+                            }}
+                          >
+                            <RotateCcw className="w-4 h-4" />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="icon"
@@ -143,6 +177,19 @@ export function StockagileSalesPanel({ query = '', found = null, onClearSearch }
                               </li>
                             ))}
                           </ul>
+                          {returnsOf(s.id).map((r) => (
+                            <div key={r.id} className="mt-2 flex items-center justify-between gap-2 border-t pt-2 text-sm">
+                              <span>Devuelto en PYMOVA: {r.return_number}</span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setRefundTicket({ id: r.id, justCreated: false })}
+                              >
+                                <Printer className="w-4 h-4 mr-2" />
+                                {eur(r.total)}
+                              </Button>
+                            </div>
+                          ))}
                         </TableCell>
                       </TableRow>
                     )}
@@ -162,6 +209,19 @@ export function StockagileSalesPanel({ query = '', found = null, onClearSearch }
         )}
       </CardContent>
       <StockagileReprintDialog saleId={reprintId} onClose={closeReprint} />
+      <StockagileReturnDialog
+        saleId={returnId}
+        onClose={closeReturn}
+        onReturned={(id) => {
+          loadTicketReturns();
+          setRefundTicket({ id, justCreated: true });
+        }}
+      />
+      <RefundTicketDialog
+        returnId={refundTicket?.id ?? null}
+        justCreated={refundTicket?.justCreated}
+        onClose={() => setRefundTicket(null)}
+      />
     </Card>
   );
 }
