@@ -18,7 +18,8 @@ export interface SaleDetailLine {
 
 export interface SaleReturn {
   id: string;
-  sale_id: string;
+  /** Vacío en las devoluciones de tickets de Stockagile (0060). */
+  sale_id: string | null;
   return_number: string;
   reason: string | null;
   refund_method: string | null;
@@ -35,6 +36,8 @@ export function refundTicketDoc(
     total: number | string;
     created_at: string;
     sales: { sale_number: string } | null;
+    /** Ticket de Stockagile que rectifica, si no es una venta de PYMOVA (0060). */
+    stockagile_sales?: { number: string | null } | null;
     sale_return_items: { product_name: string; quantity: number | string; unit_price: number | string; total: number | string | null }[];
     /** Vale creado con la devolución (reembolso «Vale de tienda»). */
     store_vouchers?: { code: string; initial_amount: number | string; expires_at: string | null }[] | null;
@@ -45,7 +48,7 @@ export function refundTicketDoc(
   return {
     kind: 'refund',
     number: row.return_number,
-    originalNumber: row.sales?.sale_number ?? null,
+    originalNumber: row.sales?.sale_number ?? row.stockagile_sales?.number ?? null,
     createdAt: new Date(row.created_at),
     taxRate,
     total: Number(row.total),
@@ -161,7 +164,7 @@ export function useSaleReturns() {
     async (returnId: string, taxRate: number): Promise<TicketDoc | null> => {
       const { data, error } = await supabase
         .from('sale_returns')
-        .select('return_number, refund_method, reason, total, created_at, seller_employee_id, sales(sale_number), sale_return_items(product_name, quantity, unit_price, total), store_vouchers(code, initial_amount, expires_at)')
+        .select('return_number, refund_method, reason, total, created_at, seller_employee_id, sales(sale_number), stockagile_sales(number), sale_return_items(product_name, quantity, unit_price, total), store_vouchers(code, initial_amount, expires_at)')
         .eq('id', returnId)
         .maybeSingle();
       if (error || !data) {
@@ -176,6 +179,7 @@ export function useSaleReturns() {
         created_at: string;
         seller_employee_id: string | null;
         sales: { sale_number: string } | null;
+        stockagile_sales: { number: string | null } | null;
         sale_return_items: { product_name: string; quantity: number | string; unit_price: number | string; total: number | string | null }[];
         store_vouchers: { code: string; initial_amount: number | string; expires_at: string | null }[] | null;
       };

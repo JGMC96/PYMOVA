@@ -21,7 +21,7 @@ PYMOVA sigue a Shopify. Su cifra es la de la ubicación de la tienda más los en
 | Camino | Escribe en Shopify | Cómo le llega a Stockagile | Cómo le llega a PYMOVA |
 |---|---|---|---|
 | Venta en el TPV de PYMOVA | 1) PYMOVA −1 (cola de envíos); 2) Stockagile copia su cifra, unos 75 s después | Por el pedido de Shopify (`pymova-tpv`, `inventoryBehaviour: BYPASS`) | Resta al vender (`decrement_stock_on_sale`) |
-| Devolución en el TPV con reposición | 1) PYMOVA +1; 2) Stockagile copia | Movimiento `stockagile_stock_moves`, después del envío a Shopify | Suma al devolver. El reembolso en Shopify es `NO_RESTOCK` |
+| Devolución en el TPV con reposición (también de tickets de Stockagile, 0060) | 1) PYMOVA +1; 2) Stockagile copia | Movimiento `stockagile_stock_moves`, después del envío a Shopify | Suma al devolver. El reembolso en Shopify es `NO_RESTOCK` |
 | Compra recibida (0040) | Igual que una devolución | Igual que una devolución | Igual que una devolución |
 | Ajuste de stock en PYMOVA, con PIN (0057) | Solo Stockagile, al copiar. PYMOVA no envía nada a Shopify | Movimiento `stockagile_stock_moves` | Ajusta al guardar |
 | Venta web | Shopify, al entrar el pedido; después Stockagile copia | Por el pedido | Solo por los avisos: las líneas web no tienen la talla enlazada |

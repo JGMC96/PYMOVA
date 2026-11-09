@@ -192,7 +192,8 @@ export function useRetailSales() {
           .eq('business_id', activeBusiness.id)
           .eq('return_number', code)
           .maybeSingle();
-        if (!ret) return null;
+        // Las de tickets de Stockagile (0060) no tienen venta de PYMOVA.
+        if (!ret?.sale_id) return null;
         const { data: sale } = await supabase
           .from('sales')
           .select('sale_number')
