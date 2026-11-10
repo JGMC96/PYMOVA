@@ -65,6 +65,7 @@ export function toTicketDoc(t: TicketData): TicketDoc {
         unitPrice: i.unit_price,
         total: i.total,
         discount: Math.max(0, Math.round((orig - i.total) * 100) / 100),
+        listPrice: i.compare_at_price ?? null,
       };
     }),
   };

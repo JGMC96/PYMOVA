@@ -319,6 +319,7 @@ export const VARIANT_FIELDS = `
   sku
   barcode
   price
+  compareAtPrice
   availableForSale
   selectedOptions { name value }
   inventoryItem {
@@ -465,6 +466,8 @@ export interface ShopifyVariantNode {
   sku: string | null;
   barcode: string | null;
   price: string;
+  /** Precio anterior de una rebaja (0061); vacío sin rebaja. */
+  compareAtPrice?: string | null;
   availableForSale: boolean;
   selectedOptions: Array<{ name: string; value: string }>;
   inventoryItem: {
@@ -476,6 +479,18 @@ export interface ShopifyVariantNode {
       edges: Array<{ node: ShopifyInventoryLevelNode }>;
     };
   } | null;
+}
+
+/**
+ * Precio anterior de una rebaja puesta en Shopify (0061), o null. Solo si es mayor que el
+ * precio: al acabar la promoción Shopify lo vacía, y así también se vacía en PYMOVA.
+ */
+export function variantCompareAtPrice(variant: ShopifyVariantNode): number | null {
+  const raw = variant.compareAtPrice;
+  if (raw === null || raw === undefined || raw === '') return null;
+  const compare = Number(raw);
+  const price = Number(variant.price);
+  return Number.isFinite(compare) && Number.isFinite(price) && compare > price ? Math.round(compare * 100) / 100 : null;
 }
 
 /** Coste unitario informado en Shopify (inventoryItem.unitCost), o null si no está. */

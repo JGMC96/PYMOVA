@@ -21,7 +21,7 @@ export function SaleReprintDialog({ saleId, onClose }: { saleId: string | null; 
     void (async () => {
       const { data, error } = await supabase
         .from('sales')
-        .select('sale_number, created_at, payment_method, total, tip, cash_received, change_given, notes, voucher_amount, seller_employee_id, clients(name), store_vouchers!sales_voucher_id_fkey(code), sale_items(product_name, quantity, unit_price, total)')
+        .select('sale_number, created_at, payment_method, total, tip, cash_received, change_given, notes, voucher_amount, seller_employee_id, clients(name), store_vouchers!sales_voucher_id_fkey(code), sale_items(product_name, quantity, unit_price, total, compare_at_price)')
         .eq('id', saleId)
         .maybeSingle();
       if (cancelled) return;

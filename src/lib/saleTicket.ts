@@ -2,6 +2,7 @@
 // del TPV en el momento de cobrar (SaleTicketDialog → toTicketDoc).
 import type { TicketDoc } from '@/lib/ticket';
 import { normalizeSearch } from '@/lib/search';
+import { promoListPrice } from './promoPrice';
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -17,7 +18,14 @@ export interface StoredSaleRow {
   voucher_amount: number | string | null;
   clients: { name: string | null } | null;
   store_vouchers: { code: string } | null;
-  sale_items: { product_name: string; quantity: number | string; unit_price: number | string; total: number | string | null }[];
+  sale_items: {
+    product_name: string;
+    quantity: number | string;
+    unit_price: number | string;
+    total: number | string | null;
+    /** Precio anterior de una rebaja de Shopify (0061). */
+    compare_at_price?: number | string | null;
+  }[];
 }
 
 export interface StoredStockagileSaleRow {
@@ -120,6 +128,7 @@ export function saleTicketDoc(row: StoredSaleRow, taxRate: number, cashier: stri
         unitPrice,
         total,
         discount: Math.max(0, round2(quantity * unitPrice - total)),
+        ...(promoListPrice(unitPrice, i.compare_at_price) ? { listPrice: promoListPrice(unitPrice, i.compare_at_price) } : {}),
       };
     }),
   };

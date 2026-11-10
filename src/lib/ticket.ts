@@ -1,6 +1,7 @@
 // Renderizado de tickets térmicos (factura simplificada) para el TPV.
 import { round2, taxBreakdown } from './tax';
 import { code128Svg } from './barcode';
+import { promoSavings } from './promoPrice';
 
 export type PaperWidth = '80' | '58';
 
@@ -57,6 +58,8 @@ export interface TicketLine {
   total: number;
   /** Importe descontado en la línea */
   discount?: number;
+  /** Precio anterior por unidad de una rebaja de Shopify (0061). */
+  listPrice?: number | null;
 }
 
 export interface TicketDoc {
@@ -189,10 +192,16 @@ export function renderTicketBody(biz: TicketBusiness, doc: TicketDoc): string {
       const disc = l.discount && l.discount > 0
         ? `<div class="row muted"><span>&nbsp;&nbsp;Descuento</span><span>-${eur(l.discount)}</span></div>`
         : '';
+      const saved = promoSavings(l);
+      const promo = saved > 0
+        ? `<div class="row muted"><span>&nbsp;&nbsp;Antes ${eur(l.listPrice ?? 0)}</span><span>Ahorras ${eur(saved)}</span></div>`
+        : '';
       return `<div class="item"><div class="iname">${esc(l.name)}</div>
-        <div class="row"><span>${l.quantity} x ${eur(l.unitPrice)}</span><span>${eur(sign * l.total)}</span></div>${disc}</div>`;
+        <div class="row"><span>${l.quantity} x ${eur(l.unitPrice)}</span><span>${eur(sign * l.total)}</span></div>${promo}${disc}</div>`;
     })
     .join('');
+  // Rebajas de Shopify y descuentos del TPV, solo en las ventas.
+  const totalSaved = doc.kind === 'refund' ? 0 : round2(doc.lines.reduce((sum, l) => sum + promoSavings(l) + (l.discount ?? 0), 0));
 
   const tip = doc.tip && doc.tip > 0 ? doc.tip : 0;
   const grand = round2(doc.total + tip);
@@ -213,6 +222,7 @@ export function renderTicketBody(biz: TicketBusiness, doc: TicketDoc): string {
   <div class="row"><span>IVA ${doc.taxRate}%</span><span>${eur(sign * tax)}</span></div>
   ${tip ? `<div class="row"><span>Propina</span><span>${eur(tip)}</span></div>` : ''}
   <div class="row xl bold total"><span>TOTAL</span><span>${eur(sign * grand)}</span></div>
+  ${totalSaved > 0 ? `<div class="row bold"><span>Has ahorrado</span><span>${eur(totalSaved)}</span></div>` : ''}
   ${doc.voucherPaid ? `<div class="row"><span>Vale ${esc(doc.voucherPaid.code)}</span><span>${eur(doc.voucherPaid.amount)}</span></div>` : ''}
   ${doc.voucherPaid && doc.voucherPaid.balanceLeft != null ? `<div class="row muted"><span>&nbsp;&nbsp;Saldo que queda</span><span>${eur(doc.voucherPaid.balanceLeft)}</span></div>` : ''}
   ${doc.paymentMethod && !(doc.voucherPaid && doc.paymentMethod === 'store_credit') ? `<div class="row"><span>${doc.kind === 'refund' ? 'Reembolso' : 'Pago'}</span><span>${esc(paymentLabels[doc.paymentMethod] ?? doc.paymentMethod)}</span></div>` : ''}

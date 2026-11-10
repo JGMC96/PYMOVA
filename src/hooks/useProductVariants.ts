@@ -13,6 +13,8 @@ export interface ProductVariant {
   sku: string | null;
   barcode: string | null;
   price: number | null;
+  /** Precio anterior de una rebaja de Shopify (0061). */
+  compare_at_price?: number | null;
   cost_price: number | null;
   stock_quantity: number;
   is_active: boolean;
