@@ -75,6 +75,37 @@ describe('tickets de PYMOVA y de Stockagile', () => {
     expect(stockagileTicketCode('1043708')).toBe('1043708');
   });
 
+  it('Stockagile: el código de barras del ticket lleva delante la caja («ND1.»)', () => {
+    expect(stockagileTicketCode('ND1.VT2510383')).toBe('VT2510383');
+    expect(stockagileTicketCode('nd1.vt2510383')).toBe('VT2510383');
+    expect(stockagileTicketCode(' ND1.VT259995 ')).toBe('VT259995');
+    // Separadores cambiados por el teclado, o sin separador.
+    expect(stockagileTicketCode("ND1'VT2510383")).toBe('VT2510383');
+    expect(stockagileTicketCode('ND1:VT2510383')).toBe('VT2510383');
+    expect(stockagileTicketCode('ND1-VT2510383')).toBe('VT2510383');
+    expect(stockagileTicketCode('ND1VT2510383')).toBe('VT2510383');
+    expect(stockagileTicketCode('ND12.VT2510383')).toBe('VT2510383');
+    // Los antiguos, solo cifras.
+    expect(stockagileTicketCode('ND1.1043708')).toBe('1043708');
+  });
+
+  it('Stockagile: el prefijo solo, o algo que no es un ticket, no vale', () => {
+    expect(stockagileTicketCode('ND1')).toBeNull();
+    expect(stockagileTicketCode('ND1.')).toBeNull();
+    expect(stockagileTicketCode('ND1.VT12')).toBeNull();
+    expect(stockagileTicketCode('ND1.ABC')).toBeNull();
+  });
+
+  it('el código de barras de Stockagile no se toma por un ticket de PYMOVA', () => {
+    expect(normalizeTicketCode('ND1.VT2510383')).toBeNull();
+    expect(pymovaTicketCode('ND1.VT2510383')).toBeNull();
+    expect(pymovaTicketCode('nd1.vt2510383')).toBeNull();
+    expect(pymovaTicketCode('ND1.1043708')).toBeNull();
+    // Y VTA-/DEV- siguen igual.
+    expect(pymovaTicketCode("vta'000123")).toBe('VTA-000123');
+    expect(pymovaTicketCode('DEV-000002')).toBe('DEV-000002');
+  });
+
   it('Stockagile: rechaza lo de PYMOVA, lo corto y lo que no es un ticket', () => {
     expect(stockagileTicketCode('VTA-000123')).toBeNull();
     expect(stockagileTicketCode('DEV-000002')).toBeNull();
@@ -89,6 +120,8 @@ describe('tickets de PYMOVA y de Stockagile', () => {
     expect(matchesStockagileNumber('VT2510383', '10383')).toBe(true);
     expect(matchesStockagileNumber('VT2510383', "VT'2510383")).toBe(true);
     expect(matchesStockagileNumber('VT2510383', 'VTA-000123')).toBe(false);
+    expect(matchesStockagileNumber('VT2510383', 'nd1.vt2510383')).toBe(true);
+    expect(matchesStockagileNumber('VT2510384', 'ND1.VT2510383')).toBe(false);
     expect(matchesStockagileNumber(null, '123')).toBe(false);
     expect(matchesStockagileNumber(null, '  ')).toBe(true);
   });
