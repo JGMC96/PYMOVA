@@ -17,17 +17,29 @@ export function pymovaTicketCode(input: string): string | null {
 }
 
 /**
+ * Lo escrito o escaneado, sin separadores ni minúsculas, y sin el prefijo de la caja que el
+ * código de barras de Stockagile pone delante («ND1.VT2510383» → «VT2510383»).
+ */
+function stockagileCleanCode(input: string): string {
+  const parts = input.trim().toUpperCase().split(/[^A-Z0-9]+/).filter(Boolean);
+  if (parts.length > 1 && /^ND\d*$/.test(parts[0])) parts.shift();
+  // Si el lector no escribe el separador, el prefijo va pegado a la «VT».
+  return parts.join('').replace(/^ND\d*(?=VT\d)/, '');
+}
+
+/**
  * Ticket de Stockagile: «VT2510383» (VT, año y número) o, en los más antiguos, solo cifras.
- * Sin separadores ni minúsculas, por si el lector cambia algún signo. Null si no lo parece.
+ * Admite el código de barras del ticket («ND1.VT2510383»), minúsculas y separadores
+ * cambiados por el teclado. Null si no lo parece.
  */
 export function stockagileTicketCode(input: string): string | null {
-  const code = input.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const code = stockagileCleanCode(input);
   return /^(VT\d{4,9}|\d{5,9})$/.test(code) ? code : null;
 }
 
 /** ¿Contiene el número de un ticket de Stockagile lo escrito (sin separadores ni mayúsculas)? */
 export function matchesStockagileNumber(number: string | null, query: string): boolean {
-  const q = query.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const q = stockagileCleanCode(query);
   if (!q) return true;
   return !!number && number.toUpperCase().includes(q);
 }
