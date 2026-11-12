@@ -2391,6 +2391,7 @@ export type Database = {
           attributes: Json
           barcode: string | null
           business_id: string
+          compare_at_price: number | null
           cost_price: number | null
           created_at: string
           created_by: string | null
@@ -2409,6 +2410,7 @@ export type Database = {
           attributes?: Json
           barcode?: string | null
           business_id: string
+          compare_at_price?: number | null
           cost_price?: number | null
           created_at?: string
           created_by?: string | null
@@ -2427,6 +2429,7 @@ export type Database = {
           attributes?: Json
           barcode?: string | null
           business_id?: string
+          compare_at_price?: number | null
           cost_price?: number | null
           created_at?: string
           created_by?: string | null
@@ -2464,6 +2467,7 @@ export type Database = {
           business_id: string
           category: string | null
           color: string | null
+          compare_at_price: number | null
           cost_price: number | null
           created_at: string
           created_by: string | null
@@ -2485,6 +2489,7 @@ export type Database = {
           business_id: string
           category?: string | null
           color?: string | null
+          compare_at_price?: number | null
           cost_price?: number | null
           created_at?: string
           created_by?: string | null
@@ -2506,6 +2511,7 @@ export type Database = {
           business_id?: string
           category?: string | null
           color?: string | null
+          compare_at_price?: number | null
           cost_price?: number | null
           created_at?: string
           created_by?: string | null
@@ -2806,6 +2812,7 @@ export type Database = {
       }
       sale_items: {
         Row: {
+          compare_at_price: number | null
           discount: number
           id: string
           product_id: string | null
@@ -2818,6 +2825,7 @@ export type Database = {
           variant_id: string | null
         }
         Insert: {
+          compare_at_price?: number | null
           discount?: number
           id?: string
           product_id?: string | null
@@ -2830,6 +2838,7 @@ export type Database = {
           variant_id?: string | null
         }
         Update: {
+          compare_at_price?: number | null
           discount?: number
           id?: string
           product_id?: string | null

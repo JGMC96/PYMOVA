@@ -428,6 +428,13 @@
       "when": 1794246327116,
       "tag": "0060_0060_devolver_stockagile",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1794500331110,
+      "tag": "0061_0061_precio_anterior",
+      "breakpoints": true
     }
   ]
 }
