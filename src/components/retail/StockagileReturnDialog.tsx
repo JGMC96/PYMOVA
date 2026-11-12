@@ -16,6 +16,8 @@ import {
   lineRefund, resolvedVariant, returnItems, suggestedRefundMethod,
   type PickedVariant, type ReturnableLine, type ReturnableTicket,
 } from '@/lib/stockagileReturn';
+import { useStoreProfile } from '@/hooks/useStoreProfile';
+import { REFUND_LABELS, refundMethods } from '@/lib/storeProfiles';
 import { round2 } from '@/lib/tax';
 
 const eur = (n: number) => `${n.toFixed(2)} €`;
@@ -101,6 +103,7 @@ export function StockagileReturnDialog({ saleId, onClose, onReturned }: Stockagi
   const [picks, setPicks] = useState<Record<string, PickedVariant>>({});
   const [confirmed, setConfirmed] = useState<Record<string, boolean>>({});
   const [reason, setReason] = useState('');
+  const { profile } = useStoreProfile();
   const [refundMethod, setRefundMethod] = useState('store_credit');
   const [restock, setRestock] = useState(true);
 
@@ -279,10 +282,9 @@ export function StockagileReturnDialog({ saleId, onClose, onReturned }: Stockagi
                 <Select value={refundMethod} onValueChange={setRefundMethod}>
                   <SelectTrigger id="stockagile-refund-method"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="store_credit">Vale de tienda</SelectItem>
-                    <SelectItem value="cash">Efectivo</SelectItem>
-                    <SelectItem value="card">Tarjeta</SelectItem>
-                    <SelectItem value="transfer">Transferencia</SelectItem>
+                    {refundMethods(profile, true).map((m) => (
+                      <SelectItem key={m} value={m}>{REFUND_LABELS[m] ?? m}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 {ticket.payment_methods && (
