@@ -7,10 +7,10 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { fetchAllRows } from './fetchAllRows';
 
 export const PRODUCT_COLUMNS =
-  'id, business_id, name, description, price, unit, category, is_active, stock_quantity, track_inventory, barcode, sku, color, external_id, external_source, created_by, created_at, updated_at';
+  'id, business_id, name, description, price, compare_at_price, unit, category, is_active, stock_quantity, track_inventory, barcode, sku, color, external_id, external_source, created_by, created_at, updated_at';
 
 export const VARIANT_COLUMNS =
-  'id, business_id, product_id, name, attributes, sku, barcode, price, stock_quantity, is_active, external_id, external_source, created_by, created_at, updated_at';
+  'id, business_id, product_id, name, attributes, sku, barcode, price, compare_at_price, stock_quantity, is_active, external_id, external_source, created_by, created_at, updated_at';
 
 export interface CatalogCosts {
   products: Map<string, number>;

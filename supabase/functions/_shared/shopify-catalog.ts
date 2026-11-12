@@ -11,6 +11,7 @@ import {
   levelRowsNeedingStock,
   productColor,
   variantsToDeactivate,
+  variantCompareAtPrice,
   variantUnitCost,
   type InventoryLevelRow,
   type LevelPairing,
@@ -89,6 +90,8 @@ export async function upsertShopifyProduct(
 
   const first = variants[0];
   const firstCost = first ? variantUnitCost(first as ShopifyVariantNode) : null;
+  // Precio anterior (0061): en el producto si no tiene tallas; si las tiene, en cada talla.
+  const productCompareAt = first && variants.length <= 1 ? variantCompareAtPrice(first as ShopifyVariantNode) : null;
   const color = productColor(node);
 
   const { data: existing } = await admin
@@ -104,6 +107,7 @@ export async function upsertShopifyProduct(
     name: node.title,
     description: node.description || null,
     price: Number(node.priceRangeV2.minVariantPrice.amount) || 0,
+    compare_at_price: productCompareAt,
     category: node.productType || null,
     sku: first?.sku ?? null,
     barcode: first?.barcode ?? null,
@@ -148,6 +152,7 @@ export async function upsertShopifyProduct(
         sku: v.sku,
         barcode: v.barcode,
         price: Number(v.price) || null,
+        compare_at_price: variantCompareAtPrice(v as ShopifyVariantNode),
         ...(variantCost !== null ? { cost_price: variantCost } : {}),
         is_active: true,
         external_id: v.id,

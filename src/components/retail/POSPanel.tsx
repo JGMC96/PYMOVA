@@ -23,6 +23,8 @@ import { useCashRegister } from '@/hooks/useCashRegister';
 import type { ProductVariant } from '@/hooks/useProductVariants';
 import { PAYMENT_LABELS } from '@/lib/storeProfiles';
 import { SaleTicketDialog, TicketData } from './SaleTicketDialog';
+import { PromoPrice } from './PromoPrice';
+import { catalogCompareAt, promoPct } from '@/lib/promoPrice';
 import { SellerBar } from './SellerBar';
 import { PosClientPicker } from './PosClientPicker';
 import { canEmailReceipt, type PosClient } from '@/hooks/usePosClients';
@@ -126,6 +128,7 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
     qty = 1
   ) => {
     const unitPrice = variant?.price ?? product.price;
+    const compareAt = catalogCompareAt(product, variant);
     const name = variant ? `${product.name} · ${variant.name}` : product.name;
     const key = variant?.id ?? product.id;
 
@@ -147,6 +150,7 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
           quantity: qty,
           unit_price: unitPrice,
           total: unitPrice * qty,
+          compare_at_price: compareAt,
         },
       ];
     });
@@ -427,9 +431,11 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
                         {variant && ` · Stock: ${variant.stock_quantity}`}
                       </p>
                     </div>
-                    <span className="text-sm font-semibold shrink-0">
-                      {(variant?.price ?? product.price).toFixed(2)} €
-                    </span>
+                    <PromoPrice
+                      className="text-sm font-semibold shrink-0"
+                      price={variant?.price ?? product.price}
+                      listPrice={catalogCompareAt(product, variant)}
+                    />
                   </button>
                 );
               })}
@@ -531,7 +537,21 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
                         <p className="text-sm font-medium truncate">{item.product_name}</p>
                         <p className="text-xs text-muted-foreground">
                           {item.unit_price.toFixed(2)} € c/u
+                          {item.compare_at_price ? (
+                            <>
+                              {' · antes '}
+                              <span className="line-through">{item.compare_at_price.toFixed(2)} €</span>
+                              <span className="ml-1 font-medium text-emerald-700 dark:text-emerald-400">
+                                −{promoPct(item.unit_price, item.compare_at_price)} %
+                              </span>
+                            </>
+                          ) : null}
                         </p>
+                        {item.compare_at_price && disc > 0 ? (
+                          <p className="text-xs text-amber-700 dark:text-amber-500">
+                            Ya rebajado un {promoPct(item.unit_price, item.compare_at_price)} %: este descuento se suma
+                          </p>
+                        ) : null}
                       </div>
 
                       <div className="flex items-center gap-1 justify-end">
@@ -666,7 +686,7 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
                       >
                         <p className="font-medium text-sm truncate">{product.name}</p>
                         <p className="text-primary font-semibold">
-                          {product.price.toFixed(2)} €
+                          <PromoPrice price={product.price} listPrice={catalogCompareAt(product)} showPct={false} />
                           {product.unit && (
                             <span className="text-xs text-muted-foreground"> / {product.unit}</span>
                           )}
@@ -968,7 +988,11 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
               >
                 <p className="font-medium text-sm">{variant.name}</p>
                 <p className="text-primary font-semibold text-sm">
-                  {(variant.price ?? variantProduct.price).toFixed(2)} €
+                  <PromoPrice
+                    price={variant.price ?? variantProduct.price}
+                    listPrice={catalogCompareAt(variantProduct, variant)}
+                    showPct={false}
+                  />
                 </p>
                 <Badge
                   variant={variant.stock_quantity > 0 ? 'secondary' : 'destructive'}

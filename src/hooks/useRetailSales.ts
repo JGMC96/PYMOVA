@@ -45,6 +45,8 @@ export interface CartItem {
   unit_price: number;
   discount?: number;
   total: number;
+  /** Precio anterior de una rebaja de Shopify, para enseñarlo. El servidor lo toma del catálogo. */
+  compare_at_price?: number | null;
 }
 
 export interface CreateSaleData {

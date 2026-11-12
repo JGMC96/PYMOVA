@@ -21,6 +21,8 @@ export interface ProductWithStock {
   sku: string | null;
   /** Color del producto en Shopify (custom.color), para las etiquetas. */
   color?: string | null;
+  /** Precio anterior de una rebaja de Shopify, si no tiene tallas (0061). */
+  compare_at_price?: number | null;
   variants: ProductVariant[];
 }
 
@@ -49,7 +51,7 @@ export function useInventory({
       fetchAllRows<Record<string, unknown>>((from, to) => {
         let q = supabase
           .from('products')
-          .select('id, name, description, price, unit, category, is_active, stock_quantity, track_inventory, barcode, sku, color' as '*')
+          .select('id, name, description, price, compare_at_price, unit, category, is_active, stock_quantity, track_inventory, barcode, sku, color' as '*')
           .eq('business_id', businessId);
         if (!inactiveWithStock) q = q.eq('is_active', true);
         return q
