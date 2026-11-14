@@ -23,6 +23,8 @@ import {
 import { useSaleReturns, type SaleDetailLine } from '@/hooks/useSaleReturns';
 import { useSellerSession } from '@/contexts/SellerSessionContext';
 import { useCashRegister } from '@/hooks/useCashRegister';
+import { useStoreProfile } from '@/hooks/useStoreProfile';
+import { REFUND_LABELS, refundMethods } from '@/lib/storeProfiles';
 import { round2 } from '@/lib/tax';
 
 /** Lo cobrado en la línea por las unidades a devolver (con su descuento), igual que create_sale_return. */
@@ -50,6 +52,7 @@ export function ReturnDialog({ open, onOpenChange, saleId, saleNumber, onComplet
   const [lines, setLines] = useState<SaleDetailLine[]>([]);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [reason, setReason] = useState('');
+  const { profile } = useStoreProfile();
   const [refundMethod, setRefundMethod] = useState('cash');
   const [restock, setRestock] = useState(true);
 
@@ -163,10 +166,9 @@ export function ReturnDialog({ open, onOpenChange, saleId, saleNumber, onComplet
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="cash">Efectivo</SelectItem>
-                    <SelectItem value="card">Tarjeta</SelectItem>
-                    <SelectItem value="transfer">Transferencia</SelectItem>
-                    <SelectItem value="store_credit">Vale de tienda</SelectItem>
+                    {refundMethods(profile).map((m) => (
+                      <SelectItem key={m} value={m}>{REFUND_LABELS[m] ?? m}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
