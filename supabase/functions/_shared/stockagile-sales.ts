@@ -35,6 +35,11 @@ export interface StockagilePosOrder {
     custom_price_incl_tax?: number | null;
     total?: string | number | null;
     deleted?: boolean;
+    /** Tarjeta regalo (vale): su código y qué tarjeta carga (emitido o vendido) o gasta. */
+    is_gift_card?: boolean | null;
+    gift_card_code?: string | null;
+    charged_gift_card?: number | null;
+    consumed_gift_card?: number | null;
   }[] | null;
 }
 
@@ -63,11 +68,22 @@ export interface StockagileSaleItemRow {
   quantity: number;
   unit_price: number | null;
   total: number | null;
+  /** Vales de Stockagile (0062). */
+  is_gift_card: boolean;
+  gift_card_code: string | null;
+  gift_card_charged_id: number | null;
+  gift_card_consumed_id: number | null;
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 const text = (s: string | null | undefined) => (s ?? '').trim() || null;
 const num = (v: unknown) => (v === null || v === undefined || v === '' || Number.isNaN(Number(v)) ? null : Number(v));
+
+/** Id de una tarjeta regalo de Stockagile: entero positivo, o null. */
+const giftCardId = (v: unknown) => {
+  const n = num(v);
+  return n !== null && Number.isInteger(n) && n > 0 ? n : null;
+};
 
 /** ¿Es un ticket de la tienda (no un pedido de la web)? */
 export function isStoreOrder(o: StockagilePosOrder): boolean {
@@ -123,6 +139,10 @@ export function mapPosOrder(
         quantity,
         unit_price: unit === null ? null : round2(unit),
         total: total === null ? null : round2(total),
+        is_gift_card: !!l.is_gift_card,
+        gift_card_code: text(l.gift_card_code),
+        gift_card_charged_id: giftCardId(l.charged_gift_card),
+        gift_card_consumed_id: giftCardId(l.consumed_gift_card),
       };
     });
   return { sale, items };
