@@ -19,6 +19,7 @@ import {
 import { useStoreProfile } from '@/hooks/useStoreProfile';
 import { REFUND_LABELS, refundMethods } from '@/lib/storeProfiles';
 import { round2 } from '@/lib/tax';
+import { cn } from '@/lib/utils';
 
 const eur = (n: number) => `${n.toFixed(2)} €`;
 
@@ -119,7 +120,10 @@ export function StockagileReturnDialog({ saleId, onClose, onReturned }: Stockagi
     void fetchReturnable(saleId).then((t) => {
       if (cancelled) return;
       setTicket(t);
-      setRefundMethod(suggestedRefundMethod(t?.payment_methods ?? null) ?? 'store_credit');
+      // Si se pagó con un vale de Stockagile, se propone devolver a vale.
+      setRefundMethod((t?.voucher_paid ?? 0) > 0
+        ? 'store_credit'
+        : suggestedRefundMethod(t?.payment_methods ?? null) ?? 'store_credit');
     });
     return () => {
       cancelled = true;
@@ -289,6 +293,22 @@ export function StockagileReturnDialog({ saleId, onClose, onReturned }: Stockagi
                 </Select>
                 {ticket.payment_methods && (
                   <p className="text-xs text-muted-foreground">Se pagó con: {ticket.payment_methods}</p>
+                )}
+                {(ticket.voucher_paid ?? 0) > 0 && (
+                  <p
+                    className={cn(
+                      'flex items-start gap-1.5 rounded-md p-2 text-xs',
+                      refundMethod === 'store_credit'
+                        ? 'bg-amber-500/10 text-amber-800 dark:text-amber-300'
+                        : 'bg-destructive/10 text-destructive',
+                    )}
+                  >
+                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    <span>
+                      Se pagó con un vale de Stockagile: devuelve a vale.
+                      {' '}({ticket.voucher_paid!.toFixed(2)} € con vale)
+                    </span>
+                  </p>
                 )}
               </div>
               <div className="flex items-end">

@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { supabase } from '@/integrations/supabase/client';
 import { pushShopifyStock, pushStockagileMoves } from '@/lib/shopifyStockPush';
-import { parseVariantSearch, type PickedVariant, type ReturnableTicket } from '@/lib/stockagileReturn';
+import { parseVariantSearch, stockagileVoucherPaid, type PickedVariant, type ReturnableTicket } from '@/lib/stockagileReturn';
 
 /** Devolución hecha en PYMOVA de un ticket de Stockagile. */
 export interface StockagileTicketReturn {
@@ -35,13 +35,20 @@ export function useStockagileReturn() {
         _business_id: activeBusinessId,
         _sale_id: saleId,
       } as never);
-      setIsLoading(false);
       if (error) {
+        setIsLoading(false);
         console.error('Error fetching returnable ticket:', error);
         toast.error(error.message || 'No se pudo cargar el ticket');
         return null;
       }
-      return data as unknown as ReturnableTicket;
+      // Vale gastado en el ticket: la RPC no lo devuelve (no es un artículo). Si falla, sin aviso.
+      const { data: negatives } = await supabase
+        .from('stockagile_sale_items')
+        .select('product_name, total')
+        .eq('sale_id', saleId)
+        .lt('total', 0);
+      setIsLoading(false);
+      return { ...(data as unknown as ReturnableTicket), voucher_paid: stockagileVoucherPaid(negatives ?? []) };
     },
     [activeBusinessId],
   );
