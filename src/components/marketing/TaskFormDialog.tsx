@@ -40,6 +40,8 @@ interface TaskFormDialogProps {
   onSubmit: (data: TaskFormData) => Promise<boolean>;
   onDelete?: (id: string) => Promise<boolean>;
   readOnly?: boolean;
+  /** Campaña ya elegida al crear la tarea desde su ficha. */
+  defaultCampaignId?: string | null;
 }
 
 const EMPTY: FormValues = { title: '', notes: '', assignee_id: '', due_on: '', campaign_id: '', post_id: '' };
@@ -85,6 +87,7 @@ export function TaskFormDialog({
   onSubmit,
   onDelete,
   readOnly = false,
+  defaultCampaignId = null,
 }: TaskFormDialogProps) {
   const isEditing = !!task;
   const form = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: EMPTY });
@@ -102,9 +105,9 @@ export function TaskFormDialog({
             campaign_id: task.campaign_id ?? '',
             post_id: task.post_id ?? '',
           }
-        : EMPTY,
+        : { ...EMPTY, campaign_id: defaultCampaignId ?? '' },
     );
-  }, [open, task, form]);
+  }, [open, task, defaultCampaignId, form]);
 
   const handleSubmit = async (v: FormValues) => {
     const ok = await onSubmit({
