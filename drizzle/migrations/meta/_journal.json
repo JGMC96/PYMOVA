@@ -435,6 +435,13 @@
       "when": 1794500331110,
       "tag": "0061_0061_precio_anterior",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1794657038213,
+      "tag": "0062_0062_vales_stockagile_copia",
+      "breakpoints": true
     }
   ]
 }
