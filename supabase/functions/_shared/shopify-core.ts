@@ -1006,6 +1006,34 @@ export function posSaleTransactions(
   ];
 }
 
+/** Nombre del IVA en los pedidos: el mismo que ponen los pedidos web, para que los informes los junten. */
+export const POS_TAX_TITLE = 'ES IVA';
+
+/**
+ * IVA de cada línea de una venta de tienda, en euros. Los precios lo llevan dentro: la cuota
+ * de cada línea es su total menos el total ÷ (1 + tipo). La suma tiene que ser el IVA de la
+ * venta en PYMOVA (que se calcula sobre el total): el céntimo de redondeo que sobre o falte va
+ * a la línea más grande. Las líneas a 0 € no llevan IVA.
+ */
+export function posLineTaxes(lineTotals: number[], ratePercent: number, saleTax: number | null): number[] {
+  const cents = lineTotals.map((t) => Math.max(Math.round(Number(t || 0) * 100), 0));
+  const rate = Number(ratePercent || 0) / 100;
+  if (rate <= 0) return cents.map(() => 0);
+  const taxes = cents.map((c) => c - Math.round(c / (1 + rate)));
+
+  const total = cents.reduce((a, b) => a + b, 0);
+  const target = saleTax == null
+    ? total - Math.round(total / (1 + rate))
+    : Math.round(Number(saleTax) * 100);
+  const diff = target - taxes.reduce((a, b) => a + b, 0);
+  // Solo el redondeo (un céntimo por línea como mucho); si es más, la venta no cuadra y se deja el cálculo.
+  if (diff !== 0 && Math.abs(diff) <= cents.length && total > 0) {
+    const biggest = cents.indexOf(Math.max(...cents));
+    taxes[biggest] = Math.min(Math.max(taxes[biggest] + diff, 0), cents[biggest]);
+  }
+  return taxes.map((c) => c / 100);
+}
+
 export interface ShopifyOrderTransaction {
   id: string;
   kind: string;

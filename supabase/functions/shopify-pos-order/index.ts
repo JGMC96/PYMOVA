@@ -12,7 +12,7 @@ import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { getShopDomain, serviceClient, shopifyGraphql, ShopifyError } from '../_shared/shopify-client.ts';
 import { storeBusinessIds, storeConnection } from '../_shared/shopify-connection.ts';
 import {
-  posOrderAttributes, posOrderSearchQuery, posSaleTransactions, posTicketTags, VOUCHER_GATEWAY,
+  posLineTaxes, posOrderAttributes, posOrderSearchQuery, posSaleTransactions, posTicketTags, POS_TAX_TITLE, VOUCHER_GATEWAY,
 } from '../_shared/shopify-core.ts';
 import { consumeTicket, hasTicket } from '../_shared/scheduled-ticket.ts';
 import { loadLevelsFor } from '../_shared/shopify-levels.ts';
@@ -58,6 +58,7 @@ interface SaleRow {
   id: string;
   sale_number: string;
   total: number;
+  tax: number | null;
   tip: number | null;
   voucher_amount: number | null;
   payment_method: string | null;
@@ -110,7 +111,7 @@ async function processBusiness(admin: SupabaseClient, businessId: string): Promi
 
   const { data: salesData, error: salesError } = await admin
     .from('sales')
-    .select('id, sale_number, total, tip, voucher_amount, payment_method, notes, created_at, seller_employee_id, shopify_order_attempts, sale_items(id, product_id, variant_id, product_name, quantity, total)')
+    .select('id, sale_number, total, tax, tip, voucher_amount, payment_method, notes, created_at, seller_employee_id, shopify_order_attempts, sale_items(id, product_id, variant_id, product_name, quantity, total)')
     .in('id', ids)
     .order('created_at', { ascending: true });
   if (salesError) throw salesError;
@@ -156,6 +157,14 @@ async function processBusiness(admin: SupabaseClient, businessId: string): Promi
   const currency = shop.shop.currencyCode;
   const money = (n: number) => ({ shopMoney: { amount: Number(n).toFixed(2), currencyCode: currency } });
 
+  // IVA: orderCreate no lo calcula, hay que mandarlo en cada línea. El mismo tipo que usa el TPV.
+  const { data: settings } = await admin
+    .from('business_settings')
+    .select('tax_rate')
+    .eq('business_id', businessId)
+    .maybeSingle();
+  const taxRate = Number((settings as { tax_rate?: number | null } | null)?.tax_rate ?? 21);
+
   // Nombre de quien atendió cada venta (dependiente con o sin cuenta).
   const sellerNames = new Map<string, string>();
   for (const id of new Set(sales.map((s) => s.seller_employee_id).filter((v): v is string => !!v))) {
@@ -181,15 +190,17 @@ async function processBusiness(admin: SupabaseClient, businessId: string): Promi
         continue;
       }
 
-      const lineItems = sale.sale_items
-        .filter((i) => i.quantity > 0)
-        .map((i) => {
-          const variant = (i.variant_id && byVariant.get(i.variant_id)) || (i.product_id && byProduct.get(i.product_id));
-          const unit = Number(i.total) / i.quantity;
-          return variant
-            ? { variantId: toGid(variant), quantity: i.quantity, priceSet: money(unit) }
-            : { title: i.product_name, quantity: i.quantity, priceSet: money(unit), requiresShipping: false };
-        });
+      const lines = sale.sale_items.filter((i) => i.quantity > 0);
+      // El IVA va dentro del precio (taxesIncluded): el total del pedido no cambia.
+      const taxes = posLineTaxes(lines.map((i) => Number(i.total)), taxRate, sale.tax);
+      const lineItems = lines.map((i, n) => {
+        const variant = (i.variant_id && byVariant.get(i.variant_id)) || (i.product_id && byProduct.get(i.product_id));
+        const unit = Number(i.total) / i.quantity;
+        const taxLines = taxes[n] > 0 ? [{ title: POS_TAX_TITLE, rate: taxRate / 100, priceSet: money(taxes[n]) }] : [];
+        return variant
+          ? { variantId: toGid(variant), quantity: i.quantity, priceSet: money(unit), taxLines }
+          : { title: i.product_name, quantity: i.quantity, priceSet: money(unit), requiresShipping: false, taxLines };
+      });
       if (lineItems.length === 0) throw new Error('La venta no tiene artículos');
 
       const gateway = PAYMENT_LABEL[sale.payment_method ?? ''] ?? sale.payment_method ?? 'Tienda';
