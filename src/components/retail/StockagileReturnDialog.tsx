@@ -16,7 +16,10 @@ import {
   lineRefund, resolvedVariant, returnItems, suggestedRefundMethod,
   type PickedVariant, type ReturnableLine, type ReturnableTicket,
 } from '@/lib/stockagileReturn';
+import { useStoreProfile } from '@/hooks/useStoreProfile';
+import { REFUND_LABELS, refundMethods } from '@/lib/storeProfiles';
 import { round2 } from '@/lib/tax';
+import { cn } from '@/lib/utils';
 
 const eur = (n: number) => `${n.toFixed(2)} €`;
 
@@ -101,6 +104,7 @@ export function StockagileReturnDialog({ saleId, onClose, onReturned }: Stockagi
   const [picks, setPicks] = useState<Record<string, PickedVariant>>({});
   const [confirmed, setConfirmed] = useState<Record<string, boolean>>({});
   const [reason, setReason] = useState('');
+  const { profile } = useStoreProfile();
   const [refundMethod, setRefundMethod] = useState('store_credit');
   const [restock, setRestock] = useState(true);
 
@@ -116,7 +120,10 @@ export function StockagileReturnDialog({ saleId, onClose, onReturned }: Stockagi
     void fetchReturnable(saleId).then((t) => {
       if (cancelled) return;
       setTicket(t);
-      setRefundMethod(suggestedRefundMethod(t?.payment_methods ?? null) ?? 'store_credit');
+      // Si se pagó con un vale de Stockagile, se propone devolver a vale.
+      setRefundMethod((t?.voucher_paid ?? 0) > 0
+        ? 'store_credit'
+        : suggestedRefundMethod(t?.payment_methods ?? null) ?? 'store_credit');
     });
     return () => {
       cancelled = true;
@@ -279,14 +286,29 @@ export function StockagileReturnDialog({ saleId, onClose, onReturned }: Stockagi
                 <Select value={refundMethod} onValueChange={setRefundMethod}>
                   <SelectTrigger id="stockagile-refund-method"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="store_credit">Vale de tienda</SelectItem>
-                    <SelectItem value="cash">Efectivo</SelectItem>
-                    <SelectItem value="card">Tarjeta</SelectItem>
-                    <SelectItem value="transfer">Transferencia</SelectItem>
+                    {refundMethods(profile, true).map((m) => (
+                      <SelectItem key={m} value={m}>{REFUND_LABELS[m] ?? m}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 {ticket.payment_methods && (
                   <p className="text-xs text-muted-foreground">Se pagó con: {ticket.payment_methods}</p>
+                )}
+                {(ticket.voucher_paid ?? 0) > 0 && (
+                  <p
+                    className={cn(
+                      'flex items-start gap-1.5 rounded-md p-2 text-xs',
+                      refundMethod === 'store_credit'
+                        ? 'bg-amber-500/10 text-amber-800 dark:text-amber-300'
+                        : 'bg-destructive/10 text-destructive',
+                    )}
+                  >
+                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    <span>
+                      Se pagó con un vale de Stockagile: devuelve a vale.
+                      {' '}({ticket.voucher_paid!.toFixed(2)} € con vale)
+                    </span>
+                  </p>
                 )}
               </div>
               <div className="flex items-end">
