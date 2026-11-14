@@ -21,6 +21,8 @@ const ticket = (over: Partial<StockagilePosOrder> = {}): StockagilePosOrder => (
   ...over,
 });
 
+const sinVale = { is_gift_card: false, gift_card_code: null, gift_card_charged_id: null, gift_card_consumed_id: null };
+
 describe('ventas de Stockagile', () => {
   it('solo los tickets de la tienda (no los pedidos web)', () => {
     expect(isStoreOrder(ticket())).toBe(true);
@@ -42,8 +44,8 @@ describe('ventas de Stockagile', () => {
       customer_email: 'ana@ejemplo.test', customer_phone: '600111222', deleted: false,
     });
     expect(items).toEqual([
-      { product_name: 'Zueco Bolonia Piel Negro - 39', size: '39', color: 'Negro', barcode: '9600000000017', quantity: 1, unit_price: 149, total: 149 },
-      { product_name: 'Calcetines', size: null, color: null, barcode: null, quantity: 1, unit_price: 6, total: 6 },
+      { product_name: 'Zueco Bolonia Piel Negro - 39', size: '39', color: 'Negro', barcode: '9600000000017', quantity: 1, unit_price: 149, total: 149, ...sinVale },
+      { product_name: 'Calcetines', size: null, color: null, barcode: null, quantity: 1, unit_price: 6, total: 6, ...sinVale },
     ]);
   });
 
@@ -52,5 +54,30 @@ describe('ventas de Stockagile', () => {
     expect(sale).toMatchObject({ is_return: true, return_of_external_id: 4000, total: -6, customer_email: null, payment_methods: 'Efectivo' });
     const anulada = mapPosOrder('negocio', ticket({ is_negative: true, negative_of: 4100, total: -155 })).sale;
     expect(anulada).toMatchObject({ is_return: true, return_of_external_id: 4100 });
+  });
+
+  it('el vale emitido en una devolución guarda su código y la tarjeta que carga (0062)', () => {
+    const { items } = mapPosOrder('negocio', ticket({
+      is_devolution: true, devolution_of: 4000, total: 0,
+      pos_order_product_variants: [
+        { product_name: 'Zueco Bolonia Piel Negro', product_variant_size_name: '39', barcode: '9600000000017', amount: -1, total: '-149.00' },
+        { product_name: 'Vale', amount: 1, total: '149.00', is_gift_card: true, gift_card_code: ' TG-00123 ', charged_gift_card: 77, consumed_gift_card: null },
+      ],
+    }));
+    expect(items[1]).toMatchObject({
+      product_name: 'Vale', total: 149, is_gift_card: true, gift_card_code: 'TG-00123', gift_card_charged_id: 77, gift_card_consumed_id: null,
+    });
+    expect(items[0]).toMatchObject(sinVale);
+  });
+
+  it('el vale gastado en una venta guarda la tarjeta que gasta; ids raros, a null', () => {
+    const { items } = mapPosOrder('negocio', ticket({
+      pos_order_product_variants: [
+        { product_name: 'Vale', amount: 1, total: '-50.00', is_gift_card: true, gift_card_code: 'TG-00123', consumed_gift_card: 77 },
+        { product_name: 'Vale', amount: 1, total: '-5.00', is_gift_card: true, gift_card_code: '', charged_gift_card: 0, consumed_gift_card: 'abc' as never },
+      ],
+    }));
+    expect(items[0]).toMatchObject({ total: -50, gift_card_code: 'TG-00123', gift_card_charged_id: null, gift_card_consumed_id: 77 });
+    expect(items[1]).toMatchObject({ gift_card_code: null, gift_card_charged_id: null, gift_card_consumed_id: null });
   });
 });
