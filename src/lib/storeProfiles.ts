@@ -20,7 +20,7 @@ export interface StoreProfilePreset {
   units: string[];
   /** Atributos de variante típicos (talla, color, tamaño...) */
   variantAttributes: { key: string; label: string; suggestions: string[] }[];
-  /** Métodos de pago destacados en el POS */
+  /** Métodos de pago destacados en el POS (sin transferencia: en tienda no se cobra así) */
   paymentMethods: string[];
   /** Mostrar campo de propina en el cobro */
   tipEnabled: boolean;
@@ -37,7 +37,7 @@ export const STORE_PROFILES: Record<StoreProfile, StoreProfilePreset> = {
     variantAttributes: [
       { key: 'variante', label: 'Variante', suggestions: [] },
     ],
-    paymentMethods: ['cash', 'card', 'transfer'],
+    paymentMethods: ['cash', 'card'],
     tipEnabled: false,
   },
   shoe_store: {
@@ -59,7 +59,7 @@ export const STORE_PROFILES: Record<StoreProfile, StoreProfilePreset> = {
         suggestions: ['Negro', 'Blanco', 'Marrón', 'Azul', 'Beige'],
       },
     ],
-    paymentMethods: ['cash', 'card', 'transfer'],
+    paymentMethods: ['cash', 'card'],
     tipEnabled: false,
   },
   bar: {
@@ -86,7 +86,7 @@ export const STORE_PROFILES: Record<StoreProfile, StoreProfilePreset> = {
       { key: 'tamano', label: 'Tamaño', suggestions: ['Pequeño', 'Mediano', 'Grande', 'Premium'] },
       { key: 'color', label: 'Color', suggestions: ['Rojo', 'Blanco', 'Rosa', 'Amarillo', 'Mixto'] },
     ],
-    paymentMethods: ['cash', 'card', 'transfer'],
+    paymentMethods: ['cash', 'card'],
     tipEnabled: false,
   },
   bakery: {
@@ -113,7 +113,7 @@ export const STORE_PROFILES: Record<StoreProfile, StoreProfilePreset> = {
       { key: 'talla', label: 'Talla', suggestions: ['XS', 'S', 'M', 'L', 'XL', 'XXL'] },
       { key: 'color', label: 'Color', suggestions: ['Negro', 'Blanco', 'Azul', 'Verde', 'Rojo'] },
     ],
-    paymentMethods: ['cash', 'card', 'transfer'],
+    paymentMethods: ['cash', 'card'],
     tipEnabled: false,
   },
 };
@@ -131,3 +131,15 @@ export const PAYMENT_LABELS: Record<string, string> = {
   store_credit: 'Vale',
   other: 'Otro',
 };
+
+/**
+ * Formas de reembolso de las devoluciones de tienda (tickets VTA y de Stockagile): las mismas
+ * con las que se cobra en el TPV, más el vale. `voucherFirst` pone el vale el primero.
+ */
+export function refundMethods(profile: Pick<StoreProfilePreset, 'paymentMethods'>, voucherFirst = false): string[] {
+  const methods = profile.paymentMethods.filter((m) => m !== 'store_credit');
+  return voucherFirst ? ['store_credit', ...methods] : [...methods, 'store_credit'];
+}
+
+/** Nombre de cada forma de reembolso en las devoluciones. */
+export const REFUND_LABELS: Record<string, string> = { ...PAYMENT_LABELS, store_credit: 'Vale de tienda' };

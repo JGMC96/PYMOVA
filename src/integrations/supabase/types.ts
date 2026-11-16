@@ -3686,7 +3686,11 @@ export type Database = {
         Row: {
           barcode: string | null
           color: string | null
+          gift_card_charged_id: number | null
+          gift_card_code: string | null
+          gift_card_consumed_id: number | null
           id: string
+          is_gift_card: boolean
           product_name: string
           quantity: number
           sale_id: string
@@ -3698,7 +3702,11 @@ export type Database = {
         Insert: {
           barcode?: string | null
           color?: string | null
+          gift_card_charged_id?: number | null
+          gift_card_code?: string | null
+          gift_card_consumed_id?: number | null
           id?: string
+          is_gift_card?: boolean
           product_name: string
           quantity?: number
           sale_id: string
@@ -3710,7 +3718,11 @@ export type Database = {
         Update: {
           barcode?: string | null
           color?: string | null
+          gift_card_charged_id?: number | null
+          gift_card_code?: string | null
+          gift_card_consumed_id?: number | null
           id?: string
+          is_gift_card?: boolean
           product_name?: string
           quantity?: number
           sale_id?: string

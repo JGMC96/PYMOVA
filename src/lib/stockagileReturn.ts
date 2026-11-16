@@ -30,6 +30,19 @@ export interface ReturnableTicket {
   blocked: string | null;
   over_returned: boolean;
   lines: ReturnableLine[];
+  /** Lo que se pagó con un vale de Stockagile (líneas «Vale» negativas); 0 si nada. */
+  voucher_paid?: number;
+}
+
+/**
+ * Lo pagado con vales de Stockagile en un ticket: en la copia, el vale gastado es una línea
+ * «Vale» en negativo. Lo pagado así se devuelve a vale, no en dinero.
+ */
+export function stockagileVoucherPaid(items: { product_name: string | null; total: number | string | null }[]): number {
+  return round2(items.reduce((sum, i) => {
+    const total = Number(i.total);
+    return /^\s*vale\b/i.test(i.product_name ?? '') && Number.isFinite(total) && total < 0 ? sum - total : sum;
+  }, 0));
 }
 
 /** Talla elegida a mano para una línea (escaneando el par o buscándolo). */

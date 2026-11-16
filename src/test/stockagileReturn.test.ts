@@ -1,7 +1,26 @@
 import { describe, expect, it } from 'vitest';
 import {
-  canOfferReturn, lineRefund, parseVariantSearch, resolvedVariant, returnItems, suggestedRefundMethod, type ReturnableLine,
+  canOfferReturn, lineRefund, parseVariantSearch, resolvedVariant, returnItems, stockagileVoucherPaid, suggestedRefundMethod,
+  type ReturnableLine,
 } from '@/lib/stockagileReturn';
+
+describe('pagado con un vale de Stockagile', () => {
+  it('suma las líneas «Vale» en negativo', () => {
+    expect(stockagileVoucherPaid([
+      { product_name: 'Botín Cannes - 37', total: 179 },
+      { product_name: 'Vale', total: '-120.50' },
+      { product_name: 'vale', total: -10 },
+    ])).toBe(130.5);
+  });
+
+  it('sin vale gastado, 0: ni un vale vendido ni otras líneas en negativo cuentan', () => {
+    expect(stockagileVoucherPaid([{ product_name: 'Vale', total: 50 }])).toBe(0);
+    expect(stockagileVoucherPaid([{ product_name: 'Zueco Valencia - 38', total: -96 }])).toBe(0);
+    expect(stockagileVoucherPaid([{ product_name: 'Valeria - 38', total: -96 }])).toBe(0);
+    expect(stockagileVoucherPaid([{ product_name: null, total: null }])).toBe(0);
+    expect(stockagileVoucherPaid([])).toBe(0);
+  });
+});
 
 const line = (over: Partial<ReturnableLine> = {}): ReturnableLine => ({
   line_key: 'b:1',
