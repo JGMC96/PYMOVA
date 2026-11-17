@@ -47,6 +47,8 @@ interface GoalFormDialogProps {
   onSubmit: (data: GoalFormData) => Promise<boolean>;
   onDelete?: (id: string) => Promise<boolean>;
   readOnly?: boolean;
+  /** Campaña ya elegida al crear el objetivo desde su ficha (pone también sus fechas). */
+  defaultCampaign?: MarketingCampaign | null;
 }
 
 const EMPTY: FormValues = {
@@ -68,6 +70,7 @@ export function GoalFormDialog({
   onSubmit,
   onDelete,
   readOnly = false,
+  defaultCampaign = null,
 }: GoalFormDialogProps) {
   const isEditing = !!goal;
   const form = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: EMPTY });
@@ -87,9 +90,16 @@ export function GoalFormDialog({
             campaign_id: goal.campaign_id ?? '',
             notes: goal.notes ?? '',
           }
-        : EMPTY,
+        : defaultCampaign
+          ? {
+              ...EMPTY,
+              campaign_id: defaultCampaign.id,
+              starts_on: defaultCampaign.starts_on,
+              ends_on: defaultCampaign.ends_on,
+            }
+          : EMPTY,
     );
-  }, [open, goal, form]);
+  }, [open, goal, defaultCampaign, form]);
 
   // Al elegir campaña, sus fechas rellenan las del objetivo si están vacías.
   const pickCampaign = (id: string) => {
