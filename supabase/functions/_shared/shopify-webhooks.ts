@@ -162,8 +162,9 @@ export async function processEvent(
   }
 
   // Catálogo: los productos activos de Shopify entran solos; Shopify manda en los que
-  // ya están (nombre, precio, tallas). Borradores y archivados no entran, y si ya
-  // estaban se desactivan. Nunca se borra nada: tienen ventas e historial.
+  // ya están (nombre, precio, tallas), también si pasan a borrador o archivado: se quedan
+  // inactivos pero con el precio al día. Los borradores nuevos no entran, y los borrados
+  // en Shopify se desactivan. Nunca se borra nada: tienen ventas e historial.
   if (topic === 'products/create' || topic === 'products/update' || topic === 'products/delete') {
     return await processProductEvent(admin, event.business_id, topic, payload, ctx);
   }
@@ -241,12 +242,7 @@ async function processProductEvent(
         .eq('id', local!.id);
       if (error) throw error;
     }
-    return {
-      status: 'processed',
-      message: node
-        ? `Producto desactivado (no está activo en Shopify): ${local!.name}`
-        : `Producto desactivado (borrado en Shopify): ${local!.name}`,
-    };
+    return { status: 'processed', message: `Producto desactivado (borrado en Shopify): ${local!.name}` };
   }
 
   const result = await upsertShopifyProduct(admin, businessId, node!, {
@@ -255,9 +251,10 @@ async function processProductEvent(
     deactivateMissingVariants: true,
   });
   const issues = result.issues.map((i) => i.message).join('; ');
+  const inactive = node!.status !== 'ACTIVE' ? ' (inactivo en Shopify)' : '';
   return {
     status: 'processed',
-    message: `${result.created ? 'Producto importado' : 'Producto actualizado'}: ${node!.title}${issues ? ` (${issues})` : ''}`,
+    message: `${result.created ? 'Producto importado' : 'Producto actualizado'}${inactive}: ${node!.title}${issues ? ` (${issues})` : ''}`,
   };
 }
 

@@ -886,12 +886,15 @@ export type CatalogAction = 'import' | 'update' | 'deactivate' | 'skip';
 
 /**
  * Qué hacer con un producto de Shopify según su estado (null = ya no existe en
- * Shopify) y si ya está en Pymova. Solo entran los activos; un borrador o archivado
- * que ya estaba se desactiva, y uno que no estaba se ignora hasta que se active.
+ * Shopify) y si ya está en Pymova. Solo entran los activos; uno en borrador o archivado
+ * que no estaba se ignora hasta que se active. Si ya estaba, se actualiza igual (queda
+ * inactivo, pero con el precio de Shopify: el TPV vende los inactivos con stock, 0053).
+ * Uno borrado en Shopify se desactiva.
  */
 export function catalogAction(status: string | null, existsLocally: boolean): CatalogAction {
   if (status === 'ACTIVE') return existsLocally ? 'update' : 'import';
-  return existsLocally ? 'deactivate' : 'skip';
+  if (!existsLocally) return 'skip';
+  return status ? 'update' : 'deactivate';
 }
 
 /** Variantes locales (por su id de Shopify) que ya no existen en el producto de Shopify. */

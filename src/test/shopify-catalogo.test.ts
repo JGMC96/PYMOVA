@@ -31,12 +31,18 @@ describe('catalogAction', () => {
     expect(catalogAction('ACTIVE', true)).toBe('update');
   });
 
-  it('borradores, archivados y borrados: se desactivan si estaban, si no se ignoran', () => {
+  it('borradores y archivados: no entran si no estaban', () => {
     expect(catalogAction('DRAFT', false)).toBe('skip');
     expect(catalogAction('ARCHIVED', false)).toBe('skip');
     expect(catalogAction(null, false)).toBe('skip');
-    expect(catalogAction('DRAFT', true)).toBe('deactivate');
-    expect(catalogAction('ARCHIVED', true)).toBe('deactivate');
+  });
+
+  it('un borrador o archivado que ya estaba se actualiza (precio incluido) y queda inactivo', () => {
+    expect(catalogAction('DRAFT', true)).toBe('update');
+    expect(catalogAction('ARCHIVED', true)).toBe('update');
+  });
+
+  it('un producto borrado en Shopify se desactiva', () => {
     expect(catalogAction(null, true)).toBe('deactivate');
   });
 });
