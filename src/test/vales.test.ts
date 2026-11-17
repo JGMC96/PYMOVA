@@ -1,5 +1,23 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeVoucherCode, parseVoucherAmount, voucherApplied, voucherProblem } from '@/lib/vales';
+import { normalizeVoucherCode, parseVoucherAmount, stockagileVoucherKey, voucherApplied, voucherProblem } from '@/lib/vales';
+
+describe('vales de Stockagile (0063)', () => {
+  it('el código «nd2.» + número de la devolución, con cualquier separador o mayúsculas', () => {
+    expect(stockagileVoucherKey('nd2.VT123456')).toBe('VT123456');
+    expect(stockagileVoucherKey(' ND2-vt123456 ')).toBe('VT123456');
+    expect(stockagileVoucherKey('ND2VT123456')).toBe('VT123456');
+    expect(stockagileVoucherKey('VT123456')).toBe('VT123456');
+    expect(stockagileVoucherKey('123456')).toBe('VT123456');
+  });
+
+  it('lo demás no es un vale de Stockagile', () => {
+    expect(stockagileVoucherKey('VALE-ABCD2345')).toBeNull();
+    expect(stockagileVoucherKey('VT12')).toBeNull();
+    expect(stockagileVoucherKey('ND2.')).toBeNull();
+    expect(stockagileVoucherKey('')).toBeNull();
+    expect(stockagileVoucherKey('9600000000017')).toBeNull();
+  });
+});
 
 describe('vales de tienda en el TPV', () => {
   it('normaliza el código escaneado o escrito', () => {

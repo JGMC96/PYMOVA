@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { AlertTriangle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { supabase } from '@/integrations/supabase/client';
 import { useBusiness } from '@/contexts/BusinessContext';
 import {
-  normalizeVoucherCode, parseVoucherAmount, voucherApplied, voucherProblem, type StoreVoucher,
+  normalizeVoucherCode, parseVoucherAmount, stockagileVoucherKey, voucherApplied, voucherProblem, type StoreVoucher,
 } from '@/lib/vales';
 
 export interface AppliedVoucher {
@@ -16,7 +16,10 @@ export interface AppliedVoucher {
   balance: number;
 }
 
-/** Pagar con vale de tienda: se escanea o escribe el código, se ve el saldo y se elige cuánto usar. */
+/**
+ * Pagar con vale de tienda: se escanea o escribe el código, se ve el saldo y se elige cuánto usar.
+ * Un vale de Stockagile («nd2.VT…») se convierte la primera vez en vale de PYMOVA (0063).
+ */
 export function VoucherDialog({
   open,
   onOpenChange,
@@ -52,11 +55,13 @@ export function VoucherDialog({
     setSearching(true);
     setError(null);
     setVoucher(null);
-    // Función nueva de la 0039: `as never` hasta que se regenere types.ts.
-    const { data, error: rpcError } = await supabase.rpc('get_store_voucher' as never, {
-      _business_id: activeBusiness.id,
-      _code: wanted,
-    } as never);
+    // Los de PYMOVA empiezan por «VALE-»; un código de Stockagile se convierte (0063).
+    const fromStockagile = !wanted.startsWith('VALE') && stockagileVoucherKey(wanted) !== null;
+    // Funciones de la 0039 y la 0063: `as never` hasta que se regenere types.ts.
+    const { data, error: rpcError } = await supabase.rpc(
+      (fromStockagile ? 'redeem_stockagile_voucher' : 'get_store_voucher') as never,
+      { _business_id: activeBusiness.id, _code: wanted } as never,
+    );
     setSearching(false);
     if (rpcError) {
       setError(rpcError.message || 'No se pudo consultar el vale');
@@ -100,7 +105,7 @@ export function VoucherDialog({
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle>Pagar con vale</DialogTitle>
-          <DialogDescription>Escanea o escribe el código del vale de tienda.</DialogDescription>
+          <DialogDescription>Escanea o escribe el código del vale de tienda (también los de Stockagile).</DialogDescription>
         </DialogHeader>
         <form onSubmit={search} className="flex gap-2">
           <Input
@@ -125,6 +130,19 @@ export function VoucherDialog({
                 <span className="text-muted-foreground">Válido hasta</span>
                 <span>{new Date(voucher.expires_at).toLocaleDateString('es-ES')}</span>
               </div>
+            )}
+            {voucher.stockagile_ticket && (
+              <p className="pt-1 text-xs text-muted-foreground">
+                Vale de Stockagile: devolución {voucher.stockagile_ticket}
+                {voucher.issued_at ? ` del ${new Date(voucher.issued_at).toLocaleDateString('es-ES')}` : ''}
+                {voucher.converted_now ? '. Ya es un vale de PYMOVA: no lo cobres en Stockagile.' : '.'}
+              </p>
+            )}
+            {voucher.conflict_at && (
+              <p className="flex items-start gap-1.5 rounded-md bg-destructive/10 p-2 text-xs text-destructive">
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                Ojo: este vale también se ha gastado en Stockagile después de pasarlo a PYMOVA. Revísalo antes de cobrar.
+              </p>
             )}
           </div>
         )}
