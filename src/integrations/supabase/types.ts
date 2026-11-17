@@ -3977,6 +3977,8 @@ export type Database = {
           origin: string
           source_return_id: string | null
           status: string
+          stockagile_conflict_at: string | null
+          stockagile_gift_card_id: number | null
           updated_at: string
           void_reason: string | null
           voided_at: string | null
@@ -3996,6 +3998,8 @@ export type Database = {
           origin?: string
           source_return_id?: string | null
           status?: string
+          stockagile_conflict_at?: string | null
+          stockagile_gift_card_id?: number | null
           updated_at?: string
           void_reason?: string | null
           voided_at?: string | null
@@ -4015,6 +4019,8 @@ export type Database = {
           origin?: string
           source_return_id?: string | null
           status?: string
+          stockagile_conflict_at?: string | null
+          stockagile_gift_card_id?: number | null
           updated_at?: string
           void_reason?: string | null
           voided_at?: string | null
@@ -5084,6 +5090,22 @@ export type Database = {
         }
         Returns: undefined
       }
+      redeem_stockagile_voucher: {
+        Args: { _business_id: string; _code: string }
+        Returns: {
+          balance: number
+          code: string
+          conflict_at: string
+          converted_now: boolean
+          expired: boolean
+          expires_at: string
+          id: string
+          initial_amount: number
+          issued_at: string
+          status: string
+          stockagile_ticket: string
+        }[]
+      }
       register_expected_cash: { Args: { _session_id: string }; Returns: number }
       remove_member: {
         Args: { _business_id: string; _user_id: string }
@@ -5274,6 +5296,7 @@ export type Database = {
           variant_name: string
         }[]
       }
+      stockagile_voucher_key: { Args: { _code: string }; Returns: string }
       transfer_ownership: {
         Args: {
           _business_id: string
