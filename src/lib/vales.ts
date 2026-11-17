@@ -11,11 +11,27 @@ export interface StoreVoucher {
   status: 'active' | 'used' | 'void' | string;
   expires_at: string | null;
   expired: boolean;
+  /** Vale de Stockagile convertido (0063): devolución que lo emitió, cuándo y si se gastó allí después. */
+  stockagile_ticket?: string | null;
+  issued_at?: string | null;
+  conflict_at?: string | null;
+  converted_now?: boolean;
 }
 
 /** Código tal como se guarda: sin espacios y en mayúsculas (el escáner o el teclado pueden variar). */
 export function normalizeVoucherCode(code: string): string {
   return code.trim().toUpperCase();
+}
+
+/**
+ * Clave de un vale de Stockagile (0063), igual que stockagile_voucher_key en la base de datos:
+ * «nd2.VT123456», «ND2-VT123456» o «VT123456» → «VT123456». null si no lo parece. El código de
+ * Stockagile es «nd2.» + el número del ticket de devolución que emitió el vale.
+ */
+export function stockagileVoucherKey(code: string): string | null {
+  let key = code.toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/^ND\d*(?=VT\d)/, '');
+  if (/^\d{5,9}$/.test(key)) key = `VT${key}`;
+  return /^VT\d{4,9}$/.test(key) ? key : null;
 }
 
 /** Por qué no se puede usar un vale, o null si se puede. */
