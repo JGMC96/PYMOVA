@@ -1,19 +1,19 @@
-// Apartado «Informes»: solo para el propietario. La seguridad real está en cada RPC
-// (`has_business_role(..., 'owner')`); aquí solo se oculta la pantalla.
+// Apartado «Informes»: propietario y quien tenga el permiso «Ver ventas». La seguridad real
+// está en cada RPC (`can_see_sales`); aquí solo se oculta la pantalla.
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
-import { RequireRole } from '@/components/auth/RequireRole';
+import { RequireSalesAccess } from '@/components/auth/RequireSalesAccess';
 import { SalesReportPanel } from '@/components/informes/SalesReportPanel';
 import { INFORME_TABS } from '@/lib/informes';
 import { cn } from '@/lib/utils';
 
 export default function Informes() {
   return (
-    <RequireRole minRole="owner">
+    <RequireSalesAccess>
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-display font-bold text-foreground">Informes</h1>
           <p className="text-muted-foreground mt-1">
-            Cifras de la tienda en solo lectura, con los tickets de Stockagile y la comparación con el año anterior.
+            Ventas de la tienda y de la web en solo lectura, comparadas con el año anterior.
           </p>
         </div>
         <nav className="flex gap-1 border-b" aria-label="Informes">
@@ -37,6 +37,6 @@ export default function Informes() {
           <Route path="*" element={<Navigate to="/dashboard/informes/ventas" replace />} />
         </Routes>
       </div>
-    </RequireRole>
+    </RequireSalesAccess>
   );
 }

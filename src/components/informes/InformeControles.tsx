@@ -11,12 +11,15 @@ interface PeriodSelectorProps {
   preset: Preset;
   from: string;
   to: string;
+  month: string;
+  today: string;
   onPreset: (preset: Preset) => void;
+  onMonth: (month: string) => void;
   onFrom: (from: string) => void;
   onTo: (to: string) => void;
 }
 
-export function PeriodSelector({ preset, from, to, onPreset, onFrom, onTo }: PeriodSelectorProps) {
+export function PeriodSelector({ preset, from, to, month, today, onPreset, onMonth, onFrom, onTo }: PeriodSelectorProps) {
   const invalid = !from || !to || from > to;
   return (
     <div className="flex flex-wrap items-end gap-3">
@@ -35,6 +38,12 @@ export function PeriodSelector({ preset, from, to, onPreset, onFrom, onTo }: Per
           </SelectContent>
         </Select>
       </div>
+      {preset === 'pickMonth' && (
+        <div className="space-y-1">
+          <Label htmlFor="informe-mes">Mes</Label>
+          <Input id="informe-mes" type="month" value={month} max={today.slice(0, 7)} onChange={(e) => onMonth(e.target.value)} />
+        </div>
+      )}
       <div className="space-y-1">
         <Label htmlFor="informe-desde">Desde</Label>
         <Input id="informe-desde" type="date" value={from} onChange={(e) => onFrom(e.target.value)} />

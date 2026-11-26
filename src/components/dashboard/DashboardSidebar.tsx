@@ -7,6 +7,7 @@ import { useBusiness } from "@/contexts/BusinessContext";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { useRoleAccess } from "@/hooks/useRoleAccess";
 import { useMyPermissions } from "@/hooks/useMyPermissions";
+import { useCanSeeSales } from "@/hooks/useSalesAccess";
 import { toast } from "sonner";
 import { isMenuItemActive, MENU_SECTIONS, visibleMenu } from "@/lib/dashboardMenu";
 
@@ -19,9 +20,10 @@ export const DashboardSidebar = ({ isOpen, onToggle }: DashboardSidebarProps) =>
   const location = useLocation();
   const { enabledModules, activeBusiness } = useBusiness();
   const { isSuperAdmin } = useSuperAdmin();
-  const { isAdmin, isOwner } = useRoleAccess("admin");
+  const { isAdmin } = useRoleAccess("admin");
   const { canAdjustStock } = useMyPermissions();
-  const sections = visibleMenu(MENU_SECTIONS, { enabledModules, isAdmin, isOwner, canAdjustStock });
+  const { canSeeSales } = useCanSeeSales();
+  const sections = visibleMenu(MENU_SECTIONS, { enabledModules, isAdmin, canSeeSales, canAdjustStock });
 
   return (
     <motion.aside

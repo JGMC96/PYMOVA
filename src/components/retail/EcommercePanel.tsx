@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Ban, Check, Loader2, Package, PackageCheck, RefreshCw, RotateCcw, ShoppingBag, Truck,
 } from 'lucide-react';
@@ -17,8 +18,7 @@ import {
 import { useShopifyOrdersSync } from '@/hooks/useShopifyOrdersSync';
 import { OnlineOrderDialog } from './OnlineOrderDialog';
 import { OnlineOrderReturnDialog } from './OnlineOrderReturnDialog';
-import { OnlineRevenueCard } from './OnlineRevenueCard';
-import { useRoleAccess } from '@/hooks/useRoleAccess';
+import { useCanSeeSales } from '@/hooks/useSalesAccess';
 
 const STATUS_STYLES: Record<OnlineOrderStatus, string> = {
   pending: 'bg-amber-500/15 text-amber-500 hover:bg-amber-500/15',
@@ -46,8 +46,8 @@ export function EcommercePanel() {
     createOrder, setStatus, createReturn, fetchOrders,
   } = useOnlineOrders();
 
-  // La facturación online solo la ve el propietario.
-  const { isOwner } = useRoleAccess('staff');
+  // La facturación online está en Informes, para quien puede ver las ventas.
+  const { canSeeSales } = useCanSeeSales();
 
   const { isSyncing: isShopifySyncing, syncOrders: runShopifySync, diagnose: diagnoseShopify } =
     useShopifyOrdersSync();
@@ -70,7 +70,7 @@ export function EcommercePanel() {
 
   return (
     <div className="space-y-6">
-      <div className={`grid gap-4 ${isOwner ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
+      <div className={`grid gap-4 ${canSeeSales ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
         <Card>
           <CardContent className="py-4">
             <p className="text-sm text-muted-foreground">Pedidos por aceptar</p>
@@ -83,7 +83,16 @@ export function EcommercePanel() {
             <p className="text-2xl font-bold">{stats.inProgress}</p>
           </CardContent>
         </Card>
-        {isOwner && <OnlineRevenueCard refreshKey={orders} />}
+        {canSeeSales && (
+          <Card>
+            <CardContent className="py-4">
+              <p className="text-sm text-muted-foreground">Facturación online</p>
+              <Link to="/dashboard/informes/ventas" className="text-sm font-medium text-primary hover:underline">
+                Ver ventas en Informes
+              </Link>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       <Card>
