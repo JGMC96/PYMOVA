@@ -44,6 +44,17 @@ export interface RegisterSellerRow {
   net_total: number | null;
 }
 
+/** Resumen por forma de pago de una caja (también de una ya cerrada, para reimprimir su cierre). */
+export async function fetchRegisterSummary(sessionId: string): Promise<RegisterSummaryRow[]> {
+  // Parámetro nuevo de la 0030: `as never` hasta que se regenere types.ts.
+  const { data, error } = await supabase.rpc('get_register_summary', {
+    _session_id: sessionId,
+    _seller_session_ids: [],
+  } as never);
+  if (error) throw error;
+  return (data ?? []) as RegisterSummaryRow[];
+}
+
 /**
  * Caja del negocio. `sellerSessionIds`: personas conectadas al TPV; si alguna puede cerrar
  * caja, el resumen trae importes (si no, arqueo a ciegas).
