@@ -21,6 +21,7 @@ const ORDER_FIELDS = `
   id
   legacyResourceId
   name
+  tags
   createdAt
   updatedAt
   cancelledAt
@@ -82,6 +83,8 @@ export interface ShopifyAdminOrder {
   id: string;
   legacyResourceId: string;
   name: string;
+  /** Con `pymova-tpv` es una venta de la caja de PYMOVA, no un pedido web. */
+  tags?: string[] | null;
   createdAt: string;
   updatedAt: string;
   cancelledAt: string | null;
