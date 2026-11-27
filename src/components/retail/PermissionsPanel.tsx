@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useSalesAccess } from '@/hooks/useSalesAccess';
 import { useSellers, type PermissionFlags } from '@/hooks/useSellers';
 import type { PosPermission } from '@/lib/sellerSession';
 
@@ -31,11 +32,14 @@ const toDraft = (p: PosPermission): Draft => ({
 /**
  * Permisos por persona (solo el propietario). En el TPV: descuento máximo, devoluciones y
  * cierre de caja (0030). En la gestión, para quien entra con su cuenta: productos y
- * precios, ver costes y ajustar stock (0031).
+ * precios, ver costes y ajustar stock (0031), y «Ver ventas» en Informes (0064).
  */
 export function PermissionsPanel() {
   const { permissions, isSaving, savePermissions } = useSellers();
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
+  const sales = useSalesAccess(true);
+  // «Ver ventas» se guarda aparte (otra RPC): aquí, lo cambiado y aún sin guardar.
+  const [salesDrafts, setSalesDrafts] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     setDrafts(Object.fromEntries(permissions.map((p) => [p.employee_id, toDraft(p)])));
@@ -52,7 +56,9 @@ export function PermissionsPanel() {
           En el TPV: si alguien intenta algo para lo que no tiene permiso (un descuento por encima de su máximo, una
           devolución o cerrar la caja), se pide el PIN de alguien que sí lo tenga y queda registrado quién lo autorizó;
           quien no puede cerrar caja la cuenta a ciegas. «Cerrar caja» también permite apuntar gastos, entradas y retiradas de caja. En la gestión: «Productos y precios», «Ver costes» y «Ajustar
-          stock» se aplican a quien entra con su propia cuenta. Solo el propietario cambia los permisos.
+          stock» se aplican a quien entra con su propia cuenta. «Ver ventas» abre Informes (ventas de tienda y online)
+          a quien entra con su propia cuenta; no se lo des a la cuenta compartida del TPV. Solo el propietario cambia
+          los permisos.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -70,6 +76,7 @@ export function PermissionsPanel() {
                       {f.label}
                     </TableHead>
                   ))}
+                  <TableHead className="text-center">Ver ventas</TableHead>
                   <TableHead className="text-right" />
                 </TableRow>
               </TableHeader>
@@ -79,8 +86,23 @@ export function PermissionsPanel() {
                   const d = drafts[p.employee_id] ?? original;
                   const max = Number(d.max.replace(',', '.'));
                   const validMax = d.max.trim() !== '' && Number.isFinite(max) && max >= 0 && max <= 100;
-                  const changed =
+                  const permsChanged =
                     validMax && (max !== Number(p.max_discount_pct) || FLAGS.some((f) => d[f.key] !== original[f.key]));
+                  const seesSales = sales.allowed?.includes(p.employee_id) ?? false;
+                  const salesDraft = salesDrafts[p.employee_id] ?? seesSales;
+                  const salesChanged = salesDraft !== seesSales;
+                  const changed = validMax && (permsChanged || salesChanged);
+                  const save = async () => {
+                    if (permsChanged) {
+                      const { max: _max, ...flags } = d;
+                      await savePermissions(p.employee_id, max, flags);
+                    }
+                    if (salesChanged) {
+                      // El aviso de error ya lo muestra el hook.
+                      await sales.setAccess(p.employee_id, salesDraft).catch(() => undefined);
+                      setSalesDrafts(({ [p.employee_id]: _done, ...rest }) => rest);
+                    }
+                  };
                   const set = (patch: Partial<Draft>) =>
                     setDrafts((all) => ({ ...all, [p.employee_id]: { ...d, ...patch } }));
                   return (
@@ -97,7 +119,7 @@ export function PermissionsPanel() {
                         )}
                       </TableCell>
                       {p.is_owner ? (
-                        <TableCell colSpan={FLAGS.length + 2} className="text-sm text-muted-foreground">
+                        <TableCell colSpan={FLAGS.length + 3} className="text-sm text-muted-foreground">
                           Todo, siempre: los permisos de un propietario no se pueden cambiar.
                         </TableCell>
                       ) : (
@@ -127,15 +149,23 @@ export function PermissionsPanel() {
                               />
                             </TableCell>
                           ))}
+                          <TableCell className="text-center">
+                            <Switch
+                              checked={salesDraft}
+                              disabled={!p.has_account || !sales.allowed}
+                              onCheckedChange={(v) => setSalesDrafts((all) => ({ ...all, [p.employee_id]: v }))}
+                              aria-label={`Ver ventas de ${p.name}`}
+                            />
+                            {!p.has_account && (
+                              <span className="block text-xs text-muted-foreground">Necesita su cuenta</span>
+                            )}
+                          </TableCell>
                           <TableCell className="text-right">
                             <Button
                               size="sm"
                               variant={changed ? 'default' : 'outline'}
-                              disabled={!changed || isSaving}
-                              onClick={() => {
-                                const { max: _max, ...flags } = d;
-                                void savePermissions(p.employee_id, max, flags);
-                              }}
+                              disabled={!changed || isSaving || sales.isSaving}
+                              onClick={() => void save()}
                             >
                               Guardar
                             </Button>

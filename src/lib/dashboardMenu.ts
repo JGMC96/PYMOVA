@@ -28,7 +28,8 @@ import type { ModuleKey } from '@/types/database';
 export interface MenuAccess {
   enabledModules: ModuleKey[];
   isAdmin: boolean;
-  isOwner: boolean;
+  /** Propietario, o persona con el permiso «Ver ventas» (0064). */
+  canSeeSales: boolean;
   canAdjustStock: boolean;
 }
 
@@ -58,7 +59,7 @@ export interface VisibleMenuSection {
 }
 
 const adminOnly = (a: MenuAccess) => a.isAdmin;
-const ownerOnly = (a: MenuAccess) => a.isOwner;
+const seesSales = (a: MenuAccess) => a.canSeeSales;
 
 export const MENU_SECTIONS: MenuSection[] = [
   { items: [{ icon: LayoutDashboard, label: 'Inicio', path: '/dashboard' }] },
@@ -118,8 +119,8 @@ export const MENU_SECTIONS: MenuSection[] = [
   {
     title: 'Informes',
     items: [
-      // Solo el propietario: lo comprueba cada RPC (`has_business_role(..., 'owner')`).
-      { icon: BarChart3, label: 'Informes', path: '/dashboard/informes', allowed: ownerOnly },
+      // Propietario y quien tenga «Ver ventas»: lo comprueba cada RPC (`can_see_sales`).
+      { icon: BarChart3, label: 'Informes', path: '/dashboard/informes', allowed: seesSales },
     ],
   },
   { items: [{ icon: MessageSquare, label: 'Asesor IA', path: '/dashboard/ai', moduleKey: 'ai_advisor' }] },
