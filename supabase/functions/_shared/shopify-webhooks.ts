@@ -19,6 +19,7 @@ import { retireShopifyCustomer, upsertShopifyCustomers } from '../_shared/shopif
 import { shopifyGraphql } from '../_shared/shopify-client.ts';
 import {
   buildUpsertArgs,
+  localOrderStatuses,
   ORDER_BY_ID_QUERY,
   type ShopifyAdminOrder,
 } from '../_shared/shopify-admin.ts';
@@ -106,9 +107,10 @@ export async function processEvent(
       return { status: 'ignored', message: `Venta de tienda creada por Pymova (${topic})` };
     }
 
+    const localStatus = await localOrderStatuses(admin, event.business_id, [data.order.id]);
     const { data: result, error } = await admin.rpc(
       'upsert_external_order',
-      buildUpsertArgs(event.business_id, data.order) as never,
+      buildUpsertArgs(event.business_id, data.order, localStatus.get(data.order.id)) as never,
     );
     if (error) throw error;
     const row = Array.isArray(result) ? result[0] : result;

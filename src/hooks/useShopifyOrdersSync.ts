@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { toast } from 'sonner';
+import type { PickingOrder } from '@/lib/pickingList';
 
 export interface ShopifyConnection {
   id: string;
@@ -225,21 +226,34 @@ export function useShopifyOrdersSync() {
   };
 }
 
+/** Envía el pedido en Shopify (crea el envío con su seguimiento). Si falla, lanza el error. */
 export async function pushShopifyOrderStatus(params: {
   businessId: string;
   orderId: string;
   status: string;
   trackingNumber?: string | null;
-  refund?: boolean;
+  trackingCompany?: string | null;
+  notifyCustomer?: boolean;
 }) {
-  return invoke({
+  return invoke<{ ok: boolean; skipped?: string; shipped?: number }>({
     action: 'push-status',
     business_id: params.businessId,
     order_id: params.orderId,
     status: params.status,
     tracking_number: params.trackingNumber ?? null,
-    refund: params.refund ?? false,
+    tracking_company: params.trackingCompany ?? null,
+    notify_customer: params.notifyCustomer ?? true,
   });
+}
+
+/** Líneas en vivo de Shopify de unos pedidos web, para la lista de preparación. */
+export async function fetchPickingOrders(businessId: string, orderIds: string[]) {
+  const data = await invoke<{ ok: boolean; orders: PickingOrder[] }>({
+    action: 'picking-list',
+    business_id: businessId,
+    order_ids: orderIds,
+  });
+  return data.orders ?? [];
 }
 
 export async function pushShopifyRefund(params: { businessId: string; returnId: string }) {

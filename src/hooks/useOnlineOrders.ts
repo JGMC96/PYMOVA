@@ -70,6 +70,13 @@ export interface NewOnlineOrder {
   items: NewOnlineOrderItem[];
 }
 
+/** Datos del envío al pulsar «Enviar». */
+export interface ShipmentDetails {
+  trackingNumber?: string;
+  trackingCompany?: string;
+  notifyCustomer?: boolean;
+}
+
 export const ORDER_STATUS_LABEL: Record<OnlineOrderStatus, string> = {
   pending: 'Pendiente',
   accepted: 'Aceptado',
@@ -161,49 +168,46 @@ export function useOnlineOrders() {
   );
 
   const setStatus = useCallback(
-    async (orderId: string, status: OnlineOrderStatus, trackingNumber?: string) => {
+    async (orderId: string, status: OnlineOrderStatus, shipment: ShipmentDetails = {}) => {
       setIsSubmitting(true);
       try {
+        const order = orders.find((o) => o.id === orderId);
+        const fromShopify = !!activeBusinessId && order?.source === 'shopify';
+
+        // Un pedido de Shopify se envía primero allí: si Shopify no lo acepta, aquí no cambia.
+        if (fromShopify && status === 'shipped') {
+          try {
+            const result = await pushShopifyOrderStatus({
+              businessId: activeBusinessId!,
+              orderId,
+              status,
+              trackingNumber: shipment.trackingNumber || null,
+              trackingCompany: shipment.trackingCompany || null,
+              notifyCustomer: shipment.notifyCustomer ?? true,
+            });
+            if (result?.skipped) toast.info(result.skipped);
+            else toast.success('Envío creado en Shopify');
+          } catch (err) {
+            toast.error(
+              `No se ha podido enviar en Shopify: ${err instanceof Error ? err.message : 'error desconocido'}. El pedido sigue igual.`,
+            );
+            return false;
+          }
+        }
+
         const { error } = await supabase.rpc('set_online_order_status', {
           _order_id: orderId,
           _status: status,
-          _tracking_number: trackingNumber || null,
+          _tracking_number: shipment.trackingNumber || null,
         });
         if (error) throw error;
         toast.success(`Pedido marcado como ${ORDER_STATUS_LABEL[status].toLowerCase()}`);
         // Los cambios de stock de pedidos creados en Pymova se mandan a Shopify.
         void pushShopifyStock(activeBusinessId);
 
-        const order = orders.find((o) => o.id === orderId);
-        if (
-          activeBusinessId &&
-          order?.source === 'shopify' &&
-          (status === 'shipped' || status === 'cancelled')
-        ) {
-          try {
-            const result = (await pushShopifyOrderStatus({
-              businessId: activeBusinessId,
-              orderId,
-              status,
-              trackingNumber: trackingNumber || null,
-              refund: status === 'cancelled' && order.payment_status === 'paid',
-            })) as { skipped?: string } | null;
-            if (result?.skipped) {
-              toast.info(result.skipped);
-            } else {
-              toast.success(
-                status === 'cancelled' && order.payment_status === 'paid'
-                  ? 'Pedido cancelado y reembolsado en Shopify'
-                  : 'Estado sincronizado con Shopify',
-              );
-            }
-          } catch (err) {
-            toast.warning(
-              `El pedido se actualizó en Pymova, pero no en Shopify: ${
-                err instanceof Error ? err.message : 'error desconocido'
-              }`,
-            );
-          }
+        // Cancelar no toca Shopify: allí se repone el stock y, con Stockagile, podría reponerse dos veces.
+        if (fromShopify && status === 'cancelled') {
+          toast.info('Cancelado en PYMOVA. Cancélalo también en Shopify.');
         }
 
         await fetchOrders();
