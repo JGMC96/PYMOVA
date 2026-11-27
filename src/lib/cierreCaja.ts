@@ -105,6 +105,74 @@ export function suggestedOpening(lastClosed: { counted_amount: number | null } |
   return v === null || v === undefined || !Number.isFinite(Number(v)) ? null : round2(Number(v));
 }
 
+/** Motivo con el que el asistente apunta la retirada al cerrar: así se reconoce al reimprimir. */
+export const CLOSING_WITHDRAWAL_REASON = 'Retirada al cerrar la caja';
+
+/**
+ * Ticket de un cierre ya hecho (reimpresión desde «Historial de cierres»), con lo guardado: la
+ * caja cerrada, su resumen por forma de pago (get_register_summary) y sus movimientos
+ * (get_cash_movements). La retirada del cierre es la última «Retirada al banco» con el motivo
+ * del asistente; el servidor guardó esperado y contado ya sin ella. El total del datáfono no se
+ * guarda: no sale. Un cierre anterior al asistente no tiene retirada: lo contado es lo que quedó.
+ */
+export function closingDocFromHistory(p: {
+  session: {
+    opened_at: string;
+    closed_at: string | null;
+    opening_amount: number | string | null;
+    expected_amount: number | string | null;
+    counted_amount: number | string | null;
+    difference: number | string | null;
+    notes: string | null;
+    opened_by_employee_id?: string | null;
+    closed_by_employee_id?: string | null;
+  };
+  summary: { payment_method: string; sales_count: number | string; total_amount: number | string | null; refunds_amount: number | string | null }[];
+  movements: { movement_type: string; amount: number | string; reason: string; created_at: string; voided_at: string | null }[];
+  personName: (id: string | null | undefined) => string | null;
+  labels: Record<string, string>;
+}): ClosingDoc {
+  const num = (v: number | string | null | undefined) => (v === null || v === undefined ? null : Number(v));
+  const live = p.movements.filter((m) => !m.voided_at);
+  const closing = live
+    .filter((m) => m.movement_type === 'withdrawal' && m.reason === CLOSING_WITHDRAWAL_REASON)
+    .sort((a, b) => a.created_at.localeCompare(b.created_at))
+    .pop();
+  const sum = (type: string) => round2(live
+    .filter((m) => m.movement_type === type && m !== closing)
+    .reduce((s, m) => s + Number(m.amount), 0));
+  const withdrawal = closing ? round2(Number(closing.amount)) : 0;
+  const counted = num(p.session.counted_amount) ?? 0;
+  const expected = num(p.session.expected_amount);
+  const cashRow = p.summary.find((r) => r.payment_method === 'cash');
+  return {
+    openedAt: p.session.opened_at,
+    closedAt: p.session.closed_at ?? p.session.opened_at,
+    openedBy: p.personName(p.session.opened_by_employee_id),
+    closedBy: p.personName(p.session.closed_by_employee_id),
+    opening: round2(num(p.session.opening_amount) ?? 0),
+    payments: p.summary
+      .filter((r) => Number(r.sales_count) > 0)
+      .map((r) => ({
+        method: r.payment_method,
+        label: p.labels[r.payment_method] ?? r.payment_method,
+        count: Number(r.sales_count),
+        amount: num(r.total_amount),
+      })),
+    cashRefunds: num(cashRow?.refunds_amount) ?? 0,
+    cashIn: sum('cash_in'),
+    expenses: sum('expense'),
+    withdrawalsBefore: sum('withdrawal'),
+    expected: expected === null ? null : round2(expected + withdrawal),
+    countedTotal: round2(counted + withdrawal),
+    difference: num(p.session.difference),
+    withdrawal,
+    keep: round2(counted),
+    cardTerminal: null,
+    notes: p.session.notes,
+  };
+}
+
 /** Datos del resumen de un cierre (pantalla final e impresión). */
 export interface ClosingDoc {
   openedAt: string;

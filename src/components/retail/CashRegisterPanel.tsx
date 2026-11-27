@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Wallet, Lock, Unlock, RefreshCw } from 'lucide-react';
+import { Wallet, Lock, Unlock, RefreshCw, Printer, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,13 +9,16 @@ import { Separator } from '@/components/ui/separator';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import { useCashMovements } from '@/hooks/useCashMovements';
-import { useCashRegister } from '@/hooks/useCashRegister';
+import { fetchCashMovements, useCashMovements } from '@/hooks/useCashMovements';
+import { fetchRegisterSummary, useCashRegister, type RegisterSession } from '@/hooks/useCashRegister';
+import { toast } from 'sonner';
 import { useRoleAccess } from '@/hooks/useRoleAccess';
 import { useSellerSession } from '@/contexts/SellerSessionContext';
 import { useTicketConfig } from '@/hooks/useTicketConfig';
 import { movementTotals } from '@/lib/cashMovements';
-import { parseCash, suggestedOpening, type ClosingDoc } from '@/lib/cierreCaja';
+import {
+  CLOSING_WITHDRAWAL_REASON, closingDocFromHistory, parseCash, suggestedOpening, type ClosingDoc,
+} from '@/lib/cierreCaja';
 import { printClosing } from '@/lib/ticket';
 import { PAYMENT_LABELS } from '@/lib/storeProfiles';
 import { cn } from '@/lib/utils';
@@ -116,7 +119,7 @@ export function CashRegisterPanel() {
         type: 'withdrawal',
         amount: toWithdraw,
         category: null,
-        reason: 'Retirada al cerrar la caja',
+        reason: CLOSING_WITHDRAWAL_REASON,
         authorizationId: movementAuth,
       });
       if (!saved) {
@@ -139,6 +142,27 @@ export function CashRegisterPanel() {
   };
 
   const printClosingDoc = (doc: ClosingDoc) => printClosing(ticketBusiness, doc, ticketPrefs);
+
+  // Reimprimir el ticket de un cierre pasado, con lo guardado (resumen y movimientos de esa caja).
+  const [reprinting, setReprinting] = useState<string | null>(null);
+  const reprintClosing = async (s: RegisterSession) => {
+    setReprinting(s.id);
+    try {
+      const [rows, moves] = await Promise.all([fetchRegisterSummary(s.id), fetchCashMovements(s.id)]);
+      printClosingDoc(closingDocFromHistory({
+        session: s,
+        summary: rows,
+        movements: moves,
+        personName: (id) => (id ? personName(id) : null),
+        labels: PAYMENT_LABELS,
+      }));
+    } catch (error) {
+      console.error('Error reprinting closing:', error);
+      toast.error('No se pudo preparar el ticket del cierre');
+    } finally {
+      setReprinting(null);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -385,7 +409,7 @@ export function CashRegisterPanel() {
                   <TableHead className="text-right">Esperado</TableHead>
                   <TableHead className="text-right">Contado</TableHead>
                   <TableHead className="text-right">Diferencia</TableHead>
-                  <TableHead><span className="sr-only">Movimientos</span></TableHead>
+                  <TableHead><span className="sr-only">Movimientos y ticket</span></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -414,9 +438,21 @@ export function CashRegisterPanel() {
                       {fmt(s.difference)}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="sm" onClick={() => setMovementsOf(s.id)}>
-                        Movimientos
-                      </Button>
+                      <div className="flex items-center justify-end gap-1 whitespace-nowrap">
+                        <Button variant="ghost" size="sm" onClick={() => setMovementsOf(s.id)}>
+                          Movimientos
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => void reprintClosing(s)}
+                          disabled={reprinting !== null}
+                          aria-label="Imprimir el ticket del cierre"
+                          title="Imprimir el ticket del cierre"
+                        >
+                          {reprinting === s.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
