@@ -117,6 +117,18 @@ async function processBusiness(admin: SupabaseClient, businessId: string): Promi
   if (salesError) throw salesError;
   const claimedSales = (salesData ?? []) as unknown as SaleRow[];
 
+  // Pago mixto (0065): las formas de pago de esas ventas, para un cobro por cada una.
+  const mixedIds = claimedSales.filter((s) => s.payment_method === 'mixed').map((s) => s.id);
+  const paymentsBySale = new Map<string, { method: string; amount: number }[]>();
+  if (mixedIds.length) {
+    const { data: pays, error: paysError } = await admin
+      .from('sale_payments').select('sale_id, method, amount').in('sale_id', mixedIds);
+    if (paysError) throw paysError;
+    for (const p of (pays ?? []) as { sale_id: string; method: string; amount: number }[]) {
+      paymentsBySale.set(p.sale_id, [...(paymentsBySale.get(p.sale_id) ?? []), { method: p.method, amount: Number(p.amount) }]);
+    }
+  }
+
   // Primero el stock. Lo que no haya llegado a Shopify espera a la siguiente ejecución, sin gastar
   // intentos: la venta vuelve a la cola tal como estaba.
   const owed = await flushStockPushes(admin, businessId, claimedSales.flatMap((s) => s.sale_items.map((i) => i.id)));
@@ -222,9 +234,16 @@ async function processBusiness(admin: SupabaseClient, businessId: string): Promi
           sale.notes,
         ].filter(Boolean).join(' — '),
       };
-      // Lo pagado con vale de tienda va como cobro aparte; el resto, con el método de la venta.
+      // Lo pagado con vale de tienda va como cobro aparte; el resto, con el método de la venta
+      // o, en un pago mixto, un cobro por forma de pago (primero la tarjeta).
       // Una venta de 0 € va sin cobros: queda como pagada solo con financialStatus.
-      const transactions = posSaleTransactions(Number(sale.total), Number(sale.voucher_amount ?? 0), gateway);
+      const mixed = sale.payment_method === 'mixed'
+        ? (paymentsBySale.get(sale.id) ?? [])
+          .sort((a, b) => Number(b.method === 'card') - Number(a.method === 'card'))
+          .map((p) => ({ gateway: PAYMENT_LABEL[p.method] ?? p.method, amount: p.amount }))
+        : null;
+      if (sale.payment_method === 'mixed' && !mixed?.length) throw new Error('Faltan las formas de pago de la venta mixta');
+      const transactions = posSaleTransactions(Number(sale.total), Number(sale.voucher_amount ?? 0), mixed ?? gateway);
       if (transactions.length > 0) {
         order.transactions = transactions.map((t) => ({
           kind: 'SALE', status: 'SUCCESS', gateway: t.gateway, amountSet: money(t.amount),

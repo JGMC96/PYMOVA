@@ -58,7 +58,7 @@ async function processBusiness(admin: SupabaseClient, businessId: string): Promi
 
   const { data: returnsData } = await admin
     .from('sale_returns')
-    .select('id, sale_id, return_number, reason, total, seller_employee_id, shopify_refund_attempts, sales!inner(shopify_order_gid, sale_number, total), sale_return_items(product_id, variant_id, product_name, quantity, unit_price, total)')
+    .select('id, sale_id, return_number, reason, total, refund_method, seller_employee_id, shopify_refund_attempts, sales!inner(shopify_order_gid, sale_number, total), sale_return_items(product_id, variant_id, product_name, quantity, unit_price, total)')
     .eq('business_id', businessId)
     .is('shopify_refund_gid', null)
     .not('sales.shopify_order_gid', 'is', null)
@@ -66,12 +66,16 @@ async function processBusiness(admin: SupabaseClient, businessId: string): Promi
     .eq('shopify_refund_status', 'pending')
     .order('created_at', { ascending: true })
     .limit(20);
+  // Pasarela de Shopify de cada forma de reembolso (las mismas que pone shopify-pos-order).
+  const REFUND_GATEWAY: Record<string, string> = { cash: 'Efectivo', card: 'Tarjeta' };
+
   interface ReturnRow {
     id: string;
     sale_id: string;
     return_number: string;
     reason: string | null;
     total: number | string;
+    refund_method: string | null;
     seller_employee_id: string | null;
     shopify_refund_attempts: number;
     sales: { shopify_order_gid: string | null; sale_number: string; total: number | string };
@@ -156,7 +160,9 @@ async function processBusiness(admin: SupabaseClient, businessId: string): Promi
         refundLineItems,
       };
       // Reparte el importe entre los cobros del pedido (p. ej. tarjeta y vale de tienda).
-      const plan = amount > 0 ? planRefundTransactions(data.order.transactions, amount) : [];
+      // En un pago mixto, el reembolso empieza por el cobro de la forma en que se devuelve (0065).
+      const preferred = REFUND_GATEWAY[ret.refund_method ?? ''] ?? null;
+      const plan = amount > 0 ? planRefundTransactions(data.order.transactions, amount, preferred) : [];
       if (plan.length) {
         input.transactions = plan.map((t) => ({
           orderId: orderGid, parentId: t.parentId, kind: 'REFUND', gateway: t.gateway, amount: t.amount.toFixed(2),

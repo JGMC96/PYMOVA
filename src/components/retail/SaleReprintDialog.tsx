@@ -31,6 +31,14 @@ export function SaleReprintDialog({ saleId, onClose }: { saleId: string | null; 
         return;
       }
       const row = data as unknown as StoredSaleRow & { seller_employee_id: string | null };
+      // Pago mixto (0065): sus formas de pago. Solo existen con la migración aplicada.
+      if (row.payment_method === 'mixed') {
+        const { data: pays } = await supabase
+          .from('sale_payments' as never)
+          .select('method, amount')
+          .eq('sale_id', saleId);
+        row.payments = (pays ?? []) as unknown as StoredSaleRow['payments'];
+      }
       let cashier: string | null = null;
       if (row.seller_employee_id) {
         const { data: name } = await supabase.rpc('employee_display_name' as never, { _employee_id: row.seller_employee_id } as never);

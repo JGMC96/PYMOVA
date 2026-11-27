@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Receipt, CreditCard, Banknote, Mail, Printer, RefreshCw, RotateCcw, ScanLine, UserRoundPen, X } from 'lucide-react';
+import {
+  Receipt, CreditCard, Banknote, Mail, Printer, RefreshCw, RotateCcw, ScanLine, SplitSquareHorizontal, UserRoundPen, X,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { normalizeTicketCode, pymovaTicketCode, stockagileTicketCode } from '@/lib/ticketCode';
@@ -136,6 +138,8 @@ export function SalesHistory({ onQueryChange, searchElsewhere }: SalesHistoryPro
     switch (method) {
       case 'card':
         return <CreditCard className="w-4 h-4" />;
+      case 'mixed':
+        return <SplitSquareHorizontal className="w-4 h-4" />;
       case 'cash':
       default:
         return <Banknote className="w-4 h-4" />;
@@ -152,6 +156,8 @@ export function SalesHistory({ onQueryChange, searchElsewhere }: SalesHistoryPro
         return 'Transferencia';
       case 'store_credit':
         return 'Vale';
+      case 'mixed':
+        return 'Mixto (efectivo y tarjeta)';
       default:
         return method || 'N/A';
     }

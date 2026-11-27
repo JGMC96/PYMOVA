@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import {
   Search, Plus, Minus, Trash2, CreditCard, Banknote,
   ScanLine, ArrowRightLeft, Layers, LayoutGrid, ChevronRight, ChevronDown,
-  MoreVertical, X, PenLine, Ticket,
+  MoreVertical, X, PenLine, Ticket, SplitSquareHorizontal,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -33,7 +33,7 @@ import { discountPct, isSellerSessionError } from '@/lib/sellerSession';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { DEFAULT_TAX_RATE, taxBreakdown } from '@/lib/tax';
-import { cashChange, parseCash, quickCashAmounts } from '@/lib/cobro';
+import { cashChange, mixedPayments, mixedSplit, parseCash, quickCashAmounts } from '@/lib/cobro';
 import { CashRegisterStaleBanner } from './CashRegisterStaleBanner';
 import { VariosDialog } from './VariosDialog';
 import { VoucherDialog, type AppliedVoucher } from './VoucherDialog';
@@ -53,6 +53,7 @@ const PAYMENT_ICONS: Record<string, typeof Banknote> = {
   cash: Banknote,
   card: CreditCard,
   transfer: ArrowRightLeft,
+  mixed: SplitSquareHorizontal,
 };
 
 export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {}) {
@@ -75,6 +76,8 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
   const [selectedPayment, setSelectedPayment] = useState<string>(profile.paymentMethods[0] ?? 'cash');
   const [tipInput, setTipInput] = useState('');
   const [cashInput, setCashInput] = useState('');
+  // Pago mixto (0065): lo que se cobra con tarjeta; el resto, en efectivo.
+  const [cardPart, setCardPart] = useState('');
   const [notes, setNotes] = useState('');
   const [client, setClient] = useState<PosClient | null>(null);
   const [breakdownOpen, setBreakdownOpen] = useState(false);
@@ -116,11 +119,19 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
   // «Varios» no es un producto del catálogo: al buscarlo, sale como primera opción.
   const showVariosResult = matchesVarios(searchQuery);
 
+  // «Mixto» (efectivo + tarjeta), si la tienda cobra de las dos formas.
+  const payOptions = useMemo(
+    () => (profile.paymentMethods.includes('cash') && profile.paymentMethods.includes('card')
+      ? [...profile.paymentMethods, 'mixed']
+      : profile.paymentMethods),
+    [profile.paymentMethods],
+  );
+
   useEffect(() => {
-    if (!profile.paymentMethods.includes(selectedPayment)) {
+    if (!payOptions.includes(selectedPayment)) {
       setSelectedPayment(profile.paymentMethods[0] ?? 'cash');
     }
-  }, [profile.paymentMethods, selectedPayment]);
+  }, [payOptions, profile.paymentMethods, selectedPayment]);
 
   const pushToCart = (
     product: ProductWithStock,
@@ -236,6 +247,7 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
     setLineDiscounts({});
     setTipInput('');
     setCashInput('');
+    setCardPart('');
     setNotes('');
     setClient(null);
     setVoucher(null);
@@ -262,10 +274,14 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
   const dueTotal = round2(total + tip - voucherAmount);
   const paidByVoucher = voucherAmount > 0 && dueTotal === 0;
   const paymentMethod = paidByVoucher ? 'store_credit' : selectedPayment;
-  const isCash = paymentMethod === 'cash';
+  const isMixed = paymentMethod === 'mixed';
+  const split = isMixed ? mixedSplit(dueTotal, cardPart) : null;
+  // Con efectivo de por medio (todo o una parte): entregado y cambio, sobre la parte en efectivo.
+  const isCash = paymentMethod === 'cash' || isMixed;
+  const cashDue = split ? split.cash : dueTotal;
   // Sin importe entregado se entiende que paga el importe exacto.
   const cashReceived = isCash ? parseCash(cashInput) : null;
-  const change = isCash ? cashChange(cashInput, dueTotal) : null;
+  const change = isCash ? cashChange(cashInput, cashDue) : null;
   const cashShortfall = change !== null && change < 0;
   const itemCount = cart.reduce((sum, i) => sum + i.quantity, 0);
   const PayIcon = paidByVoucher ? Ticket : PAYMENT_ICONS[selectedPayment] ?? Banknote;
@@ -273,7 +289,11 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
   const handleCheckout = async () => {
     if (cart.length === 0 || isCreating) return;
     const method = paymentMethod;
-    const usesCash = method === 'cash';
+    const usesCash = method === 'cash' || method === 'mixed';
+    if (split?.problem) {
+      toast.error(split.problem);
+      return;
+    }
     if (usesCash && !openSession) {
       toast.error('Abre la caja para cobrar en efectivo');
       return;
@@ -318,6 +338,7 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
       authorization_id: authorizationId,
       voucher_code: voucherAmount > 0 ? voucher?.code ?? null : null,
       voucher_amount: voucherAmount > 0 ? voucherAmount : null,
+      payments: split ? mixedPayments(split) : null,
     }, { onError: (m) => { failure = m; } });
 
     if (!result && seller && isSellerSessionError(failure)) {
@@ -345,6 +366,7 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
         saleId: result.id,
         clientName: client?.name ?? null,
         clientCanEmail: canEmailReceipt(client),
+        payments: split ? mixedPayments(split) : null,
         voucherPaid: voucher && voucherAmount > 0
           ? { code: voucher.code, amount: voucherAmount, balanceLeft: round2(voucher.balance - voucherAmount) }
           : null,
@@ -834,14 +856,14 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
             {!paidByVoucher && (
             <div
               className="mt-3 grid gap-2"
-              style={{ gridTemplateColumns: `repeat(${profile.paymentMethods.length || 1}, minmax(0, 1fr))` }}
+              style={{ gridTemplateColumns: `repeat(${payOptions.length || 1}, minmax(0, 1fr))` }}
               role="radiogroup"
               aria-label="Método de pago"
             >
-              {profile.paymentMethods.map((method) => {
+              {payOptions.map((method) => {
                 const Icon = PAYMENT_ICONS[method] ?? Banknote;
                 const active = method === selectedPayment;
-                const blocked = method === 'cash' && !openSession;
+                const blocked = (method === 'cash' || method === 'mixed') && !openSession;
                 return (
                   <Button
                     key={method}
@@ -862,13 +884,39 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
             </div>
             )}
 
+            {isMixed && split && (
+              <div className="mt-3 space-y-2">
+                <Label htmlFor="pos-card-part" className="text-xs text-muted-foreground">
+                  Con tarjeta (lo que marca el datáfono)
+                </Label>
+                <Input
+                  id="pos-card-part"
+                  inputMode="decimal"
+                  placeholder="0,00"
+                  value={cardPart}
+                  onChange={(e) => setCardPart(e.target.value)}
+                  className="h-11 text-lg"
+                  autoFocus
+                />
+                <div className="flex items-baseline justify-between rounded-lg bg-muted px-3 py-2 text-sm">
+                  <span className="font-medium">En efectivo</span>
+                  <span className="text-lg font-semibold">{split.cash.toFixed(2)} €</span>
+                </div>
+                {split.problem && cardPart.trim() !== '' && (
+                  <p className="text-xs text-destructive">{split.problem}</p>
+                )}
+              </div>
+            )}
+
             {isCash && (
               <div className="mt-3 space-y-2">
-                <Label htmlFor="pos-cash" className="text-xs text-muted-foreground">Entregado</Label>
+                <Label htmlFor="pos-cash" className="text-xs text-muted-foreground">
+                  {isMixed ? 'Entregado en efectivo' : 'Entregado'}
+                </Label>
                 <Input
                   id="pos-cash"
                   inputMode="decimal"
-                  placeholder={`${dueTotal.toFixed(2)} (exacto)`}
+                  placeholder={`${cashDue.toFixed(2)} (exacto)`}
                   value={cashInput}
                   onChange={(e) => setCashInput(e.target.value)}
                   onKeyDown={(e) => {
@@ -879,9 +927,9 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
                   }}
                   className="h-11 text-lg"
                 />
-                {dueTotal > 0 && (
+                {cashDue > 0 && (
                   <div className="flex flex-wrap gap-1.5">
-                    {quickCashAmounts(dueTotal).map((amount, i) => (
+                    {quickCashAmounts(cashDue).map((amount, i) => (
                       <Button
                         key={amount}
                         type="button"
@@ -931,7 +979,7 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
           <Button
             size="lg"
             className="h-14 w-full text-base"
-            disabled={cart.length === 0 || isCreating || (isCash && (!openSession || cashShortfall))}
+            disabled={cart.length === 0 || isCreating || (isCash && (!openSession || cashShortfall)) || !!split?.problem}
             onClick={() => void handleCheckout()}
           >
             <PayIcon className="w-5 h-5 mr-2" />
@@ -939,7 +987,9 @@ export function POSPanel({ onGoToRegister }: { onGoToRegister?: () => void } = {
               ? 'Procesando...'
               : paidByVoucher
                 ? `Cobrar con vale · ${voucherAmount.toFixed(2)} €`
-                : `Cobrar ${dueTotal.toFixed(2)} € · ${PAYMENT_LABELS[selectedPayment] ?? selectedPayment}`}
+                : split && !split.problem
+                  ? `Cobrar ${dueTotal.toFixed(2)} € · Tarjeta ${split.card.toFixed(2)} + Efectivo ${split.cash.toFixed(2)}`
+                  : `Cobrar ${dueTotal.toFixed(2)} € · ${PAYMENT_LABELS[selectedPayment] ?? selectedPayment}`}
           </Button>
         </div>
       </div>

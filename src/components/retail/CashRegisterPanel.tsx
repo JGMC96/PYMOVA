@@ -64,7 +64,11 @@ export function CashRegisterPanel() {
   const openingValue = parseCash(openingAmount);
   const openingDiffers = lastKeep !== null && openingValue !== null && Math.abs(openingValue - lastKeep) >= 0.005;
   const salesTotal = summary.reduce((s, r) => s + Number(r.total_amount ?? 0), 0);
-  const salesCount = summary.reduce((s, r) => s + Number(r.sales_count), 0);
+  // Ventas del turno: cada venta una vez. El resumen por forma de pago cuenta dos veces una venta
+  // mixta (o con vale y otra forma); el de por vendedor, no (0065).
+  const salesCount = bySeller.length > 0
+    ? bySeller.reduce((s, r) => s + Number(r.sales_count), 0)
+    : summary.reduce((s, r) => s + Number(r.sales_count), 0);
 
   const handleOpen = async () => {
     // Con dependientes con PIN, abre una persona identificada (0033).
