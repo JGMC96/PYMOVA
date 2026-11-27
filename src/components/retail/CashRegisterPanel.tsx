@@ -1,10 +1,9 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Wallet, Lock, Unlock, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -14,11 +13,15 @@ import { useCashMovements } from '@/hooks/useCashMovements';
 import { useCashRegister } from '@/hooks/useCashRegister';
 import { useRoleAccess } from '@/hooks/useRoleAccess';
 import { useSellerSession } from '@/contexts/SellerSessionContext';
+import { useTicketConfig } from '@/hooks/useTicketConfig';
 import { movementTotals } from '@/lib/cashMovements';
+import { parseCash, suggestedOpening, type ClosingDoc } from '@/lib/cierreCaja';
+import { printClosing } from '@/lib/ticket';
 import { PAYMENT_LABELS } from '@/lib/storeProfiles';
 import { cn } from '@/lib/utils';
 import { CashMovementsCard, ClosedSessionMovementsDialog } from './CashMovements';
 import { CashRegisterStaleBanner } from './CashRegisterStaleBanner';
+import { CloseRegisterDialog, type CloseRequest } from './CloseRegisterDialog';
 
 const fmt = (n: number | null | undefined) => `${(n ?? 0).toFixed(2)} €`;
 const fmtDate = (iso: string | null) =>
@@ -34,6 +37,7 @@ export function CashRegisterPanel() {
   const {
     movements, isSaving: isSavingMovement, refresh: refreshMovements, createMovement, voidMovement,
   } = useCashMovements(openSession?.id);
+  const { business: ticketBusiness, prefs: ticketPrefs } = useTicketConfig();
   const totals = movementTotals(movements);
   const expectedCash = Math.round((expectedBeforeMovements + totals.net) * 100) / 100;
   const [movementsOf, setMovementsOf] = useState<string | null>(null);
@@ -46,11 +50,19 @@ export function CashRegisterPanel() {
     id ? employees.find((e) => e.id === id)?.name ?? '—' : '—';
 
   const [openingAmount, setOpeningAmount] = useState('');
-  const [countedAmount, setCountedAmount] = useState('');
-  const [notes, setNotes] = useState('');
+  const [openingTouched, setOpeningTouched] = useState(false);
+  const [closeOpen, setCloseOpen] = useState(false);
+  const [closingId, setClosingId] = useState<string | null>(null);
+  // Retirada ya apuntada en un intento de cierre que falló: al reintentar, solo se cierra.
+  const withdrawnRef = useRef<{ sessionId: string; amount: number } | null>(null);
 
-  const counted = parseFloat(countedAmount);
-  const difference = !isNaN(counted) && !isBlind ? counted - expectedCash : null;
+  // Lo que quedó en el cajón en el último cierre: es el fondo que se propone al abrir.
+  const lastKeep = suggestedOpening(history[0]);
+  useEffect(() => {
+    if (!openSession && !openingTouched && lastKeep !== null) setOpeningAmount(lastKeep.toFixed(2).replace('.', ','));
+  }, [openSession, openingTouched, lastKeep]);
+  const openingValue = parseCash(openingAmount);
+  const openingDiffers = lastKeep !== null && openingValue !== null && Math.abs(openingValue - lastKeep) >= 0.005;
   const salesTotal = summary.reduce((s, r) => s + Number(r.total_amount ?? 0), 0);
   const salesCount = summary.reduce((s, r) => s + Number(r.sales_count), 0);
 
@@ -58,33 +70,71 @@ export function CashRegisterPanel() {
     // Con dependientes con PIN, abre una persona identificada (0033).
     const pick = await chooseSeller('la apertura de caja');
     if (pick.cancelled) return;
-    const ok = await openRegister(parseFloat(openingAmount) || 0, {
+    const ok = await openRegister(openingValue ?? 0, {
       sellerSessionId: pick.seller?.sessionId ?? null,
-    });
-    if (!ok && pick.seller) dropSession(pick.seller.sessionId);
-    if (ok) setOpeningAmount('');
-  };
-
-  const handleClose = async () => {
-    if (isNaN(counted)) return;
-    // Cierra una persona identificada; sin permiso, lo autoriza un encargado (0030).
-    const pick = await chooseSeller('el cierre de caja');
-    if (pick.cancelled) return;
-    let authorizationId: string | null = null;
-    if (!can(pick.seller, 'close_register')) {
-      authorizationId = await authorize('close_register', 'el cierre de caja');
-      if (!authorizationId) return;
-    }
-    const ok = await closeRegister(counted, notes, {
-      sellerSessionId: pick.seller?.sessionId ?? null,
-      authorizationId,
     });
     if (!ok && pick.seller) dropSession(pick.seller.sessionId);
     if (ok) {
-      setCountedAmount('');
-      setNotes('');
+      setOpeningAmount('');
+      setOpeningTouched(false);
     }
   };
+
+  /**
+   * Paso final del asistente: primero los PIN (cierre y, si se retira algo, la retirada), después
+   * la «Retirada al banco» y por último el cierre con lo que queda en el cajón como contado. La
+   * diferencia es la misma que si se cerrara con todo lo contado.
+   */
+  const handleClose = async (req: CloseRequest): Promise<boolean> => {
+    if (!openSession) return false;
+    const sessionId = openSession.id;
+    const already = withdrawnRef.current?.sessionId === sessionId ? withdrawnRef.current.amount : 0;
+    const toWithdraw = Math.round((req.withdrawal - already) * 100) / 100;
+
+    // Cierra una persona identificada; sin permiso, lo autoriza un encargado (0030).
+    const pick = await chooseSeller('el cierre de caja');
+    if (pick.cancelled) return false;
+    let authorizationId: string | null = null;
+    if (!can(pick.seller, 'close_register')) {
+      authorizationId = await authorize('close_register', 'el cierre de caja');
+      if (!authorizationId) return false;
+    }
+    let movementAuth: string | null = null;
+    if (toWithdraw > 0 && requiresSeller) {
+      movementAuth = await authorize('cash_movement', 'la retirada al banco del cierre');
+      if (!movementAuth) {
+        if (pick.seller) dropSession(pick.seller.sessionId);
+        return false;
+      }
+    }
+    if (toWithdraw > 0) {
+      const saved = await createMovement({
+        type: 'withdrawal',
+        amount: toWithdraw,
+        category: null,
+        reason: 'Retirada al cerrar la caja',
+        authorizationId: movementAuth,
+      });
+      if (!saved) {
+        if (pick.seller) dropSession(pick.seller.sessionId);
+        return false;
+      }
+      withdrawnRef.current = { sessionId, amount: already + toWithdraw };
+    }
+    const ok = await closeRegister(req.keep, req.notes, {
+      sellerSessionId: pick.seller?.sessionId ?? null,
+      authorizationId,
+    });
+    if (!ok) {
+      if (pick.seller) dropSession(pick.seller.sessionId);
+      return false;
+    }
+    withdrawnRef.current = null;
+    setClosingId(sessionId);
+    return true;
+  };
+
+  const printClosingDoc = (doc: ClosingDoc) => printClosing(ticketBusiness, doc, ticketPrefs);
 
   if (isLoading) {
     return (
@@ -120,19 +170,27 @@ export function CashRegisterPanel() {
           <CardContent className="space-y-4">
             {!openSession ? (
               <>
-                <div>
-                  <Label htmlFor="opening">Fondo inicial de caja</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="opening">Fondo inicial: el efectivo que hay ahora en el cajón</Label>
                   <Input
                     id="opening"
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    placeholder="0.00"
+                    inputMode="decimal"
+                    placeholder="0,00"
                     value={openingAmount}
-                    onChange={(e) => setOpeningAmount(e.target.value)}
+                    onChange={(e) => {
+                      setOpeningTouched(true);
+                      setOpeningAmount(e.target.value);
+                    }}
                   />
+                  {lastKeep !== null && (
+                    <p className={cn('text-xs', openingDiffers ? 'text-amber-700 dark:text-amber-400' : 'text-muted-foreground')}>
+                      {openingDiffers
+                        ? `Ojo: en el último cierre quedaron ${fmt(lastKeep)} en el cajón. Si ahora hay otra cantidad, cuéntala bien antes de abrir.`
+                        : `Es lo que quedó en el cajón en el último cierre (${fmt(lastKeep)}).`}
+                    </p>
+                  )}
                 </div>
-                <Button className="w-full" onClick={handleOpen} disabled={isWorking}>
+                <Button className="w-full" onClick={handleOpen} disabled={isWorking || openingValue === null}>
                   <Unlock className="w-4 h-4 mr-2" />
                   Abrir caja
                 </Button>
@@ -189,55 +247,13 @@ export function CashRegisterPanel() {
                   )}
                 </div>
 
-                <Separator />
-
-                <div>
-                  <Label htmlFor="counted">Efectivo contado</Label>
-                  <Input
-                    id="counted"
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    placeholder="0.00"
-                    value={countedAmount}
-                    onChange={(e) => setCountedAmount(e.target.value)}
-                  />
-                </div>
-
-                {difference !== null && (
-                  <div
-                    className={cn(
-                      'rounded-lg px-3 py-2 text-sm font-medium flex justify-between',
-                      Math.abs(difference) < 0.01
-                        ? 'bg-primary/10 text-primary'
-                        : 'bg-destructive/10 text-destructive'
-                    )}
-                  >
-                    <span>Diferencia</span>
-                    <span>{fmt(difference)}</span>
-                  </div>
-                )}
-
-                <div>
-                  <Label htmlFor="notes">Notas del arqueo</Label>
-                  <Textarea
-                    id="notes"
-                    rows={2}
-                    placeholder="Incidencias del turno..."
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                  />
-                </div>
-
-                <Button
-                  className="w-full"
-                  variant="destructive"
-                  onClick={handleClose}
-                  disabled={isWorking || isNaN(counted)}
-                >
+                <Button className="w-full" variant="destructive" onClick={() => setCloseOpen(true)} disabled={isWorking}>
                   <Lock className="w-4 h-4 mr-2" />
                   Cerrar caja
                 </Button>
+                <p className="text-xs text-muted-foreground">
+                  Te guía en 3 pasos: repasar el turno, contar el efectivo y decidir cuánto dejas para mañana.
+                </p>
               </>
             )}
           </CardContent>
@@ -406,6 +422,24 @@ export function CashRegisterPanel() {
         </CardContent>
       </Card>
       <ClosedSessionMovementsDialog sessionId={movementsOf} onClose={closeMovementsOf} />
+      <CloseRegisterDialog
+        open={closeOpen}
+        onOpenChange={(o) => {
+          setCloseOpen(o);
+          if (!o) setClosingId(null);
+        }}
+        session={openSession}
+        summary={summary}
+        isBlind={isBlind}
+        cashRefunds={cashRefunds}
+        movements={totals}
+        defaultKeep={Number(openSession?.opening_amount ?? 0) > 0 ? Number(openSession?.opening_amount) : lastKeep ?? 0}
+        isWorking={isWorking || isSavingMovement}
+        closedSession={closingId ? history.find((s) => s.id === closingId) ?? null : null}
+        personName={personName}
+        onConfirm={handleClose}
+        onPrint={printClosingDoc}
+      />
     </div>
   );
 }

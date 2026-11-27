@@ -2,6 +2,7 @@
 import { round2, taxBreakdown } from './tax';
 import { code128Svg } from './barcode';
 import { promoSavings } from './promoPrice';
+import type { ClosingDoc } from './cierreCaja';
 
 export type PaperWidth = '80' | '58';
 
@@ -262,9 +263,13 @@ export function ticketStyles(width: PaperWidth, feedLines: number, style: Pick<T
 
 /** Imprime el ticket en un iframe oculto (sin ventanas emergentes). */
 export function printTicket(biz: TicketBusiness, doc: TicketDoc, prefs: TerminalTicketPrefs) {
-  const body = renderTicketBody(biz, doc);
+  printTicketHtml(biz, doc.number, renderTicketBody(biz, doc), prefs);
+}
+
+/** Imprime un cuerpo de ticket ya dibujado (venta, abono o cierre de caja) en un iframe oculto. */
+function printTicketHtml(biz: TicketBusiness, title: string, body: string, prefs: TerminalTicketPrefs) {
   const copies = Math.max(1, Math.min(prefs.copies, 3));
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(doc.number)}</title>
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(title)}</title>
     <style>${ticketStyles(prefs.paperWidth, prefs.feedLines, biz)} .ticket+.ticket{page-break-before:always}</style></head>
     <body>${Array.from({ length: copies }, () => `<div class="ticket">${body}</div>`).join('')}</body></html>`;
 
@@ -284,6 +289,55 @@ export function printTicket(biz: TicketBusiness, doc: TicketDoc, prefs: Terminal
   const imgs = Array.from(d.images);
   if (imgs.length === 0) setTimeout(go, 50);
   else Promise.all(imgs.map((i) => (i.complete ? null : new Promise((r) => { i.onload = i.onerror = r; })))).then(go);
+}
+
+/**
+ * Resumen del cierre de caja para la impresora de tickets: fondo, ventas por forma de pago,
+ * movimientos, esperado, contado, diferencia, lo retirado y lo que queda para mañana.
+ */
+export function renderClosingBody(biz: TicketBusiness, c: ClosingDoc): string {
+  const row = (label: string, value: string, cls = '') => `<div class="row ${cls}"><span>${esc(label)}</span><span>${value}</span></div>`;
+  const money = (n: number | null) => (n === null ? '—' : eur(n));
+  const neg = (n: number | null) => (n === null ? '—' : n > 0 ? `−${eur(n)}` : eur(0));
+  const date = (iso: string) => ticketDate(new Date(iso));
+  const payments = c.payments.length
+    ? c.payments.map((p) => row(`${p.label} (${p.count})`, money(p.amount))).join('')
+    : '<div class="muted small">Sin ventas en el turno</div>';
+  const diff = c.difference === null
+    ? '—'
+    : Math.abs(c.difference) < 0.005
+      ? 'Cuadra'
+      : `${c.difference < 0 ? 'Faltan' : 'Sobran'} ${eur(Math.abs(c.difference))}`;
+  return `${ticketHeader(biz)}
+  <hr/>
+  <div class="center bold">CIERRE DE CAJA</div>
+  ${row('Apertura', esc(date(c.openedAt)))}
+  ${row('Cierre', esc(date(c.closedAt)))}
+  ${c.openedBy ? row('Abrió', esc(c.openedBy)) : ''}
+  ${c.closedBy ? row('Cerró', esc(c.closedBy)) : ''}
+  <hr/>
+  <div class="bold">Ventas</div>
+  ${payments}
+  <hr/>
+  <div class="bold">Efectivo</div>
+  ${row('Fondo al abrir', eur(c.opening))}
+  ${c.cashRefunds ? row('Devoluciones', neg(c.cashRefunds)) : ''}
+  ${c.cashIn ? row('Entradas de cambio', money(c.cashIn)) : ''}
+  ${c.expenses ? row('Gastos', neg(c.expenses)) : ''}
+  ${c.withdrawalsBefore ? row('Retiradas en el turno', neg(c.withdrawalsBefore)) : ''}
+  ${row('Esperado en el cajón', money(c.expected), 'bold')}
+  ${row('Contado', eur(c.countedTotal), 'bold')}
+  ${row('Diferencia', esc(diff), 'bold')}
+  <hr/>
+  ${row('Retirado al banco', eur(c.withdrawal))}
+  ${row('Queda en caja', eur(c.keep), 'total bold')}
+  ${c.cardTerminal !== null ? row('Datáfono', eur(c.cardTerminal)) : ''}
+  ${c.notes ? `<hr/><div class="small">${multiline(c.notes)}</div>` : ''}`;
+}
+
+/** Imprime el resumen del cierre de caja (una copia). */
+export function printClosing(biz: TicketBusiness, c: ClosingDoc, prefs: TerminalTicketPrefs) {
+  printTicketHtml(biz, 'Cierre de caja', renderClosingBody(biz, c), { ...prefs, copies: 1 });
 }
 
 /** Ticket regalo de una venta: siempre una sola copia, aunque el equipo imprima varias. */
