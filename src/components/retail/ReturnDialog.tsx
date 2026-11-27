@@ -25,6 +25,8 @@ import { useSellerSession } from '@/contexts/SellerSessionContext';
 import { useCashRegister } from '@/hooks/useCashRegister';
 import { useStoreProfile } from '@/hooks/useStoreProfile';
 import { REFUND_LABELS, refundMethods } from '@/lib/storeProfiles';
+import { supabase } from '@/integrations/supabase/client';
+import { largestPaymentMethod } from '@/lib/cobro';
 import { round2 } from '@/lib/tax';
 
 /** Lo cobrado en la línea por las unidades a devolver (con su descuento), igual que create_sale_return. */
@@ -55,14 +57,33 @@ export function ReturnDialog({ open, onOpenChange, saleId, saleNumber, onComplet
   const { profile } = useStoreProfile();
   const [refundMethod, setRefundMethod] = useState('cash');
   const [restock, setRestock] = useState(true);
+  /** Pago mixto (0065): lo que se pagó con cada forma, para proponer el reembolso. */
+  const [mixedPays, setMixedPays] = useState<{ method: string; amount: number }[] | null>(null);
 
   useEffect(() => {
     if (!open || !saleId) return;
+    let cancelled = false;
     setReason('');
     setRefundMethod('cash');
     setRestock(true);
     setQuantities({});
-    fetchSaleDetail(saleId).then(setLines);
+    setMixedPays(null);
+    fetchSaleDetail(saleId).then((l) => { if (!cancelled) setLines(l); });
+    // Venta mixta: se propone devolver con la forma de pago que más pagó.
+    void (async () => {
+      const { data: sale } = await supabase.from('sales').select('payment_method').eq('id', saleId).maybeSingle();
+      if (cancelled || (sale as { payment_method?: string } | null)?.payment_method !== 'mixed') return;
+      const { data: pays } = await supabase.from('sale_payments' as never).select('method, amount').eq('sale_id', saleId);
+      const list = ((pays ?? []) as unknown as { method: string; amount: number | string }[])
+        .map((p) => ({ method: p.method, amount: Number(p.amount) }));
+      if (cancelled) return;
+      setMixedPays(list);
+      const best = largestPaymentMethod(list);
+      if (best) setRefundMethod(best);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [open, saleId, fetchSaleDetail]);
 
   const remaining = (line: SaleDetailLine) => Number(line.quantity) - Number(line.returned_quantity);
@@ -171,6 +192,11 @@ export function ReturnDialog({ open, onOpenChange, saleId, saleNumber, onComplet
                     ))}
                   </SelectContent>
                 </Select>
+                {mixedPays && mixedPays.length > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Pago mixto: {mixedPays.map((p) => `${REFUND_LABELS[p.method] ?? p.method} ${p.amount.toFixed(2)} €`).join(' · ')}
+                  </p>
+                )}
               </div>
               <div className="flex items-end">
                 <label className="flex items-center gap-2 text-sm">

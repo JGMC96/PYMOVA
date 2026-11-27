@@ -34,6 +34,52 @@ export function parseCash(received: string): number | null {
   return isNaN(value) ? null : round2(value);
 }
 
+export interface MixedSplit {
+  /** Lo que se cobra con tarjeta (lo que marca el datáfono). */
+  card: number;
+  /** El resto, en efectivo: sobre esto se calcula el cambio. */
+  cash: number;
+  problem: string | null;
+}
+
+/**
+ * Pago mixto (0065): se escribe la parte con tarjeta y el resto es efectivo. Las dos partes
+ * tienen que ser mayores que 0 (si no, es un pago de una sola forma).
+ */
+export function mixedSplit(due: number, cardInput: string): MixedSplit {
+  const total = round2(due);
+  const raw = cardInput.trim();
+  const card = raw ? parseCash(raw) : null;
+  if (card === null) return { card: 0, cash: total, problem: 'Escribe cuánto se cobra con tarjeta.' };
+  if (card <= 0) return { card, cash: total, problem: 'La parte con tarjeta tiene que ser mayor que 0.' };
+  if (card >= total) {
+    return { card, cash: 0, problem: `Con tarjeta tiene que ser menos de ${total.toFixed(2).replace('.', ',')} €: si es todo, elige «Tarjeta».` };
+  }
+  return { card, cash: round2(total - card), problem: null };
+}
+
+/** Las formas de pago que se mandan a create_sale_with_items (_payments) en un pago mixto. */
+export function mixedPayments(split: MixedSplit): { method: 'card' | 'cash'; amount: number }[] {
+  return [
+    { method: 'card', amount: split.card },
+    { method: 'cash', amount: split.cash },
+  ];
+}
+
+/**
+ * Devolución de una venta mixta: se propone devolver con la forma de pago que más pagó
+ * (con empate, la tarjeta). null si no hay formas de pago.
+ */
+export function largestPaymentMethod(payments: { method: string; amount: number | string }[] | null | undefined): string | null {
+  let best: { method: string; amount: number } | null = null;
+  for (const p of payments ?? []) {
+    const amount = Number(p.amount);
+    if (!(amount > 0)) continue;
+    if (!best || amount > best.amount || (amount === best.amount && p.method === 'card')) best = { method: p.method, amount };
+  }
+  return best?.method ?? null;
+}
+
 /** ¿La caja se abrió un día anterior al de hoy (hora local)? */
 export function isOpenFromEarlierDay(openedAt: string | Date, now = new Date()): boolean {
   const opened = new Date(openedAt);

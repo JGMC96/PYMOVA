@@ -82,6 +82,7 @@ export const PAYMENT_LABELS: Record<string, string> = {
   transfer: 'Transferencia',
   bizum: 'Bizum',
   store_credit: 'Vale',
+  mixed: 'Efectivo y tarjeta',
 }
 
 const DEFAULT_TAX_RATE = 21

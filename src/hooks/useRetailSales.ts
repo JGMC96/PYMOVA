@@ -69,6 +69,8 @@ export interface CreateSaleData {
   /** Vale de tienda con el que se paga parte o todo el total (0039). */
   voucher_code?: string | null;
   voucher_amount?: number | null;
+  /** Pago mixto (0065): efectivo y tarjeta con su importe. Solo se manda si hay reparto. */
+  payments?: { method: string; amount: number }[] | null;
 }
 
 
@@ -151,6 +153,9 @@ export function useRetailSales() {
         _authorization_id: data.authorization_id ?? null,
         _voucher_code: data.voucher_code ?? null,
         _voucher_amount: data.voucher_amount ?? null,
+        // Parámetro nuevo de la 0065: solo en un pago mixto, para que el resto de ventas no
+        // dependa de que la migración esté aplicada.
+        ...(data.payments?.length ? { _payments: data.payments } : {}),
       } as never);
 
       if (error) throw error;

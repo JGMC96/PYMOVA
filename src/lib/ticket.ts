@@ -81,6 +81,8 @@ export interface TicketDoc {
   originalNumber?: string | null;
   /** Cliente de la venta, si se eligió en el TPV. */
   clientName?: string | null;
+  /** Pago mixto (0065): cada forma de pago con su importe (sin el vale). */
+  payments?: { method: string; amount: number }[] | null;
   /** Venta: parte pagada con un vale de tienda (el resto, con paymentMethod). */
   voucherPaid?: { code: string; amount: number; balanceLeft?: number | null } | null;
   /** Abono: vale de tienda creado con lo devuelto. */
@@ -95,6 +97,7 @@ export const paymentLabels: Record<string, string> = {
   transfer: 'Transferencia',
   bizum: 'Bizum',
   store_credit: 'Vale',
+  mixed: 'Mixto',
 };
 
 const esc = (s: string) =>
@@ -226,7 +229,9 @@ export function renderTicketBody(biz: TicketBusiness, doc: TicketDoc): string {
   ${totalSaved > 0 ? `<div class="row bold"><span>Has ahorrado</span><span>${eur(totalSaved)}</span></div>` : ''}
   ${doc.voucherPaid ? `<div class="row"><span>Vale ${esc(doc.voucherPaid.code)}</span><span>${eur(doc.voucherPaid.amount)}</span></div>` : ''}
   ${doc.voucherPaid && doc.voucherPaid.balanceLeft != null ? `<div class="row muted"><span>&nbsp;&nbsp;Saldo que queda</span><span>${eur(doc.voucherPaid.balanceLeft)}</span></div>` : ''}
-  ${doc.paymentMethod && !(doc.voucherPaid && doc.paymentMethod === 'store_credit') ? `<div class="row"><span>${doc.kind === 'refund' ? 'Reembolso' : 'Pago'}</span><span>${esc(paymentLabels[doc.paymentMethod] ?? doc.paymentMethod)}</span></div>` : ''}
+  ${doc.payments && doc.payments.length > 1
+    ? doc.payments.map((p) => `<div class="row"><span>${esc(paymentLabels[p.method] ?? p.method)}</span><span>${eur(p.amount)}</span></div>`).join('')
+    : doc.paymentMethod && !(doc.voucherPaid && doc.paymentMethod === 'store_credit') ? `<div class="row"><span>${doc.kind === 'refund' ? 'Reembolso' : 'Pago'}</span><span>${esc(paymentLabels[doc.paymentMethod] ?? doc.paymentMethod)}</span></div>` : ''}
   ${doc.cashReceived != null ? `<div class="row"><span>Entregado</span><span>${eur(doc.cashReceived)}</span></div>` : ''}
   ${doc.change != null && doc.change > 0 ? `<div class="row"><span>Cambio</span><span>${eur(doc.change)}</span></div>` : ''}
   <div class="muted small">IVA incluido</div>

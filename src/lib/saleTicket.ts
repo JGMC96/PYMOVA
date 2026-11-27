@@ -18,6 +18,8 @@ export interface StoredSaleRow {
   voucher_amount: number | string | null;
   clients: { name: string | null } | null;
   store_vouchers: { code: string } | null;
+  /** Pago mixto (0065): de sale_payments; solo se piden si payment_method es 'mixed'. */
+  payments?: { method: string; amount: number | string }[] | null;
   sale_items: {
     product_name: string;
     quantity: number | string;
@@ -118,6 +120,11 @@ export function saleTicketDoc(row: StoredSaleRow, taxRate: number, cashier: stri
       voucherAmount > 0 && row.store_vouchers
         ? { code: row.store_vouchers.code, amount: voucherAmount, balanceLeft: null }
         : null,
+    payments: row.payments?.length
+      ? [...row.payments]
+        .map((p) => ({ method: p.method, amount: Number(p.amount) }))
+        .sort((a, b) => (a.method === 'card' ? -1 : 0) - (b.method === 'card' ? -1 : 0))
+      : null,
     lines: row.sale_items.map((i) => {
       const quantity = Number(i.quantity);
       const unitPrice = Number(i.unit_price);

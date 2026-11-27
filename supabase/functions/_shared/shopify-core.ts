@@ -992,21 +992,31 @@ export const VOUCHER_GATEWAY = 'Vale de tienda';
 
 /**
  * Cobros del pedido de una venta de tienda: lo pagado con vale (si hay) y el resto con el
- * método de la venta. Sin importes a 0: una venta de 0 € no tiene cobros, porque Shopify
- * rechaza los de importe 0. El vale nunca pasa del total (lo exige la venta).
+ * método de la venta, o repartido entre sus formas de pago si es un pago mixto (0065). Sin
+ * importes a 0: una venta de 0 € no tiene cobros, porque Shopify rechaza los de importe 0. El
+ * vale nunca pasa del total (lo exige la venta). En un pago mixto, las partes no pasan del
+ * resto (la propina, si la hubiera, no va al pedido): primero la tarjeta y lo demás, efectivo.
  */
 export function posSaleTransactions(
   total: number,
   voucherAmount: number,
-  gateway: string,
+  gateway: string | { gateway: string; amount: number }[],
 ): { gateway: string; amount: number }[] {
   const t = Math.round(Number(total) * 100) / 100;
   const v = Math.min(Math.max(Math.round(Number(voucherAmount || 0) * 100) / 100, 0), t);
   const rest = Math.round((t - v) * 100) / 100;
-  return [
-    ...(v > 0 ? [{ gateway: VOUCHER_GATEWAY, amount: v }] : []),
-    ...(rest > 0 ? [{ gateway, amount: rest }] : []),
-  ];
+  const voucher = v > 0 ? [{ gateway: VOUCHER_GATEWAY, amount: v }] : [];
+  if (typeof gateway === 'string') return [...voucher, ...(rest > 0 ? [{ gateway, amount: rest }] : [])];
+  let left = Math.round(rest * 100);
+  const parts: { gateway: string; amount: number }[] = [];
+  for (const p of gateway) {
+    const take = Math.min(Math.max(Math.round(Number(p.amount) * 100), 0), left);
+    if (take > 0) {
+      parts.push({ gateway: p.gateway, amount: take / 100 });
+      left -= take;
+    }
+  }
+  return [...voucher, ...parts];
 }
 
 /** Nombre del IVA en los pedidos: el mismo que ponen los pedidos web, para que los informes los junten. */
@@ -1049,11 +1059,13 @@ export interface ShopifyOrderTransaction {
 /**
  * Reparte un reembolso entre los cobros del pedido, sin pasar de lo que le queda a cada uno
  * (lo cobrado menos sus reembolsos). Primero el dinero (tarjeta, efectivo…) y al final el vale.
- * Si no llega, se reparte lo que se puede.
+ * Con `preferredGateway` (la forma de reembolso en PYMOVA, p. ej. «Efectivo» en un pago mixto),
+ * ese cobro va el primero. Si no llega, se reparte lo que se puede.
  */
 export function planRefundTransactions(
   transactions: ShopifyOrderTransaction[],
   amount: number,
+  preferredGateway?: string | null,
 ): { parentId: string; gateway: string; amount: number }[] {
   const cents = (s: string | number | undefined | null) => Math.round(Number(s ?? 0) * 100);
   const ok = transactions.filter((t) => t.status === 'SUCCESS');
@@ -1065,7 +1077,9 @@ export function planRefundTransactions(
   }
   const parents = ok
     .filter((t) => t.kind === 'SALE' || t.kind === 'CAPTURE')
-    .sort((a, b) => Number(a.gateway === VOUCHER_GATEWAY) - Number(b.gateway === VOUCHER_GATEWAY));
+    .sort((a, b) =>
+      Number(a.gateway === VOUCHER_GATEWAY) - Number(b.gateway === VOUCHER_GATEWAY)
+      || Number(b.gateway === preferredGateway) - Number(a.gateway === preferredGateway));
   let left = cents(amount);
   const plan: { parentId: string; gateway: string; amount: number }[] = [];
   for (const p of parents) {

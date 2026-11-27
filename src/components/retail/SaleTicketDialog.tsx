@@ -32,6 +32,8 @@ export interface TicketData {
   clientCanEmail?: boolean;
   /** Parte pagada con vale de tienda y saldo que le queda. */
   voucherPaid?: { code: string; amount: number; balanceLeft: number } | null;
+  /** Pago mixto (0065): tarjeta y efectivo con su importe. */
+  payments?: { method: string; amount: number }[] | null;
 }
 
 interface SaleTicketDialogProps {
@@ -56,6 +58,7 @@ export function toTicketDoc(t: TicketData): TicketDoc {
     cashier: t.cashier ?? null,
     clientName: t.clientName ?? null,
     voucherPaid: t.voucherPaid ?? null,
+    payments: t.payments ?? null,
     lines: t.items.map((i) => {
       const key = i.variant_id ?? i.product_id;
       const orig = t.originalTotals?.[key] ?? i.total;
