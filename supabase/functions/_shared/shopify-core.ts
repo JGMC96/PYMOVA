@@ -692,6 +692,43 @@ export function isPymovaPosOrder(order: { tags?: unknown } | null | undefined): 
   return tags.some((t) => t.trim() === POS_ORDER_TAG);
 }
 
+/**
+ * Estado de un pedido web al guardarlo desde Shopify. Shopify manda en enviado, cancelado y
+ * devuelto. «Aceptado» y «Preparando» son de PYMOVA (Shopify no los conoce): un aviso de un
+ * pedido sin enviar no los deshace. «Entregado» tampoco vuelve a «Enviado».
+ */
+export function mergeOrderStatus(local: string | null | undefined, remote: string): string {
+  if (local === 'preparing' && (remote === 'pending' || remote === 'accepted')) return 'preparing';
+  if (local === 'accepted' && remote === 'pending') return 'accepted';
+  if (local === 'delivered' && remote === 'shipped') return 'delivered';
+  return remote;
+}
+
+/** Bloque de envío (fulfillment order) de un pedido de Shopify. */
+export interface ShopifyFulfillmentOrderRef {
+  id: string;
+  status: string;
+}
+
+/**
+ * Bloques que se pueden enviar ahora: los abiertos o en curso. Uno por ubicación, y se envían
+ * de uno en uno (fulfillmentCreate exige que todos los de una llamada sean de la misma ubicación).
+ */
+export function fulfillmentOrdersToShip(orders: ShopifyFulfillmentOrderRef[]): string[] {
+  return orders.filter((o) => o.status === 'OPEN' || o.status === 'IN_PROGRESS').map((o) => o.id);
+}
+
+/** Seguimiento del envío: sin número, no se manda (el envío se crea igual, sin seguimiento). */
+export function shipmentTracking(
+  company: unknown,
+  number: unknown,
+): { company?: string; number: string } | undefined {
+  const n = String(number ?? '').trim();
+  if (!n) return undefined;
+  const c = String(company ?? '').trim();
+  return c ? { company: c, number: n } : { number: n };
+}
+
 export const ORDER_TOPICS = [
   'orders/create',
   'orders/updated',

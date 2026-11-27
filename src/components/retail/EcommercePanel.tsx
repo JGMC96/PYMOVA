@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import {
-  Ban, Check, Loader2, Package, PackageCheck, RefreshCw, RotateCcw, ShoppingBag, Truck,
+  Ban, Check, ClipboardList, Loader2, Package, PackageCheck, RefreshCw, RotateCcw, ShoppingBag, Truck,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -14,10 +15,13 @@ import {
 import {
   useOnlineOrders, ORDER_STATUS_LABEL, type OnlineOrder, type OnlineOrderStatus,
 } from '@/hooks/useOnlineOrders';
-import { useShopifyOrdersSync } from '@/hooks/useShopifyOrdersSync';
+import { fetchPickingOrders, useShopifyOrdersSync } from '@/hooks/useShopifyOrdersSync';
+import { useBusiness } from '@/contexts/BusinessContext';
+import { printPickingList, type PickingOrder } from '@/lib/pickingList';
 import { OnlineOrderDialog } from './OnlineOrderDialog';
 import { OnlineOrderReturnDialog } from './OnlineOrderReturnDialog';
 import { OnlineRevenueCard } from './OnlineRevenueCard';
+import { ShipOrderDialog } from './ShipOrderDialog';
 import { useRoleAccess } from '@/hooks/useRoleAccess';
 
 const STATUS_STYLES: Record<OnlineOrderStatus, string> = {
@@ -61,6 +65,40 @@ export function EcommercePanel() {
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [returnOrder, setReturnOrder] = useState<OnlineOrder | null>(null);
+  const [shipOrder, setShipOrder] = useState<OnlineOrder | null>(null);
+  const [isPrinting, setIsPrinting] = useState(false);
+  const { activeBusinessId } = useBusiness();
+
+  // Pedidos por preparar: los aceptados y en preparación que se ven en la lista.
+  const toPrepare = useMemo(
+    () => orders.filter((o) => o.status === 'accepted' || o.status === 'preparing'),
+    [orders],
+  );
+
+  const printPicking = async () => {
+    if (!activeBusinessId || toPrepare.length === 0) return;
+    setIsPrinting(true);
+    try {
+      const shopify = toPrepare.filter((o) => o.source === 'shopify');
+      // Los de Shopify, con talla y SKU en vivo; los creados aquí, con sus líneas.
+      const fromShopify = shopify.length ? await fetchPickingOrders(activeBusinessId, shopify.map((o) => o.id)) : [];
+      const local: PickingOrder[] = toPrepare
+        .filter((o) => o.source !== 'shopify')
+        .map((o) => ({
+          name: o.order_number,
+          customer: o.customer_name,
+          city: null,
+          lines: (o.online_order_items ?? []).map((i) => ({
+            title: i.product_name, size: null, sku: null, barcode: null, quantity: Number(i.quantity),
+          })),
+        }));
+      printPickingList([...fromShopify, ...local]);
+    } catch (err) {
+      toast.error(`No se ha podido preparar la lista: ${err instanceof Error ? err.message : 'error desconocido'}`);
+    } finally {
+      setIsPrinting(false);
+    }
+  };
 
   const stats = useMemo(() => {
     const pending = orders.filter((o) => o.status === 'pending').length;
@@ -115,6 +153,14 @@ export function EcommercePanel() {
                 <RefreshCw className="w-4 h-4 mr-2" />
               )}
               Sincronizar Shopify
+            </Button>
+            <Button variant="outline" onClick={printPicking} disabled={isPrinting || toPrepare.length === 0}>
+              {isPrinting ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <ClipboardList className="w-4 h-4 mr-2" />
+              )}
+              Lista de preparación
             </Button>
             <Button variant="ghost" onClick={() => diagnoseShopify()}>
               Comprobar permisos
@@ -178,7 +224,9 @@ export function EcommercePanel() {
                               size="sm"
                               variant="outline"
                               disabled={isSubmitting}
-                              onClick={() => setStatus(order.id, action.next)}
+                              onClick={() =>
+                                action.next === 'shipped' ? setShipOrder(order) : setStatus(order.id, action.next)
+                              }
                             >
                               <ActionIcon className="w-3.5 h-3.5 mr-1.5" />
                               {action.label}
@@ -221,6 +269,12 @@ export function EcommercePanel() {
         onOpenChange={setIsFormOpen}
         onSubmit={createOrder}
         isSubmitting={isSubmitting}
+      />
+      <ShipOrderDialog
+        order={shipOrder}
+        onOpenChange={(open) => !open && setShipOrder(null)}
+        isSubmitting={isSubmitting}
+        onSubmit={(orderId, shipment) => setStatus(orderId, 'shipped', shipment)}
       />
       <OnlineOrderReturnDialog
         order={returnOrder}

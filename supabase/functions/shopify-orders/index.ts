@@ -4,10 +4,13 @@ import {
   adminGraphql,
   buildUpsertArgs,
   getShopDomain,
+  localOrderStatuses,
   ORDERS_HISTORY_QUERY,
   ORDERS_QUERY,
   type ShopifyAdminOrder,
 } from '../_shared/shopify-admin.ts';
+import { shopifyGraphql } from '../_shared/shopify-client.ts';
+import { fulfillmentOrdersToShip, isPymovaPosOrder, shipmentTracking } from '../_shared/shopify-core.ts';
 import { upsertShopifyCustomers } from '../_shared/shopify-customers-db.ts';
 import { historyBuyers } from '../_shared/shopify-history.ts';
 
@@ -29,6 +32,63 @@ const WEBHOOK_TOPICS = [
   'CUSTOMERS_DELETE',
   'APP_UNINSTALLED',
 ];
+
+/** Permisos de Shopify para leer y crear envíos en las ubicaciones de la tienda. */
+const FULFILLMENT_SCOPES = ['read_merchant_managed_fulfillment_orders', 'write_merchant_managed_fulfillment_orders'];
+
+const FULFILLMENT_ORDERS_QUERY = `
+  query PedidoParaEnviar($id: ID!) {
+    order(id: $id) {
+      id
+      tags
+      fulfillmentOrders(first: 10) { nodes { id status } }
+    }
+  }
+`;
+
+const FULFILLMENT_CREATE = `
+  mutation EnviarPedido($fulfillment: FulfillmentInput!) {
+    fulfillmentCreate(fulfillment: $fulfillment) {
+      fulfillment { id status }
+      userErrors { field message }
+    }
+  }
+`;
+
+const PICKING_QUERY = `
+  query ListaDePreparacion($ids: [ID!]!) {
+    nodes(ids: $ids) {
+      ... on Order {
+        id
+        name
+        tags
+        shippingAddress { name city }
+        lineItems(first: 100) {
+          nodes { title variantTitle sku currentQuantity variant { barcode } }
+        }
+      }
+    }
+  }
+`;
+
+type PickingNode = {
+  id: string;
+  name: string;
+  tags: string[];
+  shippingAddress: { name: string | null; city: string | null } | null;
+  lineItems: {
+    nodes: Array<{
+      title: string;
+      variantTitle: string | null;
+      sku: string | null;
+      currentQuantity: number;
+      variant: { barcode: string | null } | null;
+    }>;
+  };
+};
+
+/** Acciones que puede hacer el personal (preparar y enviar); el resto, solo administradores. */
+const STAFF_ACTIONS = ['push-status', 'picking-list'];
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -54,12 +114,15 @@ Deno.serve(async (req) => {
     const businessId = String(body.business_id ?? '');
     if (!businessId) return json({ error: 'Falta el negocio activo' }, 400);
 
-    const { data: isAdmin } = await userClient.rpc('has_min_role', {
+    const staffAction = STAFF_ACTIONS.includes(action);
+    const { data: hasRole } = await userClient.rpc('has_min_role', {
       _business_id: businessId,
-      _min_role: 'admin',
+      _min_role: staffAction ? 'staff' : 'admin',
     });
     const { data: isSuper } = await userClient.rpc('is_super_admin');
-    if (!isAdmin && !isSuper) return json({ error: 'Necesitas permisos de administrador' }, 403);
+    if (!hasRole && !isSuper) {
+      return json({ error: staffAction ? 'No tienes permisos en este negocio' : 'Necesitas permisos de administrador' }, 403);
+    }
 
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
     const shop = getShopDomain();
@@ -198,11 +261,12 @@ Deno.serve(async (req) => {
             query: `updated_at:>='${since}' AND -tag:pymova-tpv`,
           });
 
+          const localStatus = await localOrderStatuses(admin, businessId, data.orders.edges.map((e) => e.node.id));
           for (const { node } of data.orders.edges) {
             try {
               const { data: result, error } = await admin.rpc(
                 'upsert_external_order',
-                buildUpsertArgs(businessId, node) as never,
+                buildUpsertArgs(businessId, node, localStatus.get(node.id)) as never,
               );
               if (error) throw error;
               const row = Array.isArray(result) ? result[0] : result;
@@ -305,11 +369,12 @@ Deno.serve(async (req) => {
         }
 
         const saved: string[] = [];
+        const localStatus = await localOrderStatuses(admin, businessId, nodes.map((n) => n.id));
         for (const node of nodes) {
           try {
             const { data: result, error } = await admin.rpc(
               'upsert_external_order',
-              buildUpsertArgs(businessId, node) as never,
+              buildUpsertArgs(businessId, node, localStatus.get(node.id)) as never,
             );
             if (error) throw error;
             const row = Array.isArray(result) ? result[0] : result;
@@ -346,7 +411,6 @@ Deno.serve(async (req) => {
     if (action === 'push-status') {
       const orderId = String(body.order_id ?? '');
       const status = String(body.status ?? '');
-      const tracking = body.tracking_number ? String(body.tracking_number) : null;
       if (!orderId || !status) return json({ error: 'Faltan datos del pedido' }, 400);
 
       const { data: order } = await admin
@@ -361,61 +425,95 @@ Deno.serve(async (req) => {
         return json({ ok: true, skipped: 'El pedido no proviene de Shopify' });
       }
 
+      // Las ventas de la caja de PYMOVA nunca se preparan ni se envían desde aquí.
+      const { data: posSale } = await admin
+        .from('sales')
+        .select('id')
+        .eq('business_id', businessId)
+        .eq('shopify_order_gid', order.external_id)
+        .limit(1)
+        .maybeSingle();
+      if (posSale) return json({ error: 'Es una venta de la caja de PYMOVA: no se envía desde Pedidos web' }, 409);
+
       if (status === 'shipped') {
-        const data = await adminGraphql<{
-          order: { fulfillmentOrders: { edges: Array<{ node: { id: string; status: string } }> } } | null;
-        }>(
-          `query($id: ID!) {
-             order(id: $id) {
-               fulfillmentOrders(first: 10) { edges { node { id status } } }
-             }
-           }`,
-          { id: order.external_id },
-        );
+        const data = await shopifyGraphql<{
+          order: { id: string; tags: string[]; fulfillmentOrders: { nodes: Array<{ id: string; status: string }> } } | null;
+        }>(FULFILLMENT_ORDERS_QUERY, { id: order.external_id }, { requiredScopes: FULFILLMENT_SCOPES });
+        if (!data.order) return json({ error: 'El pedido ya no existe en Shopify' }, 404);
+        if (isPymovaPosOrder(data.order)) {
+          return json({ error: 'Es una venta de la caja de PYMOVA: no se envía desde Pedidos web' }, 409);
+        }
 
-        const openOrders = (data.order?.fulfillmentOrders.edges ?? [])
-          .filter((e) => ['OPEN', 'IN_PROGRESS', 'SCHEDULED'].includes(e.node.status))
-          .map((e) => ({ fulfillmentOrderId: e.node.id }));
-
-        if (openOrders.length > 0) {
-          const result = await adminGraphql<{
-            fulfillmentCreateV2: { userErrors: Array<{ message: string }> };
+        const toShip = fulfillmentOrdersToShip(data.order.fulfillmentOrders.nodes);
+        if (toShip.length === 0) {
+          return json({ ok: true, skipped: 'En Shopify no queda nada por enviar de este pedido' });
+        }
+        const trackingInfo = shipmentTracking(body.tracking_company, body.tracking_number);
+        const notifyCustomer = body.notify_customer !== false;
+        // Uno por bloque: fulfillmentCreate exige que los de una misma llamada sean de la misma ubicación.
+        for (const fulfillmentOrderId of toShip) {
+          const result = await shopifyGraphql<{
+            fulfillmentCreate: { fulfillment: { id: string } | null; userErrors: Array<{ message: string }> };
           }>(
-            `mutation Fulfill($fulfillment: FulfillmentV2Input!) {
-               fulfillmentCreateV2(fulfillment: $fulfillment) {
-                 userErrors { message }
-               }
-             }`,
+            FULFILLMENT_CREATE,
             {
               fulfillment: {
-                lineItemsByFulfillmentOrder: openOrders,
-                notifyCustomer: true,
-                trackingInfo: tracking ? { number: tracking } : undefined,
+                lineItemsByFulfillmentOrder: [{ fulfillmentOrderId }],
+                notifyCustomer,
+                ...(trackingInfo ? { trackingInfo } : {}),
               },
             },
+            { requiredScopes: FULFILLMENT_SCOPES },
           );
-          const errors = result.fulfillmentCreateV2?.userErrors ?? [];
+          const errors = result.fulfillmentCreate?.userErrors ?? [];
           if (errors.length) throw new Error(errors.map((e) => e.message).join(', '));
         }
+        return json({ ok: true, shipped: toShip.length });
       }
 
+      // Cancelar desde PYMOVA no toca Shopify: allí se repone el stock y, con Stockagile, podría
+      // reponerse dos veces. Se cancela en Shopify a mano.
       if (status === 'cancelled') {
-        const withRefund = body.refund === true;
-        const result = await adminGraphql<{
-          orderCancel: { userErrors: Array<{ message: string }> };
-        }>(
-          `mutation Cancel($orderId: ID!, $refund: Boolean!) {
-             orderCancel(orderId: $orderId, reason: OTHER, refund: $refund, restock: true, notifyCustomer: true) {
-               userErrors { message }
-             }
-           }`,
-          { orderId: order.external_id, refund: withRefund },
-        );
-        const errors = result.orderCancel?.userErrors ?? [];
-        if (errors.length) throw new Error(errors.map((e) => e.message).join(', '));
+        return json({ ok: true, skipped: 'Cancelado en PYMOVA. Cancélalo también en Shopify.' });
       }
 
       return json({ ok: true });
+    }
+
+    if (action === 'picking-list') {
+      const ids = (Array.isArray(body.order_ids) ? body.order_ids : []).map(String).slice(0, 100);
+      if (ids.length === 0) return json({ error: 'Elige los pedidos' }, 400);
+
+      const { data: rows, error: rowsError } = await admin
+        .from('online_orders')
+        .select('id, external_id')
+        .eq('business_id', businessId)
+        .eq('source', 'shopify')
+        .in('id', ids);
+      if (rowsError) throw rowsError;
+      const gids = (rows ?? []).map((r) => r.external_id as string | null).filter((g): g is string => !!g);
+      if (gids.length === 0) return json({ ok: true, orders: [] });
+
+      const data = await shopifyGraphql<{ nodes: Array<PickingNode | null> }>(
+        PICKING_QUERY,
+        { ids: gids },
+        { requiredScopes: ['read_orders'] },
+      );
+      const orders = (data.nodes ?? [])
+        .filter((n): n is PickingNode => !!n?.id && !isPymovaPosOrder(n))
+        .map((n) => ({
+          name: n.name,
+          customer: n.shippingAddress?.name ?? null,
+          city: n.shippingAddress?.city ?? null,
+          lines: n.lineItems.nodes.map((l) => ({
+            title: l.title,
+            size: l.variantTitle,
+            sku: l.sku,
+            barcode: l.variant?.barcode ?? null,
+            quantity: l.currentQuantity,
+          })),
+        }));
+      return json({ ok: true, orders });
     }
 
     if (action === 'push-refund') {

@@ -1,4 +1,6 @@
 // Consultas y mapeos de pedidos. La autenticación vive en shopify-client.ts.
+import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
+import { mergeOrderStatus } from './shopify-core.ts';
 import {
   SHOPIFY_API_VERSION,
   getShopDomain,
@@ -166,7 +168,28 @@ export function formatAddress(order: ShopifyAdminOrder): string | null {
     .join(', ') || null;
 }
 
-export function buildUpsertArgs(businessId: string, order: ShopifyAdminOrder) {
+/**
+ * Estado actual en PYMOVA de unos pedidos de Shopify (por su gid), para no deshacer al
+ * guardarlos el «Aceptado» o «Preparando» que se puso aquí (mergeOrderStatus).
+ */
+export async function localOrderStatuses(
+  admin: SupabaseClient,
+  businessId: string,
+  externalIds: string[],
+): Promise<Map<string, string>> {
+  const ids = [...new Set(externalIds.filter(Boolean))];
+  if (ids.length === 0) return new Map();
+  const { data, error } = await admin
+    .from('online_orders')
+    .select('external_id, status')
+    .eq('business_id', businessId)
+    .eq('source', 'shopify')
+    .in('external_id', ids);
+  if (error) throw error;
+  return new Map((data ?? []).map((r) => [r.external_id as string, r.status as string]));
+}
+
+export function buildUpsertArgs(businessId: string, order: ShopifyAdminOrder, localStatus?: string | null) {
   const customerName =
     [order.customer?.firstName, order.customer?.lastName].filter(Boolean).join(' ').trim() ||
     (order.shippingAddress?.name ?? '') ||
@@ -194,7 +217,7 @@ export function buildUpsertArgs(businessId: string, order: ShopifyAdminOrder) {
     _customer_email: order.customer?.email ?? order.email,
     _customer_phone: order.customer?.phone ?? order.phone,
     _shipping_address: formatAddress(order),
-    _status: mapOrderStatus(order),
+    _status: mergeOrderStatus(localStatus, mapOrderStatus(order)),
     _payment_status: mapPaymentStatus(order),
     _payment_method: 'shopify',
     _subtotal: num(order.currentSubtotalPriceSet),
