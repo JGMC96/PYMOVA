@@ -678,6 +678,20 @@ export function resolveClientMatch(
 // Webhooks
 // ---------------------------------------------------------------------------
 
+/** Etiqueta de los pedidos que crea PYMOVA para las ventas de la caja (shopify-pos-order). */
+export const POS_ORDER_TAG = 'pymova-tpv';
+
+/**
+ * ¿Es un pedido de una venta de la caja de PYMOVA? Mira sus etiquetas: en el pedido de la
+ * API son una lista; en el aviso de un pedido, un texto separado por comas. El aviso de un
+ * reembolso no trae etiquetas: hay que mirarlas en el pedido leído de Shopify.
+ */
+export function isPymovaPosOrder(order: { tags?: unknown } | null | undefined): boolean {
+  const raw = order?.tags;
+  const tags = Array.isArray(raw) ? raw.map(String) : String(raw ?? '').split(',');
+  return tags.some((t) => t.trim() === POS_ORDER_TAG);
+}
+
 export const ORDER_TOPICS = [
   'orders/create',
   'orders/updated',

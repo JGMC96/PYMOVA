@@ -4,6 +4,7 @@ import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
 import {
   catalogAction,
   isCatalogTopic,
+  isPymovaPosOrder,
   levelFromInventoryWebhook,
   ORDER_TOPICS,
   orderGidFromPayload,
@@ -74,7 +75,7 @@ export async function processEvent(
       return { status: 'ignored', message: 'La sincronización de pedidos está desactivada' };
     }
 
-    if (String((payload as { tags?: unknown })?.tags ?? '').split(',').map((t) => t.trim()).includes('pymova-tpv')) {
+    if (isPymovaPosOrder(payload)) {
       return { status: 'ignored', message: 'Venta de tienda creada por Pymova' };
     }
     const orderGid = orderGidFromPayload(payload);
@@ -86,6 +87,24 @@ export async function processEvent(
       { requiredScopes: ['read_orders'] },
     );
     if (!data.order) return { status: 'ignored', message: 'Pedido no encontrado en Shopify' };
+
+    // El aviso de un reembolso no trae las etiquetas del pedido: una venta de la caja que se
+    // devuelve se guardaba como pedido web. Se mira en el pedido leído y, por si alguien quita
+    // la etiqueta en Shopify, también si hay una venta de la caja con ese pedido.
+    if (isPymovaPosOrder(data.order)) {
+      return { status: 'ignored', message: `Venta de tienda creada por Pymova (${topic})` };
+    }
+    const { data: posSale, error: posSaleError } = await admin
+      .from('sales')
+      .select('id')
+      .eq('business_id', event.business_id)
+      .eq('shopify_order_gid', data.order.id)
+      .limit(1)
+      .maybeSingle();
+    if (posSaleError) throw posSaleError;
+    if (posSale) {
+      return { status: 'ignored', message: `Venta de tienda creada por Pymova (${topic})` };
+    }
 
     const { data: result, error } = await admin.rpc(
       'upsert_external_order',
