@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { CAMPAIGN_COLORS } from '@/lib/marketingPlan';
+import { CAMPAIGN_BRIEF_TEMPLATE } from '@/lib/marketingCampaignKit';
 import type { MarketingCampaign } from '@/types/database';
 import type { CampaignFormData } from '@/hooks/useMarketingCampaigns';
 
@@ -232,9 +233,27 @@ export function CampaignFormDialog({
                 name="notes"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Notas</FormLabel>
+                    <div className="flex items-center justify-between gap-2">
+                      <FormLabel>Brief y notas</FormLabel>
+                      {!readOnly && !field.value?.trim() && (
+                        <Button
+                          type="button"
+                          variant="link"
+                          size="sm"
+                          className="h-auto p-0"
+                          onClick={() => form.setValue('notes', CAMPAIGN_BRIEF_TEMPLATE, { shouldDirty: true })}
+                        >
+                          Usar plantilla de brief
+                        </Button>
+                      )}
+                    </div>
                     <FormControl>
-                      <Textarea rows={3} className="resize-none" placeholder="Descuentos, productos, ideas…" {...field} />
+                      <Textarea
+                        rows={field.value?.includes('\n') ? 8 : 3}
+                        className="resize-y"
+                        placeholder="Qué ofrecemos, para quién, mensaje, productos, canales…"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

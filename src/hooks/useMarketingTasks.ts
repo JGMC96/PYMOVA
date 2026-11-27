@@ -113,6 +113,20 @@ export function useMarketingTasks() {
     [activeBusinessId, run],
   );
 
+  // Varias de golpe (plantilla de campaña): un solo insert, sin responsable.
+  const addTasks = useCallback(
+    (rows: TaskFormData[]) => {
+      if (!activeBusinessId || rows.length === 0) return Promise.resolve(false);
+      const payload = rows.map((r) => ({ ...normalize(r), business_id: activeBusinessId }));
+      return run(
+        () => table().insert(payload as never),
+        rows.length === 1 ? '1 tarea creada' : `${rows.length} tareas creadas`,
+        'No se pudieron crear las tareas',
+      );
+    },
+    [activeBusinessId, run],
+  );
+
   const setDone = useCallback(
     (id: string, done: boolean) =>
       run(
@@ -123,5 +137,5 @@ export function useMarketingTasks() {
     [run],
   );
 
-  return { tasks, isLoading, reload, saveTask, deleteTask, setDone };
+  return { tasks, isLoading, reload, saveTask, addTasks, deleteTask, setDone };
 }
